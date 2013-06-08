@@ -109,6 +109,73 @@ def list():
             outp = outp + note[0] + ": " + note[1] + "\n"
         return outp
 
+def last(changes_num=0):
+    limit = 100
+    if changes_num > limit or changes_num < 1:
+        changes_num = limit
+    with sqlite3.connect(db_path) as con:
+        cur = __init_db(con)
+        cur.execute("""SELECT stamp, change_uuid, note_uuid, action
+                       FROM notes ORDER BY ID DESC
+                       LIMIT """ + str(changes_num))
+        notes = cur.fetchall() #FIXME paginate?
+        ret_html = ""
+        for note in notes:
+            ret_html = ret_html + str(note[0])
+            for col in note[1:]:
+                ret_html = ret_html + " : " + str(col)
+            ret_html = ret_html + "<br />"
+        if not notes:
+            return "None"
+        return ret_html
+
+def changes_since_id(change_id):
+    with sqlite3.connect(db_path) as con:
+        cur = __init_db(con)
+        cur.execute("""SELECT id FROM notes WHERE change_uuid = ?
+                       LIMIT 1""", (change_id,))
+        note_id = cur.fetchone()
+        if note_id is not None:
+            cur.execute("""SELECT stamp, change_uuid, note_uuid, action
+                           FROM notes WHERE id > ?""",
+                           (note_id[0],))
+            notes = cur.fetchall() #FIXME paginate?
+            ret_html = ""
+            for note in notes:
+                ret_html = ret_html + str(note[0])
+                for col in note[1:]:
+                    ret_html = ret_html + " : " + str(col)
+                ret_html = ret_html + "<br />"
+            if not notes:
+                return "None"
+            return ret_html
+        else:
+            return "ERROR"
+
+def summ_changes_since_id(change_id):
+    with sqlite3.connect(db_path) as con:
+        cur = __init_db(con)
+        cur.execute("""SELECT id FROM notes WHERE change_uuid = ?
+                       LIMIT 1""", (change_id,))
+        note_id = cur.fetchone()
+        if note_id is not None:
+            cur.execute("""SELECT action, count(action)
+                           FROM notes WHERE id > ?
+                           GROUP BY action""",
+                           (note_id[0],))
+            notes = cur.fetchall() #FIXME paginate?
+            ret_html = ""
+            for note in notes:
+                ret_html = ret_html + str(note[0])
+                for col in note[1:]:
+                    ret_html = ret_html + " : " + str(col)
+                ret_html = ret_html + "<br />"
+            if not notes:
+                return "None"
+            return ret_html
+        else:
+            return "ERROR"
+
 if __name__ == '__main__':
     try:
         cli_options = {
