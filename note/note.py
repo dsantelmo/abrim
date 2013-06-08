@@ -4,6 +4,7 @@
 import sqlite3
 import uuid
 import sys
+import datetime
 
 db_path='_notes.sqlite'
 
@@ -15,6 +16,7 @@ def __init_db(con):
     cur = con.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS notes
       (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+       stamp INT,
        uuid TEXT,
        text TEXT,
        action TEXT)""")
@@ -28,9 +30,10 @@ def cli_create():
     note = ' '.join(sys.argv[2:])
     with sqlite3.connect(db_path) as con:
         cur = __init_db(con)
-        inserts = (note, uuid.uuid4().hex, 'NEW')
+        stamp = int(datetime.datetime.utcnow().strftime('%s'))
+        inserts = (stamp, uuid.uuid4().hex, note, 'NEW')
         cur.execute("""INSERT OR IGNORE INTO notes
-                       (text, uuid, action) VALUES (?,?,?)""", inserts)
+                       (stamp, uuid, text, action) VALUES (?,?,?,?)""", inserts)
         cur.execute('SELECT last_insert_rowid()')
         note_id = cur.fetchone()
         con.commit()
@@ -55,9 +58,10 @@ def cli_modify():
         elif note[1] == 'DEL':
             print "That note was deleted. Re-creating"
         if action != 'ERROR':
-            insert = (note_text, note_uuid, action)
-            cur.execute("""INSERT INTO notes (text, uuid, action)
-                           VALUES (?,?,?)""", insert)
+            stamp = int(datetime.datetime.utcnow().strftime('%s'))
+            insert = (stamp, note_uuid, note_text, action)
+            cur.execute("""INSERT INTO notes (stamp, uuid, text, action)
+                           VALUES (?,?,?,?)""", insert)
             con.commit()
 
 def cli_delete():
@@ -84,7 +88,8 @@ def cli_list():
         cur.execute("""SELECT a.uuid, a.text FROM notes a
                        INNER JOIN (SELECT id, uuid FROM notes
                                    GROUP BY uuid ORDER BY id DESC) b
-                       ON a.id = b.id WHERE a.action <> 'DEL'""")
+                       ON a.id = b.id WHERE a.action <> 'DEL'
+                       ORDER BY a.id ASC""")
         notes = cur.fetchall() #FIXME paginate?
         for note in notes:
             print note[0] + ": " + note[1]
