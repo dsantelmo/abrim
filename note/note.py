@@ -4,7 +4,6 @@
 import sqlite3
 import uuid
 import sys
-import datetime
 
 db_path='_notes.sqlite'
 
@@ -32,12 +31,12 @@ def create(note_text=''):
         note_text = ' '.join(sys.argv[2:])
     with sqlite3.connect(db_path) as con:
         cur = __init_db(con)
-        stamp = int(datetime.datetime.utcnow().strftime('%s'))
         note_uuid = uuid.uuid4().hex
-        inserts = (stamp, note_uuid, note_uuid, note_text, 'NEW')
+        inserts = (note_uuid, note_uuid, note_text, 'NEW')
+        #FIXME Y2038?
         cur.execute("""INSERT OR IGNORE INTO notes
                        (stamp, change_uuid, note_uuid, text, action)
-                       VALUES (?,?,?,?,?)""", inserts)
+                       VALUES (DATETIME('now'),?,?,?,?)""", inserts)
         cur.execute('SELECT last_insert_rowid()')
         note_id = cur.fetchone()
         con.commit()
@@ -63,12 +62,11 @@ def modify(note_uuid='', note_text=''):
         elif note[1] == 'DEL':
             return "WARN: that note was deleted. Re-creating"
         if action != 'ERROR':
-            stamp = int(datetime.datetime.utcnow().strftime('%s'))
             change_uuid = uuid.uuid4().hex
-            insert = (stamp, change_uuid, note_uuid, note_text, action)
+            insert = (change_uuid, note_uuid, note_text, action)
             cur.execute("""INSERT INTO notes
                            (stamp, change_uuid, note_uuid, text, action)
-                           VALUES (?,?,?,?,?)""", insert)
+                           VALUES (DATETIME('now'),?,?,?,?)""", insert)
             con.commit()
             return "OK"
 
@@ -85,12 +83,11 @@ def delete(note_uuid=''):
         if note is None or note[1] == 'DEL':
             return "ERROR: that note didn't exist."
             sys.exit(1) #FIXME
-        stamp = int(datetime.datetime.utcnow().strftime('%s'))
         change_uuid = uuid.uuid4().hex
-        insert = (stamp, change_uuid, note_uuid, '', 'DEL')
+        insert = (change_uuid, note_uuid, '', 'DEL')
         cur.execute("""INSERT INTO notes
                        (stamp, change_uuid, note_uuid, text, action)
-                       VALUES (?,?,?,?,?)""", insert)
+                       VALUES (DATETIME('now'),?,?,?,?)""", insert)
         con.commit()
         return "OK"
 
