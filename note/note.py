@@ -3,6 +3,7 @@
 
 import sqlite3
 import uuid
+import json
 import sys
 
 db_path='_notes.sqlite'
@@ -21,6 +22,10 @@ def __init_db(con):
        text TEXT,
        action TEXT)""")
     return cur
+
+def __to_json(inp):
+    return json.dumps(inp, sort_keys=True,
+                      indent=4, separators=(',', ': '))
 
 #FIXME ugly, redundant code...
 #FIXME abstract database access
@@ -116,15 +121,14 @@ def last(changes_num=0):
                        FROM notes ORDER BY ID DESC
                        LIMIT """ + str(changes_num))
         notes = cur.fetchall() #FIXME paginate?
-        ret_html = ""
+        ret_list = []
         for note in notes:
-            ret_html = ret_html + str(note[0])
-            for col in note[1:]:
-                ret_html = ret_html + " : " + str(col)
-            ret_html = ret_html + "<br />"
-        if not notes:
-            return "None"
-        return ret_html
+            ret_list.append({'stamp': str(note[0]),
+                             'change_uuid': str(note[1]),
+                             'note_uuid': str(note[2]),
+                             'action': str(note[3]),
+                             })
+        return __to_json(ret_list)
 
 def changes_since_id(change_id):
     with sqlite3.connect(db_path) as con:
@@ -132,22 +136,20 @@ def changes_since_id(change_id):
         cur.execute("""SELECT id FROM notes WHERE change_uuid = ?
                        LIMIT 1""", (change_id,))
         note_id = cur.fetchone()
+        ret_list = "ERROR"
         if note_id is not None:
             cur.execute("""SELECT stamp, change_uuid, note_uuid, action
                            FROM notes WHERE id > ?""",
                            (note_id[0],))
             notes = cur.fetchall() #FIXME paginate?
-            ret_html = ""
+            ret_list = []
             for note in notes:
-                ret_html = ret_html + str(note[0])
-                for col in note[1:]:
-                    ret_html = ret_html + " : " + str(col)
-                ret_html = ret_html + "<br />"
-            if not notes:
-                return "None"
-            return ret_html
-        else:
-            return "ERROR"
+                ret_list.append({'stamp': str(note[0]),
+                                 'change_uuid': str(note[1]),
+                                 'note_uuid': str(note[2]),
+                                 'action': str(note[3]),
+                                 })
+        return __to_json(ret_list)
 
 def summ_changes_since_id(change_id):
     with sqlite3.connect(db_path) as con:
@@ -155,23 +157,19 @@ def summ_changes_since_id(change_id):
         cur.execute("""SELECT id FROM notes WHERE change_uuid = ?
                        LIMIT 1""", (change_id,))
         note_id = cur.fetchone()
+        ret_list = "ERROR"
         if note_id is not None:
             cur.execute("""SELECT action, count(action)
                            FROM notes WHERE id > ?
                            GROUP BY action""",
                            (note_id[0],))
             notes = cur.fetchall() #FIXME paginate?
-            ret_html = ""
+            ret_list = []
             for note in notes:
-                ret_html = ret_html + str(note[0])
-                for col in note[1:]:
-                    ret_html = ret_html + " : " + str(col)
-                ret_html = ret_html + "<br />"
-            if not notes:
-                return "None"
-            return ret_html
-        else:
-            return "ERROR"
+                ret_dict = {}
+                ret_dict[str(note[0])] = note[1]
+                ret_list.append(ret_dict)
+        return __to_json(ret_list)
 
 if __name__ == '__main__':
     try:
