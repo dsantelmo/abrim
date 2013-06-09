@@ -8,7 +8,11 @@ app = Flask(__name__)
 
 @app.route('/')
 def __root():
-    return redirect(url_for('last', changes_num=1))
+    return redirect(url_for('__list'))
+
+@app.route('/list/')
+def __list():
+    return list()
 
 @app.route('/last/<int:changes_num>')
 def __last(changes_num):

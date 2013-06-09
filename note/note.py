@@ -100,16 +100,21 @@ def delete(note_uuid=''):
 def list():
     with sqlite3.connect(db_path) as con:
         cur = __init_db(con)
-        cur.execute("""SELECT a.note_uuid, a.text FROM notes a
+        cur.execute("""SELECT a.stamp, a.change_uuid, a.note_uuid, a.action
+                       FROM notes a
                        INNER JOIN (SELECT id, note_uuid FROM notes
                                    GROUP BY note_uuid ORDER BY id DESC) b
                        ON a.id = b.id WHERE a.action <> 'DEL'
                        ORDER BY a.id ASC""")
         notes = cur.fetchall() #FIXME paginate?
-        outp = ""
+        ret_list = []
         for note in notes:
-            outp = outp + note[0] + ": " + note[1] + "\n"
-        return outp
+            ret_list.append({'stamp': str(note[0]),
+                             'change_uuid': str(note[1]),
+                             'note_uuid': str(note[2]),
+                             'action': str(note[3]),
+                             })
+        return __to_json(ret_list)
 
 def last(changes_num=0):
     limit = 100
