@@ -22,6 +22,10 @@ def __changes_since_id(change_id):
 def __summ_changes_since_id(change_id):
     return summ_changes_since_id(change_id)
 
+@app.route('/get_change_by_id/<change_id>')
+def __get_change_by_id(change_id):
+    return get_change_by_id(change_id)
+
 if __name__ == '__main__':
     app.debug = True
     app.run(host='0.0.0.0')

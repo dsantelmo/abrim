@@ -171,6 +171,21 @@ def summ_changes_since_id(change_id):
                 ret_list.append(ret_dict)
         return __to_json(ret_list)
 
+def get_change_by_id(change_id):
+    with sqlite3.connect(db_path) as con:
+        cur = __init_db(con)
+        cur.execute("""SELECT stamp, note_uuid, text, action
+                       FROM notes WHERE change_uuid = ?""", (change_id,))
+        ret_note = cur.fetchone()
+        if ret_note is not None:
+            return __to_json({'stamp': ret_note[0],
+                    'note_uuid': ret_note[1],
+                    'text': ret_note[2],
+                    'action': ret_note[3],
+                   })
+        else:
+            return __to_json("ERROR")
+
 if __name__ == '__main__':
     try:
         cli_options = {
