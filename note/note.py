@@ -5,6 +5,7 @@ import sqlite3
 import uuid
 import json
 import sys
+import urllib2
 import os.path
 
 try:
@@ -197,6 +198,70 @@ def get_change_by_id(change_id):
         else:
             return __to_json("ERROR")
 
+def __get_last_change():
+    with sqlite3.connect(db_path) as con:
+        cur = __init_db(con)
+        cur.execute("""SELECT stamp, change_uuid, note_uuid, action
+                       FROM notes ORDER BY id DESC LIMIT 1""")
+        return cur.fetchone()
+
+def __get_remote_list(url):
+    try:
+        return json.loads(urllib2.urlopen(url + '/list/').read())
+    except ValueError:
+        print "ValueError"
+        sys.exit(1) #FIXME
+    except urllib2.URLError:
+        print "URLError"
+        sys.exit(1) #FIXME
+
+def __get_remote_change_by_id(url, change_uuid):
+    try:
+        url = url + '/get_change_by_id/' + change_uuid
+        return json.loads(urllib2.urlopen(url).read())
+    except ValueError:
+        print "ValueError"
+        sys.exit(1) #FIXME
+    except urllib2.URLError:
+        print "URLError"
+        sys.exit(1) #FIXME
+
+def __insert_remote_list(url, notes_list):
+    with sqlite3.connect(db_path) as con:
+        cur = __init_db(con)
+        inserts = []
+        for note in notes_list:
+            change = __get_remote_change_by_id(url, note['change_uuid'])
+            insert = (note['stamp'],
+                      note['change_uuid'],
+                      note['note_uuid'],
+                      change['text'],
+                      note['action'],)
+            inserts.append(insert)
+        cur.executemany("""INSERT OR IGNORE INTO notes
+                       (stamp, change_uuid, note_uuid, text, action)
+                       VALUES (?,?,?,?,?)""", inserts)
+        con.commit()
+        return len(inserts)
+
+def sync(url=None):
+    if __name__ == '__main__':
+        if len(sys.argv) < 3:
+            __usage_exit()
+        url = sys.argv[2]
+    if url is None:
+        sys.exit(1) #FIXME
+    try:
+        stamp, c_uuid, n_uuid, action = __get_last_change()
+        # if there are changes start partial sync
+        # ask for the changes from last common change
+        # merge, push changes, finish sync
+    except TypeError:
+        # no changes, full sync
+        new_notes_num = __insert_remote_list(url, __get_remote_list(url))
+        print "Full sync. %d new note(s)" % new_notes_num
+        #FIXME also sync history
+
 if __name__ == '__main__':
     try:
         cli_options = {
@@ -204,6 +269,7 @@ if __name__ == '__main__':
           'modify' : modify,
           'delete' : delete,
           'list' : list_notes,
+          'sync' : sync,
         }
         outp = cli_options[sys.argv[1]]()
         print outp
