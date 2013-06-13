@@ -97,7 +97,7 @@ def delete(note_uuid=''):
         return "OK"
 
 
-def list():
+def list_notes():
     with sqlite3.connect(db_path) as con:
         cur = __init_db(con)
         cur.execute("""SELECT a.stamp, a.change_uuid, a.note_uuid, a.action
@@ -197,7 +197,7 @@ if __name__ == '__main__':
           'create' : create,
           'modify' : modify,
           'delete' : delete,
-          'list' : list,
+          'list' : list_notes,
         }
         outp = cli_options[sys.argv[1]]()
         print outp
