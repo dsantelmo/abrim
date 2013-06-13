@@ -5,8 +5,14 @@ import sqlite3
 import uuid
 import json
 import sys
+import os.path
 
-db_path='_notes.sqlite'
+try:
+    db_path = "." \
+              + os.path.basename(sys.modules['__main__'].__file__) \
+              + ".sqlite"
+except AttributeError:
+    db_path='.notes.sqlite'
 
 def __usage_exit():
     print "USAGE" #FIXME
