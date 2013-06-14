@@ -10,8 +10,8 @@ def __root():
     return note.redirect(url_for('__list'))
 
 @app.route('/list/')
-def __list():
-    return note.list()
+def __list_notes():
+    return note.list_notes()
 
 @app.route('/last/<int:changes_num>')
 def __last(changes_num):
