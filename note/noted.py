@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def __root():
-    return note.redirect(url_for('__list'))
+    return redirect(url_for('__list'))
 
 @app.route('/list/')
 def __list_notes():
@@ -17,9 +17,15 @@ def __list_notes():
 def __last(changes_num):
     return note.last(changes_num)
 
-@app.route('/changes_since_id/<change_id>')
-def __changes_since_id(change_id):
-    return note.changes_since_id(change_id)
+@app.route('/changes_since_id/<ch_id>')
+def __changes_since_id(ch_id):
+    return redirect(url_for('__changes_since_id_num',
+                            change_id=ch_id,
+                            num=0))
+
+@app.route('/changes_since_id/<change_id>/<int:num>')
+def __changes_since_id_num(change_id, num=0):
+    return note.changes_since_id(change_id, num)
 
 @app.route('/summ_changes_since_id/<change_id>')
 def __summ_changes_since_id(change_id):
