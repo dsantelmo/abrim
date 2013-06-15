@@ -17,6 +17,16 @@ def __list_notes():
 def __last(changes_num):
     return note.last(changes_num)
 
+@app.route('/changes_before_id/<ch_id>')
+def __changes_since_id(ch_id):
+    return redirect(url_for('__changes_before_id_num',
+                            change_id=ch_id,
+                            num=0))
+
+@app.route('/changes_before_id/<change_id>/<int:num>')
+def __changes_before_id_num(change_id, num=0):
+    return note.changes_before_id(change_id, num)
+
 @app.route('/changes_since_id/<ch_id>')
 def __changes_since_id(ch_id):
     return redirect(url_for('__changes_since_id_num',

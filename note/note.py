@@ -142,6 +142,29 @@ def last(changes_num=0):
                              })
         return __to_json(ret_list)
 
+def changes_before_id(change_id,num=0):
+    if num < 1:
+        num = -1
+    with sqlite3.connect(db_path) as con:
+        cur = __init_db(con)
+        cur.execute("""SELECT id FROM notes WHERE change_uuid = ?
+                       LIMIT 1""", (change_id,))
+        note_id = cur.fetchone()
+        ret_list = "ERROR"
+        if note_id is not None:
+            cur.execute("""SELECT stamp, change_uuid, note_uuid, action
+                           FROM notes WHERE id < ? LIMIT ?""",
+                           (note_id[0],num))
+            notes = cur.fetchall() #FIXME paginate?
+            ret_list = []
+            for note in notes:
+                ret_list.append({'stamp': str(note[0]),
+                                 'change_uuid': str(note[1]),
+                                 'note_uuid': str(note[2]),
+                                 'action': str(note[3]),
+                                 })
+        return __to_json(ret_list)
+
 def changes_since_id(change_id,num=0):
     if num < 1:
         num = -1
