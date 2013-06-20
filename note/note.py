@@ -6,15 +6,22 @@ import uuid
 import json
 import sys
 import urllib2
+from os import makedirs
 import os.path
 import platform
-
 try:
-    db_path = "." \
-              + os.path.basename(sys.modules['__main__'].__file__) \
-              + ".sqlite"
-except AttributeError:
-    db_path='.notes.sqlite'
+    import appdirs2
+    udd = appdirs.user_data_dir("abrim","abrim_notes")
+    db_path = os.path.join(udd, 'abrimnotes.sqlite')
+    if not os.path.exists(udd):
+        makedirs(udd)
+except ImportError:
+    try:
+        db_path = "." \
+                  + os.path.basename(sys.modules['__main__'].__file__) \
+                  + ".sqlite"
+    except AttributeError:
+        db_path='.notes.sqlite'
 
 def __usage_exit():
     print "USAGE" #FIXME
