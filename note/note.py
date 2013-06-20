@@ -7,6 +7,7 @@ import json
 import sys
 import urllib2
 import os.path
+import platform
 
 try:
     db_path = "." \
@@ -21,6 +22,15 @@ def __usage_exit():
 
 def __init_db(con):
     cur = con.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS node_info
+      (node_uuid TEXT,
+       node_type TEXT,
+       node_url TEXT,
+       last_seen INT,
+       hostname TEXT,
+       platform TEXT,
+       processor TEXT
+       )""")
     cur.execute("""CREATE TABLE IF NOT EXISTS notes
       (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
        stamp INT,
@@ -28,6 +38,23 @@ def __init_db(con):
        note_uuid TEXT,
        text TEXT,
        action TEXT)""")
+    cur.execute("""SELECT node_uuid FROM node_info
+                   WHERE node_url IS NULL
+                   AND last_seen IS NULL""")
+    node_uuid = cur.fetchone()
+    if node_uuid is None:
+        node_uuid = uuid.uuid4().hex
+        node_type = 'unknown'
+        hostname = platform.node()
+        plat = platform.platform()
+        processor = platform.processor()
+        insert = (node_uuid, node_type, hostname, plat, processor,
+                  None, None)
+        cur.execute("""INSERT OR IGNORE INTO node_info
+                       (node_uuid, node_type, hostname, platform, processor,
+                        node_url, last_seen)
+                       VALUES (?,?,?,?,?,?,?)""", insert)
+    con.commit()
     return cur
 
 def __to_json(inp):
@@ -279,7 +306,7 @@ def sync(url=None):
     try:
         stamp, c_uuid, n_uuid, action = __get_last_change()
         # if there are changes start partial sync
-        comprobar pillando el summary
+        # check summary
         # ask for the changes from last common change
         # merge, push changes, finish sync
     except TypeError:
@@ -290,6 +317,10 @@ def sync(url=None):
         #FIXME this assumes that both systems have a correct time in clock
         # sync full history here
 
+
+
+with sqlite3.connect(db_path) as con:
+    __init_db(con)
 
 if __name__ == '__main__':
     try:
