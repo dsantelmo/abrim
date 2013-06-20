@@ -65,7 +65,7 @@ def modify(note_uuid='', note_text=''):
     with sqlite3.connect(db_path) as con:
         cur = __init_db(con)
         cur.execute("""SELECT id, action FROM notes WHERE note_uuid = ?
-                       ORDER BY id DESC LIMIT 1""", (note_uuid,))
+                       ORDER BY stamp DESC LIMIT 1""", (note_uuid,))
         note = cur.fetchone()
         action = 'MOD'
         if note is None:
@@ -90,7 +90,7 @@ def delete(note_uuid=''):
     with sqlite3.connect(db_path) as con:
         cur = __init_db(con)
         cur.execute("""SELECT id, action FROM notes WHERE note_uuid = ?
-                       ORDER BY id DESC LIMIT 1""", (note_uuid,))
+                       ORDER BY stamp DESC LIMIT 1""", (note_uuid,))
         note = cur.fetchone()
         if note is None or note[1] == 'DEL':
             return "ERROR: that note didn't exist."
@@ -110,9 +110,9 @@ def list_notes():
         cur.execute("""SELECT a.stamp, a.change_uuid, a.note_uuid, a.action
                        FROM notes a
                        INNER JOIN (SELECT id, note_uuid FROM notes
-                                   GROUP BY note_uuid ORDER BY id DESC) b
+                                   GROUP BY note_uuid ORDER BY stamp DESC) b
                        ON a.id = b.id WHERE a.action <> 'DEL'
-                       ORDER BY a.id ASC""")
+                       ORDER BY a.stamp ASC""")
         notes = cur.fetchall() #FIXME paginate?
         ret_list = []
         for note in notes:
@@ -130,7 +130,7 @@ def last(changes_num=0):
     with sqlite3.connect(db_path) as con:
         cur = __init_db(con)
         cur.execute("""SELECT stamp, change_uuid, note_uuid, action
-                       FROM notes ORDER BY ID DESC
+                       FROM notes ORDER BY stamp DESC
                        LIMIT """ + str(changes_num))
         notes = cur.fetchall() #FIXME paginate?
         ret_list = []
@@ -227,7 +227,7 @@ def __get_last_change():
     with sqlite3.connect(db_path) as con:
         cur = __init_db(con)
         cur.execute("""SELECT stamp, change_uuid, note_uuid, action
-                       FROM notes ORDER BY id DESC LIMIT 1""")
+                       FROM notes ORDER BY stamp DESC LIMIT 1""")
         return cur.fetchone()
 
 def __get_remote_list(url):
@@ -279,13 +279,17 @@ def sync(url=None):
     try:
         stamp, c_uuid, n_uuid, action = __get_last_change()
         # if there are changes start partial sync
+        comprobar pillando el summary
         # ask for the changes from last common change
         # merge, push changes, finish sync
     except TypeError:
         # no changes, full sync
         new_notes_num = __insert_remote_list(url, __get_remote_list(url))
-        print "Full sync. %d new note(s)" % new_notes_num
+        return "Full sync. %d new note(s)" % new_notes_num
         #FIXME also sync history
+        #FIXME this assumes that both systems have a correct time in clock
+        # sync full history here
+
 
 if __name__ == '__main__':
     try:
