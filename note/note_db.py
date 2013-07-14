@@ -82,3 +82,74 @@ def _init_db(con):
     con.commit()
     return cur
 
+#FIXME ugly, redundant code...
+#FIXME abstract database access
+def _create_note(node_uuid,note_text):
+    with sqlite3.connect(db_path) as con:
+        cur = _init_db(con)
+        note_uuid = uuid.uuid4().hex
+        inserts = (node_uuid, # node_uuid
+                   note_uuid, # note_uuid
+                   note_uuid, # change_uuid
+                   None, # prev_change_uuid
+                   note_text, # text
+                   'NEW', # action
+                   'nodiff',) # diff_type
+        #FIXME Y2038?
+        cur.execute("""INSERT OR IGNORE INTO notes
+                       (stamp,
+                        node_uuid,
+                        note_uuid,
+                        change_uuid,
+                        prev_change_uuid,
+                        text,
+                        action,
+                        diff_type)
+                       VALUES (DATETIME('now'),?,?,?,?,?,?,?)""", inserts)
+        cur.execute('SELECT last_insert_rowid()')
+        note_id = cur.fetchone()
+        con.commit()
+        #FIXME control SQLITE_FULL
+        cur.execute("SELECT * FROM notes WHERE id = ?", note_id)
+        return (cur.fetchone())
+
+def _modify_note(node_uuid, note_uuid, note_text):
+    with sqlite3.connect(db_path) as con:
+        cur = _init_db(con)
+        cur.execute("""SELECT id, action FROM notes WHERE note_uuid = ?
+                       ORDER BY stamp DESC LIMIT 1""", (note_uuid,))
+        note = cur.fetchone()
+        action = 'MOD'
+        if note is None:
+            return "ERROR: that note doesn't exist."
+            action = 'ERROR'
+        elif note[1] == 'DEL':
+            return "WARN: that note was deleted. Re-creating"
+        if action != 'ERROR':
+            change_uuid = uuid.uuid4().hex
+            insert = (change_uuid, note_uuid, note_text, action)
+            cur.execute("""INSERT INTO notes
+                           (stamp, change_uuid, note_uuid, text, action)
+                           VALUES (DATETIME('now'),?,?,?,?)""", insert)
+            con.commit()
+            return "OK"
+        else:
+            return "ERROR"
+
+def _delete_note(node_uuid, note_uuid):
+   with sqlite3.connect(db_path) as con:
+        cur = _init_db(con)
+        cur.execute("""SELECT id, action FROM notes WHERE note_uuid = ?
+                       ORDER BY stamp DESC LIMIT 1""", (note_uuid,))
+        note = cur.fetchone()
+        if note is None or note[1] == 'DEL':
+            return "ERROR: that note didn't exist."
+            sys.exit(1) #FIXME
+        change_uuid = uuid.uuid4().hex
+        insert = (change_uuid, note_uuid, '', 'DEL')
+        cur.execute("""INSERT INTO notes
+                       (stamp, change_uuid, note_uuid, text, action)
+                       VALUES (DATETIME('now'),?,?,?,?)""", insert)
+        con.commit()
+        return "OK"
+
