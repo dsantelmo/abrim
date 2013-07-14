@@ -9,8 +9,9 @@ import urllib2
 from os import makedirs
 import os.path
 import platform
+from note_db import *
 try:
-    import appdirs2
+    import appdirs
     udd = appdirs.user_data_dir("abrim","abrim_notes")
     db_path = os.path.join(udd, 'abrimnotes.sqlite')
     if not os.path.exists(udd):
@@ -23,46 +24,13 @@ except ImportError:
     except AttributeError:
         db_path='.notes.sqlite'
 
+#FIXME globals for node_uuid, db_path...
+node_uuid = None
+
 def __usage_exit():
     print "USAGE" #FIXME
     sys.exit(1)
 
-def __init_db(con):
-    cur = con.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS node_info
-      (node_uuid TEXT,
-       node_type TEXT,
-       node_url TEXT,
-       last_seen INT,
-       hostname TEXT,
-       platform TEXT,
-       processor TEXT
-       )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS notes
-      (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-       stamp INT,
-       change_uuid TEXT,
-       note_uuid TEXT,
-       text TEXT,
-       action TEXT)""")
-    cur.execute("""SELECT node_uuid FROM node_info
-                   WHERE node_url IS NULL
-                   AND last_seen IS NULL""")
-    node_uuid = cur.fetchone()
-    if node_uuid is None:
-        node_uuid = uuid.uuid4().hex
-        node_type = 'unknown'
-        hostname = platform.node()
-        plat = platform.platform()
-        processor = platform.processor()
-        insert = (node_uuid, node_type, hostname, plat, processor,
-                  None, None)
-        cur.execute("""INSERT OR IGNORE INTO node_info
-                       (node_uuid, node_type, hostname, platform, processor,
-                        node_url, last_seen)
-                       VALUES (?,?,?,?,?,?,?)""", insert)
-    con.commit()
-    return cur
 
 def __to_json(inp):
     return json.dumps(inp, sort_keys=True,
@@ -76,13 +44,26 @@ def create(note_text=''):
             __usage_exit()
         note_text = ' '.join(sys.argv[2:])
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         note_uuid = uuid.uuid4().hex
-        inserts = (note_uuid, note_uuid, note_text, 'NEW')
+        inserts = (node_uuid, # node_uuid
+                   note_uuid, # note_uuid
+                   note_uuid, # change_uuid
+                   None, # prev_change_uuid
+                   note_text, # text
+                   'NEW', # action
+                   'nodiff',) # diff_type
         #FIXME Y2038?
         cur.execute("""INSERT OR IGNORE INTO notes
-                       (stamp, change_uuid, note_uuid, text, action)
-                       VALUES (DATETIME('now'),?,?,?,?)""", inserts)
+                       (stamp,
+                        node_uuid,
+                        note_uuid,
+                        change_uuid,
+                        prev_change_uuid,
+                        text,
+                        action,
+                        diff_type)
+                       VALUES (DATETIME('now'),?,?,?,?,?,?,?)""", inserts)
         cur.execute('SELECT last_insert_rowid()')
         note_id = cur.fetchone()
         con.commit()
@@ -97,7 +78,7 @@ def modify(note_uuid='', note_text=''):
         note_uuid = sys.argv[2]
         note_text = ' '.join(sys.argv[3:])
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT id, action FROM notes WHERE note_uuid = ?
                        ORDER BY stamp DESC LIMIT 1""", (note_uuid,))
         note = cur.fetchone()
@@ -122,7 +103,7 @@ def delete(note_uuid=''):
             __usage_exit()
         note_uuid = sys.argv[2]
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT id, action FROM notes WHERE note_uuid = ?
                        ORDER BY stamp DESC LIMIT 1""", (note_uuid,))
         note = cur.fetchone()
@@ -140,7 +121,7 @@ def delete(note_uuid=''):
 
 def list_notes():
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT a.stamp, a.change_uuid, a.note_uuid, a.action
                        FROM notes a
                        INNER JOIN (SELECT id, note_uuid FROM notes
@@ -162,7 +143,7 @@ def last(changes_num=0):
     if changes_num > limit or changes_num < 1:
         changes_num = limit
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT stamp, change_uuid, note_uuid, action
                        FROM notes ORDER BY stamp DESC
                        LIMIT """ + str(changes_num))
@@ -180,7 +161,7 @@ def changes_before_id(change_id,num=0):
     if num < 1:
         num = -1
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT id FROM notes WHERE change_uuid = ?
                        LIMIT 1""", (change_id,))
         note_id = cur.fetchone()
@@ -203,7 +184,7 @@ def changes_since_id(change_id,num=0):
     if num < 1:
         num = -1
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT id FROM notes WHERE change_uuid = ?
                        LIMIT 1""", (change_id,))
         note_id = cur.fetchone()
@@ -224,7 +205,7 @@ def changes_since_id(change_id,num=0):
 
 def summ_changes_since_id(change_id):
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT id FROM notes WHERE change_uuid = ?
                        LIMIT 1""", (change_id,))
         note_id = cur.fetchone()
@@ -244,7 +225,7 @@ def summ_changes_since_id(change_id):
 
 def get_change_by_id(change_id):
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT stamp, note_uuid, text, action
                        FROM notes WHERE change_uuid = ?""", (change_id,))
         ret_note = cur.fetchone()
@@ -257,9 +238,12 @@ def get_change_by_id(change_id):
         else:
             return __to_json("ERROR")
 
+def say_db():
+    return db_path
+
 def __get_last_change():
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         cur.execute("""SELECT stamp, change_uuid, note_uuid, action
                        FROM notes ORDER BY stamp DESC LIMIT 1""")
         return cur.fetchone()
@@ -287,7 +271,7 @@ def __get_remote_change_by_id(url, change_uuid):
 
 def __insert_remote_list(url, notes_list):
     with sqlite3.connect(db_path) as con:
-        cur = __init_db(con)
+        cur = _init_db(con)
         inserts = []
         for note in notes_list:
             change = __get_remote_change_by_id(url, note['change_uuid'])
@@ -327,7 +311,7 @@ def sync(url=None):
 
 
 with sqlite3.connect(db_path) as con:
-    __init_db(con)
+    _init_db(con)
 
 if __name__ == '__main__':
     try:
@@ -337,6 +321,7 @@ if __name__ == '__main__':
           'delete' : delete,
           'list' : list_notes,
           'sync' : sync,
+          'db' : say_db,
         }
         outp = cli_options[sys.argv[1]]()
         print outp
