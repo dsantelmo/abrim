@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from flask import request, redirect, url_for, abort
+from flask import Flask, request, redirect, url_for, abort
 import flask
 import diff_match_patch
 
@@ -88,19 +88,19 @@ def send_sync(request):
                 d['server_shadows'] = {}
             server_text = d['server_text']
             server_shadows = d['server_shadows']
-        
+
         # first check the server shadow cheksum
         # if server_shadows[client_id] is empty ask for it
-        
+
         client_id = req['client_id']
-        
+
         if not client_id in server_shadows:
             res = err_response('NoServerShadow',
             'No shadow found in the server. Send it again')
         else:
 
             print("FIXME: CONTINUE HERE")
-        
+
         #    print("Shadow received. Now you can sync!")
         #    server_shadows[client_id] = client_shadow
         #else:
@@ -169,18 +169,18 @@ def send_shadow(request):
         # receive text_patches and client_shadow_cksum
         #
         server_shadows = None
-        
+
         res = err_response('UnknowErrorSendShadow',
         'Unknown error in send_shadow')
-        
+
         with closing(shelve.open(temp_server_file_name)) as d:
             if not 'server_shadows' in d:
                 d['server_shadows'] = {}
             server_shadows = d['server_shadows']
-        
+
             # first check the server shadow cheksum
             # if server_shadows[client_id] is empty ask for it
-            
+
             print("saving shadow from " + req['client_id'])
             print("----")
             print(req['client_shadow'])
@@ -188,9 +188,9 @@ def send_shadow(request):
             client_id = req['client_id']
             server_shadows[client_id] = req['client_shadow']
             d['server_shadows'] = server_shadows
-            
+
             print d['server_shadows']
-            
+
             res = {
                 'status': 'OK',
                 }

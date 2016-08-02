@@ -74,7 +74,7 @@ def show_main_form():
               </p>
             </header>
             <section>
-                <form action="/sync" method="post">
+                <form autocomplete="off" action="/sync" method="post">
                     <p>
                         <textarea name="client_text" placeholder="Some text here...">"""
     main_form2 = """</textarea>
@@ -85,7 +85,7 @@ def show_main_form():
                 </form>
             </section>
             <section>
-                <form>
+                <form autocomplete="off">
                   <textarea name="client_shadow" disabled placeholder="Shadow text...">
 """
 
@@ -101,12 +101,14 @@ def show_main_form():
 </html>
 """
     with closing(shelve.open(temp_client_file_name)) as d:
-        if not 'client_text' in d:
-            d['client_text'] = """Bad dog. KO"""
-        if not 'client_shadow' in d:
-            d['client_shadow'] = """Bad dog. KO"""
-        main_form = main_form1 + d['client_text'] + \
-                    main_form2 + d['client_shadow'] + \
+        client_text = ""
+        client_shadow = ""
+        if 'client_text' in d:
+            client_text = d['client_text']
+        if 'client_shadow' in d:
+            client_shadow = d['client_shadow']
+        main_form = main_form1 + client_text + \
+                    main_form2 + client_shadow + \
                     main_form3
     return main_form 
 
@@ -129,8 +131,7 @@ def show_sync(client_text):
             abort(500)
 
         if not client_text or not client_shadow:
-            print("show_sync 500 B")
-            abort(500)
+            return("nothing to update!")
 
 
         diff_obj = diff_match_patch.diff_match_patch()
@@ -164,7 +165,7 @@ def show_sync(client_text):
                 # FIXME what happens on first sync?
                 print("client_shadow_cksum {}".format(client_shadow_cksum))
 
-                d['client_shadow'] = client_text
+                d['client_shadow'] = d['client_text'] = client_text
 
 
                 # send text_patches, client_id and client_shadow_cksum
