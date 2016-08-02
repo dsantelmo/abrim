@@ -3,9 +3,11 @@
 
 from flask import Flask, request, redirect, url_for, abort
 import diff_match_patch
+import random
+import string
 
-DIFF_TIMEOUT=0.1
-CLIENT_ID='client1'
+DIFF_TIMEOUT = 0.1
+CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
 
 # set FLASK_APP=client.py
 # set FLASK_DEBUG=1
@@ -44,7 +46,7 @@ import os
 
 
 temp_client_file_name = os.path.join( tempfile.gettempdir(),
-  tempfile.gettempprefix() + CLIENT_ID)
+  tempfile.gettempprefix() + "abrim_client_datastore")
 
 
 
@@ -65,7 +67,7 @@ def show_main_form():
     <header>
         <h1>header</h1>
     </<header>
-    <nav>main nav</nav>
+    <nav>User: """ + CLIENT_ID + """ - main nav</nav>
     <main>
         <article>
             <header>
@@ -103,10 +105,15 @@ def show_main_form():
     with closing(shelve.open(temp_client_file_name)) as d:
         client_text = ""
         client_shadow = ""
-        if 'client_text' in d:
-            client_text = d['client_text']
-        if 'client_shadow' in d:
-            client_shadow = d['client_shadow']
+        if CLIENT_ID in d and 'client_text' in d[CLIENT_ID]:
+            client_text = d[CLIENT_ID]['client_text']
+        else:
+            print("no client_text for " + CLIENT_ID)
+            print(d)
+        if CLIENT_ID in d and 'client_shadow' in d[CLIENT_ID]:
+            client_shadow = d[CLIENT_ID]['client_shadow']
+        else:
+            print("no client_shadow for " + CLIENT_ID)
         main_form = main_form1 + client_text + \
                     main_form2 + client_shadow + \
                     main_form3
@@ -125,12 +132,18 @@ def show_sync(client_text):
 
     with closing(shelve.open(temp_client_file_name)) as d:
         try:
-            client_shadow =  d['client_shadow']
+            client = d[CLIENT_ID]
+            client_shadow = client['client_shadow']
         except KeyError, e:
-            print("show_sync 500 A")
-            abort(500)
+            if not CLIENT_ID in d:
+                d[CLIENT_ID] = {}
+            if not 'client_shadow' in d[CLIENT_ID]:
+                client_shadow = ""
+                temp_client = d[CLIENT_ID]
+                temp_client.update({'client_shadow' : client_shadow})
+                d[CLIENT_ID] = temp_client
 
-        if not client_text or not client_shadow:
+        if not client_text:
             return("nothing to update!")
 
 
@@ -165,8 +178,8 @@ def show_sync(client_text):
                 # FIXME what happens on first sync?
                 print("client_shadow_cksum {}".format(client_shadow_cksum))
 
-                d['client_shadow'] = d['client_text'] = client_text
-
+                d[CLIENT_ID] = {'client_text' : client_text,
+                                'client_shadow' : client_text, }
 
                 # send text_patches, client_id and client_shadow_cksum
 
@@ -182,8 +195,9 @@ def show_sync(client_text):
                             error_return = "Unknown error in response"
                             if 'error_type' in r_json:
                                 if r_json['error_type'] == u"NoServerShadow":
+                                    print("NoServerShadow")
                                     # client sends its shadow:
-                                    r_shadow = send_shadow("http://127.0.0.1:5002/send_shadow", CLIENT_ID, d['client_shadow'])
+                                    r_shadow = send_shadow("http://127.0.0.1:5002/send_shadow", CLIENT_ID, d[CLIENT_ID]['client_shadow'])
                                     try:
                                         r_shadow_json = r_shadow.json()
                                         if 'status' in r_shadow_json:
@@ -206,7 +220,6 @@ def show_sync(client_text):
                             return("sync OK")
                     else:
                         return "ERROR: send_sync response doesn't contain status"
-                    {u'status': u'ERROR', u'error_type': u'NoServerShadow', u'error_message': u'No shadow found in the server. Send it again'}
                 except ValueError, e:
                     return(r.text)
             except ValueError:

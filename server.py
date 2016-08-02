@@ -62,6 +62,7 @@ import requests
 import json
 
 def send_sync(request):
+    print("send_sync")
     req = request.json
     res = None
     if req and 'client_id' in req and 'client_shadow_cksum' in req and 'client_patches' in req:
@@ -95,36 +96,35 @@ def send_sync(request):
         client_id = req['client_id']
 
         if not client_id in server_shadows:
+            print("NoServerShadow")
             res = err_response('NoServerShadow',
             'No shadow found in the server. Send it again')
         else:
 
             print("FIXME: CONTINUE HERE")
 
-        #    print("Shadow received. Now you can sync!")
-        #    server_shadows[client_id] = client_shadow
-        #else:
-        #    server_shadow_cksum = hashlib.md5(
-        #      server_shadows[client_id]).hexdigest()
-        #    print("server_shadow_cksum {}".format(server_shadow_cksum))
-        #    if client_shadow_cksum != server_shadow_cksum:
-        #        #FIXME what happenson first sync?
-        #        print("too bad! Shadows got desynced. "
-        #              "I'm sending back ALLserver shadow text, "
-        #              "use it a your client shadow")
-        #        print(server_shadows[client_id])
-        #        #clients updates its shadow AND text:
-        #        print("DATALOSS on latest client text. "
-        #          "Updating with server text")
-        #        client_shadow = server_shadows[client_id]
-        #        client_text = client_shadow
-        #
-        #
+            #else:
+            #    server_shadow_cksum = hashlib.md5(
+            #      server_shadows[client_id]).hexdigest()
+            #    print("server_shadow_cksum {}".format(server_shadow_cksum))
+            #    if client_shadow_cksum != server_shadow_cksum:
+            #        #FIXME what happenson first sync?
+            #        print("too bad! Shadows got desynced. "
+            #              "I'm sending back ALLserver shadow text, "
+            #              "use it a your client shadow")
+            #        print(server_shadows[client_id])
+            #        #clients updates its shadow AND text:
+            #        print("DATALOSS on latest client text. "
+            #          "Updating with server text")
+            #        client_shadow = server_shadows[client_id]
+            #        client_text = client_shadow
+            #
+            #
 
 
-        res = {
-            'status': 'OK',
-            }
+            res = {
+                'status': 'OK',
+                }
     else:
         if not req:
             res = err_response('NoPayload', 
@@ -151,6 +151,7 @@ def send_sync(request):
 
 
 def send_shadow(request):
+    print("send_shadow")
     req = request.json
     res = None
     if req and 'client_id' in req and 'client_shadow' in req:
