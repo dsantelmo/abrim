@@ -21,6 +21,14 @@ app.debug = True
 def __root():
     return redirect(url_for('__main'), code=307) #307 for POST redir
 
+
+@app.route('/datastore')
+def __datastore():
+    if request.method != 'GET':
+        abort(404)
+    else:
+        return show_datastore_form()
+
 @app.route('/main/', methods=['GET', 'POST'])
 def __main():
     if request.method == 'POST':
@@ -50,6 +58,31 @@ temp_client_file_name = os.path.join( tempfile.gettempdir(),
 
 
 
+
+
+def show_datastore_form():
+    with closing(shelve.open(temp_client_file_name)) as d:
+        temp_string = "<h1>Datastore</h1><h3>" + temp_client_file_name + "</h3>"
+        return __print_iter_contents(d, 6, temp_string)
+
+def __print_iter_contents(iter, depth, temp_string):
+    if depth > 0:
+        for k, element in iter.iteritems():
+            if isinstance(element, dict):
+                temp_string = temp_string + "<li><b>{0} :</b></li>".format(k)
+                temp_string = temp_string + "<ul>"
+                temp_string = __print_iter_contents(element, depth - 1, temp_string)
+                temp_string = temp_string + "</ul>"
+            else:
+                temp_string = temp_string + "<li><b>{0}</b> : {1}</li>".format(k, element)
+    return temp_string
+
+
+
+
+
+
+
 def show_main_form():
     main_form = ""
     main_form1 = """
@@ -65,13 +98,13 @@ def show_main_form():
 
   <body>
     <header>
-        <h1>header</h1>
+        <h1>Main</h1>
     </<header>
-    <nav>User: """ + CLIENT_ID + """ - main nav</nav>
+    <nav>User: """ + CLIENT_ID + """ || <b>main</b> - <a href="/datastore">datastore</a></nav>
     <main>
         <article>
             <header>
-              <h1>text title</h1>
+              <h1>...</h1>
               <p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
               </p>
             </header>
@@ -176,7 +209,8 @@ def show_sync(client_text):
 
                 client_shadow_cksum =  hashlib.md5(client_shadow).hexdigest()
                 # FIXME what happens on first sync?
-                print("client_shadow_cksum {}".format(client_shadow_cksum))
+                #print("client_shadow_cksum {}".format(client_shadow_cksum))
+                #print(client_shadow)
 
                 d[CLIENT_ID] = {'client_text' : client_text,
                                 'client_shadow' : client_text, }
@@ -202,17 +236,30 @@ def show_sync(client_text):
                                         r_shadow_json = r_shadow.json()
                                         if 'status' in r_shadow_json:
                                             if r_shadow_json['status'] == "OK":
-                                                return "Shadow updated. Sync Again"
+                                                return "Shadow updated from client. Sync Again"
                                             else:
                                                 return "ERROR: unable to send_shadow"
                                         else:
                                             return "ERROR: send_shadow response doesn't contain status"
                                     except ValueError, e:
                                         return(r_shadow.text)
+                                elif r_json['error_type'] == u"ServerShadowChecksumFailed":
+                                    print("ServerShadowChecksumFailed")
+                                    # server sends its shadow:
+                                    if 'server_shadow' in r_json:
+                                        temp_server_shadow = r_json['server_shadow']
+                                        temp_client = d[CLIENT_ID]
+                                        temp_client.update({'client_shadow' : temp_server_shadow})
+                                        d[CLIENT_ID] = temp_client
+
+                                        return "Shadow updated from server. Sync Again"
+                                    else:
+                                        return "ERROR: unable to update shadow from server"
                                 else:
                                     error_return = "ERROR<br />" + r_json['error_type']
                                     if  'error_message' in r_json:
                                         error_return = error_return + "<br />" + r_json['error_message']
+                                        error_return = error_return + "<br />" + "FULL MESSAGE:<br />" + json.dumps(r_json)
                             return error_return
                         else:
                             print("sync seems to be going OK")

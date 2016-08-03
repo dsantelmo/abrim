@@ -17,7 +17,15 @@ app.debug = True
 #@app.route('/', methods=['POST',])
 @app.route('/', methods=['GET', 'POST'])
 def __root():
-    return show_main_form()
+    abort(404)
+
+@app.route('/datastore')
+def __datastore():
+    if request.method != 'GET':
+        abort(404)
+    else:
+        return show_datastore_form()
+
 
 
 @app.route('/send_sync', methods=['POST'])
@@ -52,8 +60,25 @@ temp_server_file_name = os.path.join( tempfile.gettempdir(),
 
 
 
-def show_main_form():
-    return "Hi! I'm a server" 
+
+
+def show_datastore_form():
+    with closing(shelve.open(temp_server_file_name)) as d:
+        temp_string = "<h1>Datastore</h1><h3>" + temp_server_file_name + "</h3>"
+        return __print_iter_contents(d, 6, temp_string)
+
+def __print_iter_contents(iter, depth, temp_string):
+    if depth > 0:
+        for k, element in iter.iteritems():
+            if isinstance(element, dict):
+                temp_string = temp_string + "<li><b>{0} :</b></li>".format(k)
+                temp_string = temp_string + "<ul>"
+                temp_string = __print_iter_contents(element, depth - 1, temp_string)
+                temp_string = temp_string + "</ul>"
+            else:
+                temp_string = temp_string + "<li><b>{0}</b> : {1}</li>".format(k, element)
+    return temp_string
+
 
 
 import diff_match_patch
@@ -64,7 +89,7 @@ import json
 def send_sync(request):
     print("send_sync")
     req = request.json
-    res = None
+    res = err_response('UnknownError', 'Not controlled error in server')
     if req and 'client_id' in req and 'client_shadow_cksum' in req and 'client_patches' in req:
 
         # steps 4 (atomic with 5, 6 & 7)
@@ -94,37 +119,64 @@ def send_sync(request):
         # if server_shadows[client_id] is empty ask for it
 
         client_id = req['client_id']
+        client_id = client_id.encode('utf-8')
+        client_shadow_cksum = req['client_shadow_cksum']
 
         if not client_id in server_shadows:
             print("NoServerShadow")
             res = err_response('NoServerShadow',
             'No shadow found in the server. Send it again')
         else:
+            server_shadow = server_shadows[client_id]
+            server_shadow_cksum = hashlib.md5(server_shadow).hexdigest()
+            #print("server_shadow_cksum {}".format(server_shadow_cksum))
+            #print(server_shadow)
 
-            print("FIXME: CONTINUE HERE")
+            if client_shadow_cksum != server_shadow_cksum:
+                #FIXME what happenson first sync?
+                print("ServerShadowChecksumFailed")
+                res = {
+                    'status': 'ERROR',
+                    'error_type': 'ServerShadowChecksumFailed',
+                    'error_message': 'Shadows got desynced. Sending back the full server shadow',
+                    'server_shadow' : server_shadow
+                    }
+            else:
+                #print("shadows' checksums match")
 
-            #else:
-            #    server_shadow_cksum = hashlib.md5(
-            #      server_shadows[client_id]).hexdigest()
-            #    print("server_shadow_cksum {}".format(server_shadow_cksum))
-            #    if client_shadow_cksum != server_shadow_cksum:
-            #        #FIXME what happenson first sync?
-            #        print("too bad! Shadows got desynced. "
-            #              "I'm sending back ALLserver shadow text, "
-            #              "use it a your client shadow")
-            #        print(server_shadows[client_id])
-            #        #clients updates its shadow AND text:
-            #        print("DATALOSS on latest client text. "
-            #          "Updating with server text")
-            #        client_shadow = server_shadows[client_id]
-            #        client_text = client_shadow
-            #
-            #
+                diff_obj = diff_match_patch.diff_match_patch()
+                diff_obj.Diff_Timeout = DIFF_TIMEOUT
 
+                patches2 = diff_obj.patch_fromText(req['client_patches'])
 
-            res = {
-                'status': 'OK',
-                }
+                server_shadow_patch_results = diff_obj.patch_apply(
+                  patches2, server_shadow)
+                results = server_shadow_patch_results[1]
+
+                # len(set(list)) should be 1 if all elements are the same
+                if len(set(results)) == 1 and results[0]: 
+                    # step 5
+                    with closing(shelve.open(temp_server_file_name)) as d:
+                        server_shadows = d['server_shadows']
+                        server_shadows[client_id] = server_shadow_patch_results[0]
+                        d['server_shadows'] = server_shadows
+                    # should a break here be catastrophic ??
+                    #
+                    # step 6
+                    # FIXME: shouldn't this be a new set of patches generated
+                    # diff'ing THIS new server_shadow and server_text?
+                    # Another client could have changed the server text
+                    server_text_patch_results = diff_obj.patch_apply(
+                      patches2, server_text)
+                    #
+                    #step 7
+                    with closing(shelve.open(temp_server_file_name)) as d:
+                        d['server_text'] = server_text_patch_results[0]
+                    res = { 'status': 'OK', }
+                else:
+                    # I should try to patch again
+                    res = err_response('ServerPatchFailed', 
+                    'Match-Patch failed in server')
     else:
         if not req:
             res = err_response('NoPayload', 
@@ -182,15 +234,17 @@ def send_shadow(request):
             # first check the server shadow cheksum
             # if server_shadows[client_id] is empty ask for it
 
-            print("saving shadow from " + req['client_id'])
-            print("----")
-            print(req['client_shadow'])
-            print("----")
+            #print("saving shadow from " + req['client_id'])
+            #print("----")
+            #print(req['client_shadow'])
+            #print("----")
             client_id = req['client_id']
             server_shadows[client_id] = req['client_shadow']
             d['server_shadows'] = server_shadows
 
-            print d['server_shadows']
+            #d['server_text'] = req['client_shadow']
+
+            #print d['server_shadows']
 
             res = {
                 'status': 'OK',
