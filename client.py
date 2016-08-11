@@ -326,21 +326,36 @@ def show_sync(client_text):
                         if not r_json['status'] == u"OK":
                             error_return = "Unknown error in response"
                             if 'error_type' in r_json:
-                                if r_json['error_type'] == u"NoServerShadow":
+                                if r_json['error_type'] == u"NoServerText":
+                                    print("NoServerText")
+                                    # client sends its text:
+                                    r_send_text = send_text("http://127.0.0.1:5002/send_text", CLIENT_ID, d[CLIENT_ID]['client_text'], d[CLIENT_ID]['client_shadow'])
+                                    try:
+                                        r_send_text_json = r_send_text.json()
+                                        if 'status' in r_send_text_json:
+                                            if r_send_text_json['status'] == "OK":
+                                                return "Text updated from client. Sync Again" #FIXME create a recursive function counting tries
+                                            else:
+                                                return "ERROR: unable to send_text"
+                                        else:
+                                            return "ERROR: send_text response doesn't contain status"
+                                    except ValueError, e:
+                                        return(r_send_text.text)
+                                elif r_json['error_type'] == u"NoServerShadow":
                                     print("NoServerShadow")
                                     # client sends its shadow:
-                                    r_shadow = send_shadow("http://127.0.0.1:5002/send_shadow", CLIENT_ID, d[CLIENT_ID]['client_shadow'])
+                                    r_send_shadow = send_shadow("http://127.0.0.1:5002/send_shadow", CLIENT_ID, d[CLIENT_ID]['client_shadow'])
                                     try:
-                                        r_shadow_json = r_shadow.json()
-                                        if 'status' in r_shadow_json:
-                                            if r_shadow_json['status'] == "OK":
-                                                return "Shadow updated from client. Sync Again"
+                                        r_send_shadow_json = r_send_shadow.json()
+                                        if 'status' in r_send_shadow_json:
+                                            if r_send_shadow_json['status'] == "OK":
+                                                return "Shadow updated from client. Sync Again" #FIXME create a recursive function counting tries
                                             else:
                                                 return "ERROR: unable to send_shadow"
                                         else:
                                             return "ERROR: send_shadow response doesn't contain status"
                                     except ValueError, e:
-                                        return(r_shadow.text)
+                                        return(r_send_shadow.text)
                                 elif r_json['error_type'] == u"ServerShadowChecksumFailed":
                                     print("ServerShadowChecksumFailed")
                                     # server sends its shadow:
@@ -386,6 +401,19 @@ def send_sync(url, client_id, client_shadow_cksum, client_patches):
                'client_id': client_id,
                'client_shadow_cksum': client_shadow_cksum,
                'client_patches': client_patches,
+              }
+
+    return requests.post(
+      url,
+      headers={'Content-Type': 'application/json'},
+      data=json.dumps(payload)
+      )
+
+def send_text(url, client_id, client_text, client_shadow):
+    payload = {
+               'client_id': client_id,
+               'client_text': client_text,
+               'client_shadow': client_shadow,
               }
 
     return requests.post(

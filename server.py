@@ -36,6 +36,14 @@ def __sync():
         return send_sync(request)
 
 
+@app.route('/send_text', methods=['POST'])
+def __text():
+    if request.method != 'POST':
+        abort(404)
+    else:
+        return send_text(request)
+
+
 @app.route('/send_shadow', methods=['POST'])
 def __shadow():
     if request.method != 'POST':
@@ -106,14 +114,14 @@ def send_sync(request):
         # receive text_patches and client_shadow_cksum
         #
         server_text = None
-        server_shadows = None
+        server_shadows = {}
         with closing(shelve.open(temp_server_file_name)) as d:
-            if not 'server_text' in d:
-                d['server_text'] = ""
+            if 'server_text' in d:
+                server_text = d['server_text']
             if not 'server_shadows' in d:
                 d['server_shadows'] = {}
-            server_text = d['server_text']
-            server_shadows = d['server_shadows']
+            else:
+                server_shadows = d['server_shadows']
 
         # first check the server shadow cheksum
         # if server_shadows[client_id] is empty ask for it
@@ -122,7 +130,11 @@ def send_sync(request):
         client_id = client_id.encode('utf-8')
         client_shadow_cksum = req['client_shadow_cksum']
 
-        if not client_id in server_shadows:
+        if not server_text:
+            print("NoServerText")
+            res = err_response('NoServerText',
+            'No text found in the server. Send it again')
+        elif not client_id in server_shadows:
             print("NoServerShadow")
             res = err_response('NoServerShadow',
             'No shadow found in the server. Send it again')
@@ -199,6 +211,48 @@ def send_sync(request):
 
 
 
+def send_text(request):
+    print("send_text")
+    req = request.json
+    res = None
+    if req and 'client_id' in req and 'client_text' in req:
+        server_shadows = None
+
+        res = err_response('UnknowErrorSendShadow',
+        'Unknown error in send_text')
+
+        with closing(shelve.open(temp_server_file_name)) as d:
+            if not 'server_text' in d:
+                d['server_text'] = req['client_text']
+
+            if not 'server_shadows' in d:
+                d['server_shadows'] = {}
+            server_shadows = d['server_shadows']
+
+            client_id = req['client_id']
+            server_shadows[client_id] = req['client_shadow']
+            d['server_shadows'] = server_shadows
+
+            res = {
+                'status': 'OK',
+                }
+
+    else:
+        if not req:
+            res = err_response('NoPayload',
+            'No payload found in the request')
+        elif not 'client_id' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No client_id found in the request')
+        elif not 'client_shadow' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No client_shadow found in the request')
+        else:
+            print("send_text 500")
+            abort(500)
+    print("response:")
+    print(res)
+    return flask.jsonify(**res)
 
 
 
