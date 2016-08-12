@@ -172,19 +172,30 @@ def send_sync(request):
                         server_shadows = d['server_shadows']
                         server_shadows[client_id] = server_shadow_patch_results[0]
                         d['server_shadows'] = server_shadows
-                    # should a break here be catastrophic ??
-                    #
-                    # step 6
-                    # FIXME: shouldn't this be a new set of patches generated
-                    # diff'ing THIS new server_shadow and server_text?
-                    # Another client could have changed the server text
-                    server_text_patch_results = diff_obj.patch_apply(
-                      patches2, server_text)
-                    #
-                    #step 7
-                    with closing(shelve.open(temp_server_file_name)) as d:
-                        d['server_text'] = server_text_patch_results[0]
-                    res = { 'status': 'OK', }
+                        # should a break here be catastrophic ??
+                        #
+                        # step 6
+                        server_text = d['server_text']
+
+                        edits = diff_obj.diff_main(server_text, server_shadow_patch_results[0])
+                        diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
+
+                        server_text_patches = diff_obj.patch_make(edits)
+
+                        server_text_patch_results = diff_obj.patch_apply(
+                          server_text_patches, server_text)
+                        server_text_patches_results = server_shadow_patch_results[1]
+
+                        # len(set(list)) should be 1 if all elements are the same
+                        if len(set(server_text_patches_results)) == 1 and server_text_patches_results[0]:
+                            #
+                            #step 7
+                            d['server_text'] = server_text_patch_results[0]
+                            res = { 'status': 'OK', }
+                        else:
+                            # I should try to patch again
+                            res = err_response('ServerPatchFailed',
+                            'Match-Patch failed in server')
                 else:
                     # I should try to patch again
                     res = err_response('ServerPatchFailed', 
