@@ -284,7 +284,8 @@ def show_sync(client_text, recursive_count):
                 d[CLIENT_ID] = temp_client
 
         if not client_text:
-            return("nothing to update!")
+            # nothing to update!
+            return redirect(url_for('__main'), code=302)
 
 
         diff_obj = diff_match_patch.diff_match_patch()
@@ -303,7 +304,8 @@ def show_sync(client_text, recursive_count):
         text_patches = diff_obj.patch_toText(patches)
 
         if not text_patches:
-            return("nothing to update!")
+            # nothing to update!
+            return redirect(url_for('__main'), code=302)
         else:
             print ("step 2 results: {}".format(text_patches))
 
