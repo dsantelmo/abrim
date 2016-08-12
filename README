@@ -1,1 +1,4 @@
-Hello, World!
+cd .git/hooks/
+ln -s ../../git_hooks/pre-commit.sh pre-commit
+
+pdb.set_trace()
