@@ -8,6 +8,7 @@ import string
 
 DIFF_TIMEOUT = 0.1
 CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
+MAX_RECURSIVE_COUNT = 3
 
 # set FLASK_APP=client.py
 # set FLASK_DEBUG=1
@@ -41,7 +42,9 @@ def __sync():
     if request.method != 'POST':
         abort(404)
     else:
-        return show_sync(request.form['client_text'])
+        return show_sync(request.form['client_text'], 0)
+
+
 
 
 from contextlib import closing
@@ -258,7 +261,13 @@ import json
 import urllib2
 import sys
 
-def show_sync(client_text):
+def show_sync(client_text, recursive_count):
+
+    recursive_count += 1
+
+    if recursive_count > MAX_RECURSIVE_COUNT:
+        return "MAX_RECURSIVE_COUNT"
+
     client_shadow = None
 
     with closing(shelve.open(temp_client_file_name)) as d:
@@ -305,10 +314,9 @@ def show_sync(client_text):
                 # the value of Client Text in step 1, so in a multi-threaded environment
                 # a snapshot of the text should have been taken.
 
+                print("_____________pre__cksum_______")
                 client_shadow_cksum =  hashlib.md5(client_shadow).hexdigest()
-                # FIXME what happens on first sync?
-                #print("client_shadow_cksum {}".format(client_shadow_cksum))
-                #print(client_shadow)
+                print(client_shadow_cksum)
 
                 d[CLIENT_ID] = {'client_text' : client_text,
                                 'client_shadow' : client_text, }
@@ -317,67 +325,31 @@ def show_sync(client_text):
 
                 url = "http://127.0.0.1:5002/send_sync"
 
-                r = send_sync(url, CLIENT_ID, client_shadow_cksum, text_patches)
+                r = __send_sync(url, CLIENT_ID, client_shadow_cksum, text_patches)
 
-                print("-------------------")
                 try:
                     r_json = r.json()
                     if 'status' in r_json:
                         if not r_json['status'] == u"OK":
-                            error_return = "Unknown error in response"
-                            if 'error_type' in r_json:
-                                if r_json['error_type'] == u"NoServerText":
-                                    print("NoServerText")
-                                    # client sends its text:
-                                    r_send_text = send_text("http://127.0.0.1:5002/send_text", CLIENT_ID, d[CLIENT_ID]['client_text'], d[CLIENT_ID]['client_shadow'])
-                                    try:
-                                        r_send_text_json = r_send_text.json()
-                                        if 'status' in r_send_text_json:
-                                            if r_send_text_json['status'] == "OK":
-                                                return "Text updated from client. Sync Again" #FIXME create a recursive function counting tries
-                                            else:
-                                                return "ERROR: unable to send_text"
-                                        else:
-                                            return "ERROR: send_text response doesn't contain status"
-                                    except ValueError, e:
-                                        return(r_send_text.text)
-                                elif r_json['error_type'] == u"NoServerShadow":
-                                    print("NoServerShadow")
-                                    # client sends its shadow:
-                                    r_send_shadow = send_shadow("http://127.0.0.1:5002/send_shadow", CLIENT_ID, d[CLIENT_ID]['client_shadow'])
-                                    try:
-                                        r_send_shadow_json = r_send_shadow.json()
-                                        if 'status' in r_send_shadow_json:
-                                            if r_send_shadow_json['status'] == "OK":
-                                                return "Shadow updated from client. Sync Again" #FIXME create a recursive function counting tries
-                                            else:
-                                                return "ERROR: unable to send_shadow"
-                                        else:
-                                            return "ERROR: send_shadow response doesn't contain status"
-                                    except ValueError, e:
-                                        return(r_send_shadow.text)
-                                elif r_json['error_type'] == u"ServerShadowChecksumFailed":
-                                    print("ServerShadowChecksumFailed")
-                                    # server sends its shadow:
-                                    if 'server_shadow' in r_json:
-                                        temp_server_shadow = r_json['server_shadow']
-                                        temp_client = d[CLIENT_ID]
-                                        temp_client.update({'client_shadow' : temp_server_shadow})
-                                        d[CLIENT_ID] = temp_client
-
-                                        return "Shadow updated from server. Sync Again"
-                                    else:
-                                        return "ERROR: unable to update shadow from server"
-                                else:
-                                    error_return = "ERROR<br />" + r_json['error_type']
-                                    if  'error_message' in r_json:
-                                        error_return = error_return + "<br />" + r_json['error_message']
-                                        error_return = error_return + "<br />" + "FULL MESSAGE:<br />" + json.dumps(r_json)
+                            print("__manage_error_return")
+                            error_return, new_client_shadow = __manage_error_return(r_json, CLIENT_ID, d[CLIENT_ID], recursive_count)
+                            if new_client_shadow:
+                                temp_client = d[CLIENT_ID]
+                                print("_____________pre______________")
+                                print(d[CLIENT_ID]['client_shadow'])
+                                temp_client.update({'client_shadow' : new_client_shadow})
+                                d[CLIENT_ID] = temp_client
+                                print("_____________post_____________")
+                                print(d[CLIENT_ID]['client_shadow'])
+                                print("______________________________")
+                                print("new_client_shadow -> show_sync")
+                                print("______________________________")
+                                error_return = show_sync(d[CLIENT_ID]['client_text'], recursive_count)
                             return error_return
                         else:
                             print("sync seems to be going OK")
                             print("FIXME: CONTINUE HERE")
-                            return("sync OK")
+                            return redirect(url_for('__main'), code=302)
                     else:
                         return "ERROR: send_sync response doesn't contain status"
                 except ValueError, e:
@@ -392,11 +364,80 @@ def show_sync(client_text):
                 print "ConnectionError"
                 return "ERROR: ConnectionError" #FIXME
 
-
     print("show_sync 500 C")
     abort(500)
 
-def send_sync(url, client_id, client_shadow_cksum, client_patches):
+
+#def __get_client_value(client_id, value):
+#    return_value = None
+#
+#    with closing(shelve.open(temp_client_file_name)) as d:
+#        try:
+#            client = d[client_id]
+#            return_value = client[value]
+#        except KeyError, e:
+#            pass
+#    return return_value
+
+
+def __manage_error_return(r_json, CLIENT_ID, client, recursive_count):
+    client_text = client['client_text']
+    client_shadow = client['client_shadow']
+    new_client_shadow = None
+
+    error_return = "Unknown error in response"
+
+    if 'error_type' in r_json:
+        if r_json['error_type'] == u"NoServerText":
+            print("NoServerText")
+            # client sends its text:
+            r_send_text = __send_text("http://127.0.0.1:5002/send_text", CLIENT_ID, client_text, client_shadow)
+            try:
+                r_send_text_json = r_send_text.json()
+                if 'status' in r_send_text_json:
+                    if r_send_text_json['status'] == "OK":
+                        #error_return =  "Text updated from client. Sync Again" #FIXME create a recursive function counting tries
+                        error_return = show_sync(client_text, recursive_count)
+                    else:
+                        error_return = "ERROR: unable to send_text"
+                else:
+                    error_return =  "ERROR: send_text response doesn't contain status"
+            except ValueError, e:
+                error_return = r_send_text.text
+        elif r_json['error_type'] == u"NoServerShadow":
+            print("NoServerShadow")
+            # client sends its shadow:
+            r_send_shadow = __send_shadow("http://127.0.0.1:5002/send_shadow", CLIENT_ID, client_shadow)
+            try:
+                r_send_shadow_json = r_send_shadow.json()
+                if 'status' in r_send_shadow_json:
+                    if r_send_shadow_json['status'] == "OK":
+                        #error_return = "Shadow updated from client. Sync Again" #FIXME create a recursive function counting tries
+                        error_return =  show_sync(client_text, recursive_count)
+                    else:
+                        error_return = "ERROR: unable to send_shadow"
+                else:
+                    error_return = "ERROR: send_shadow response doesn't contain status"
+            except ValueError, e:
+                error_return = r_send_shadow.text
+        elif r_json['error_type'] == u"ServerShadowChecksumFailed":
+            print("ServerShadowChecksumFailed")
+            # server sends its shadow:
+            if 'server_shadow' in r_json:
+                new_client_shadow = r_json['server_shadow']
+                error_return = "Shadow updated from server. Sync Again" #FIXME create a recursive function counting tries
+            else:
+                error_return = "ERROR: unable to update shadow from server"
+        else:
+            error_return = "ERROR<br />" + r_json['error_type']
+            if  'error_message' in r_json:
+                error_return = error_return + "<br />" + r_json['error_message']
+                error_return = error_return + "<br />" + "FULL MESSAGE:<br />" + json.dumps(r_json)
+
+    return error_return, new_client_shadow
+
+
+def __send_sync(url, client_id, client_shadow_cksum, client_patches):
     payload = {
                'client_id': client_id,
                'client_shadow_cksum': client_shadow_cksum,
@@ -409,7 +450,7 @@ def send_sync(url, client_id, client_shadow_cksum, client_patches):
       data=json.dumps(payload)
       )
 
-def send_text(url, client_id, client_text, client_shadow):
+def __send_text(url, client_id, client_text, client_shadow):
     payload = {
                'client_id': client_id,
                'client_text': client_text,
@@ -422,7 +463,7 @@ def send_text(url, client_id, client_text, client_shadow):
       data=json.dumps(payload)
       )
 
-def send_shadow(url, client_id, client_shadow):
+def __send_shadow(url, client_id, client_shadow):
     payload = {
                'client_id': client_id,
                'client_shadow': client_shadow,
