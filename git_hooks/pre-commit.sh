@@ -46,25 +46,26 @@ then
 	exit 1
 fi
 
-# If there are whitespace errors, print the offending file names and fail.
-exec git diff-index --check --cached $against --
-
-
 # http://codeinthehole.com/writing/tips-for-using-a-git-pre-commit-hook/
 
-git stash -q --keep-index
+#git stash -q --keep-index
 #./run_tests.sh
-RESULT=$?
-git stash pop -q
-[ $RESULT -ne 0 ] && exit 1
+#RESULT=$?
+#git stash pop -q
+#[ $RESULT -ne 0 ] && exit 1
 
 
-FILES_PATTERN='\.(js|coffee)(\..+)?$'
-FORBIDDEN1='^[^#]*pdb.set_trace()'
+FILES_PATTERN='\.(py|js|coffee)(\..+)?$'
+FORBIDDEN1='pdb.set_trace()'
 FORBIDDEN2='console.log'
 git diff --cached --name-only | \
     grep -E $FILES_PATTERN | \
-    GREP_COLOR='4;5;37;41' xargs grep --color --with-filename -n -e $FORBIDDEN1 -e $FORBIDDEN1 && echo 'COMMIT REJECTED Found "$FORBIDDEN" references. Please remove them before commiting' && exit 1
+    GREP_COLOR='4;5;37;41' xargs grep --color --with-filename -n -e $FORBIDDEN1 -e $FORBIDDEN2 && echo 'COMMIT REJECTED Found "$FORBIDDEN" references. Please remove them before commiting' && exit 1
+
+echo "ALL OK"
 
 
+
+# If there are whitespace errors, print the offending file names and fail.
+exec git diff-index --check --cached $against --
 exit 0
