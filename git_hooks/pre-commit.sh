@@ -59,12 +59,14 @@ FILES_PATTERN='\.(py|js|coffee)(\..+)?$'
 FORBIDDEN='pdb.set_trace()'
 git diff --cached --name-only | \
     grep -E $FILES_PATTERN | \
-    GREP_COLOR='4;5;37;41' xargs grep --color --with-filename -n -e $FORBIDDEN && echo 'COMMIT REJECTED Found "'$FORBIDDEN'" references. Please remove them before commiting' && exit 1
+    GREP_COLOR='4;5;37;41' xargs grep --color --with-filename -n -v '^\s*\#' | \
+    grep --color $FORBIDDEN && echo 'COMMIT REJECTED Found "'$FORBIDDEN'" references. Please remove them before commiting' && exit 1
 
 FORBIDDEN='console.log'
 git diff --cached --name-only | \
     grep -E $FILES_PATTERN | \
-    GREP_COLOR='4;5;37;41' xargs grep --color --with-filename -n -e $FORBIDDEN && echo 'COMMIT REJECTED Found "'$FORBIDDEN'" references. Please remove them before commiting' && exit 1
+    GREP_COLOR='4;5;37;41' xargs grep --color --with-filename -n -v '^\s*\#' | \
+    grep --color $FORBIDDEN &&echo 'COMMIT REJECTED Found "'$FORBIDDEN'" references. Please remove them before commiting' && exit 1
 
 # If there are whitespace errors, print the offending file names and fail.
 exec git diff-index --check --cached $against --
