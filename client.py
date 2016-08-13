@@ -278,10 +278,10 @@ def show_sync(client_text, recursive_count):
             if not CLIENT_ID in d:
                 d[CLIENT_ID] = {}
             if not 'client_shadow' in d[CLIENT_ID]:
-                client_shadow = ""
-                temp_client = d[CLIENT_ID]
-                temp_client.update({'client_shadow' : client_shadow})
-                d[CLIENT_ID] = temp_client
+                client_shadow = None
+                #temp_client = d[CLIENT_ID]
+                #temp_client.update({'client_shadow' : client_shadow})
+                #d[CLIENT_ID] = temp_client
 
         if not client_text:
             # nothing to update!
@@ -296,8 +296,11 @@ def show_sync(client_text, recursive_count):
         # Client Text is diffed against Shadow. This returns a list of edits which
         # have been performed on Client Text
 
-
-        edits = diff_obj.diff_main(client_shadow, client_text)
+        edits = None
+        if not client_shadow:
+            edits = diff_obj.diff_main("", client_text)
+        else:
+            edits = diff_obj.diff_main(client_shadow, client_text)
         diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
 
         patches = diff_obj.patch_make(edits)
@@ -316,12 +319,17 @@ def show_sync(client_text, recursive_count):
                 # the value of Client Text in step 1, so in a multi-threaded environment
                 # a snapshot of the text should have been taken.
 
+                client_shadow_cksum = 0
+                if not client_shadow:
+                    print("client_shadow: None")
+                else:
+                    print("client_shadow: " + client_shadow)
+                    client_shadow_cksum =  hashlib.md5(client_shadow).hexdigest()
                 print("_____________pre__cksum_______")
-                client_shadow_cksum =  hashlib.md5(client_shadow).hexdigest()
                 print(client_shadow_cksum)
 
                 d[CLIENT_ID] = {'client_text' : client_text,
-                                'client_shadow' : client_text, }
+                                'client_shadow' : client_shadow, }
 
                 # send text_patches, client_id and client_shadow_cksum
 
@@ -335,6 +343,8 @@ def show_sync(client_text, recursive_count):
                         if not r_json['status'] == u"OK":
                             print("__manage_error_return")
                             error_return, new_client_shadow = __manage_error_return(r_json, CLIENT_ID, d[CLIENT_ID], recursive_count)
+                            d[CLIENT_ID] = {'client_text' : client_text,
+                                            'client_shadow' : client_text, }
                             if new_client_shadow:
                                 temp_client = d[CLIENT_ID]
                                 print("_____________pre______________")
@@ -349,6 +359,8 @@ def show_sync(client_text, recursive_count):
                                 error_return = show_sync(d[CLIENT_ID]['client_text'], recursive_count)
                             return error_return
                         else:
+                            d[CLIENT_ID] = {'client_text' : client_text,
+                                            'client_shadow' : client_text, }
                             print("sync seems to be going OK")
                             print("FIXME: CONTINUE HERE")
                             return redirect(url_for('__main'), code=302)
@@ -383,9 +395,14 @@ def show_sync(client_text, recursive_count):
 
 
 def __manage_error_return(r_json, CLIENT_ID, client, recursive_count):
-    client_text = client['client_text']
-    client_shadow = client['client_shadow']
+    client_text = None
+    client_shadow = None
     new_client_shadow = None
+    try:
+        client_text = client['client_text']
+        client_shadow = client['client_shadow']
+    except KeyError, e:
+        print("no text or shadow in __manage_error_return")
 
     error_return = "Unknown error in response"
 

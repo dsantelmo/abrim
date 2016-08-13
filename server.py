@@ -95,6 +95,7 @@ import requests
 import json
 
 def send_sync(request):
+    #import pdb; pdb.set_trace()
     print("send_sync")
     req = request.json
     res = err_response('UnknownError', 'Not controlled error in server')
@@ -140,9 +141,12 @@ def send_sync(request):
             'No shadow found in the server. Send it again')
         else:
             server_shadow = server_shadows[client_id]
-            server_shadow_cksum = hashlib.md5(server_shadow).hexdigest()
-            #print("server_shadow_cksum {}".format(server_shadow_cksum))
-            #print(server_shadow)
+            if not server_shadow:
+                server_shadow_cksum = 0
+            else:
+                server_shadow_cksum = hashlib.md5(server_shadow).hexdigest()
+            print("server_shadow_cksum {}".format(server_shadow_cksum))
+            print(server_shadow)
 
             if client_shadow_cksum != server_shadow_cksum:
                 #FIXME what happenson first sync?
@@ -161,8 +165,13 @@ def send_sync(request):
 
                 patches2 = diff_obj.patch_fromText(req['client_patches'])
 
-                server_shadow_patch_results = diff_obj.patch_apply(
-                  patches2, server_shadow)
+                server_shadow_patch_results = None
+                if not server_shadow:
+                    server_shadow_patch_results = diff_obj.patch_apply(
+                      patches2, "")
+                else:
+                    server_shadow_patch_results = diff_obj.patch_apply(
+                      patches2, server_shadow)
                 results = server_shadow_patch_results[1]
 
                 # len(set(list)) should be 1 if all elements are the same
@@ -223,6 +232,7 @@ def send_sync(request):
 
 
 def send_text(request):
+    #import pdb; pdb.set_trace()
     print("send_text")
     req = request.json
     res = None
@@ -268,6 +278,7 @@ def send_text(request):
 
 
 def send_shadow(request):
+    #import pdb; pdb.set_trace()
     print("send_shadow")
     req = request.json
     res = None
