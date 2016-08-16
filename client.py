@@ -49,7 +49,7 @@ def __sync():
 
 from contextlib import closing
 import shelve
-# FIXME Warning Because the shelve module is backed by pickle, it is insecure 
+# FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
 # can execute arbitrary code.
 import tempfile
@@ -93,7 +93,7 @@ def show_main_form():
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>Title of the document</title>
+        <title>abrim</title>
 
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -216,7 +216,7 @@ def show_main_form():
     main_form2 = """</textarea>
                     </p>
                     <p>
-                        <input type="submit" value="Sync!">
+                        <input name="submit" type="submit" value="Sync!">
                     </p>
                 </form>
             </section>
@@ -251,7 +251,7 @@ def show_main_form():
         main_form = main_form1 + client_text + \
                     main_form2 + client_shadow + \
                     main_form3
-    return main_form 
+    return main_form
 
 
 import diff_match_patch
