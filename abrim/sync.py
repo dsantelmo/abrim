@@ -3,7 +3,7 @@ import hashlib
 from contextlib import closing
 
 import shelve
-# FIXME Warning Because the shelve module is backed by pickle, it is insecure 
+# FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
 # can execute arbitrary code.
 import random
@@ -20,7 +20,7 @@ import os
 #    if not 'client_text' in d:
 #        d['client_text'] = """Good dog. OK"""
 
-client_text   = 
+client_text   =
 client_shadow = """Bad dog. KO"""
 
 server_text   = """Bad dog. KO"""
@@ -119,7 +119,7 @@ if text_patches: # "send" if there are results
             results = server_shadow_patch_results[1]
             #
             # len(set(list)) should be 1 if all elements are the same
-            if len(set(results)) == 1 and results[0]: 
+            if len(set(results)) == 1 and results[0]:
                 # step 5
                 server_shadows[client_id] = server_shadow_patch_results[0]
                 # should a break here be catastrophic ??
@@ -185,7 +185,7 @@ else:
             print("all ok! nothing to update")
         else:
             # step 1 & 2
-            print("Server text changed. " 
+            print("Server text changed. "
             "This is the patches for the new text")
             server_edits = diff_obj.diff_main(
               server_shadows[client_id], server_text)
@@ -216,12 +216,12 @@ else:
                 # basis
                 #
                 # Server Text is updated with the result of the patch.
-                # Steps 4 and 5 must be atomic, but they do not have to be 
-                # blocking; they may be repeated until Server Text stays 
+                # Steps 4 and 5 must be atomic, but they do not have to be
+                # blocking; they may be repeated until Server Text stays
                 # still long enough.
                 #
                 # Client Text and Server Shadow (or symmetrically Server
-                # Text and Client Shadow) must be absolutely identical 
+                # Text and Client Shadow) must be absolutely identical
                 # after every half of the synchronization
                 #
                 # receive text patches and shadow checksum

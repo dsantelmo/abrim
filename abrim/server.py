@@ -55,7 +55,7 @@ def __shadow():
 
 from contextlib import closing
 import shelve
-# FIXME Warning Because the shelve module is backed by pickle, it is insecure 
+# FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
 # can execute arbitrary code.
 import tempfile
@@ -175,7 +175,7 @@ def send_sync(request):
                 results = server_shadow_patch_results[1]
 
                 # len(set(list)) should be 1 if all elements are the same
-                if len(set(results)) == 1 and results[0]: 
+                if len(set(results)) == 1 and results[0]:
                     # step 5
                     with closing(shelve.open(temp_server_file_name)) as d:
                         server_shadows = d['server_shadows']
@@ -207,20 +207,20 @@ def send_sync(request):
                             'Match-Patch failed in server')
                 else:
                     # I should try to patch again
-                    res = err_response('ServerPatchFailed', 
+                    res = err_response('ServerPatchFailed',
                     'Match-Patch failed in server')
     else:
         if not req:
-            res = err_response('NoPayload', 
+            res = err_response('NoPayload',
             'No payload found in the request')
         elif not 'client_id' in req:
-            res = err_response('PayloadMissingAttribute', 
+            res = err_response('PayloadMissingAttribute',
             'No client_id found in the request')
         elif not 'client_shadow_cksum' in req:
-            res = err_response('PayloadMissingAttribute', 
+            res = err_response('PayloadMissingAttribute',
             'No client_shadow_cksum found in the request')
         elif not 'client_patches' in req:
-            res = err_response('PayloadMissingAttribute', 
+            res = err_response('PayloadMissingAttribute',
             'No client_patches found in the request')
         else:
             print("send_sync 500")
