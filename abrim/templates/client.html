@@ -12,7 +12,7 @@
               </p>
             </header>
             <section>
-                <form autocomplete="off" action="/sync" method="post">
+                <form autocomplete="off" action="/sync" method="post" onsubmit="submit.disabled = true; return true;" >
                     <p>
                         <textarea name="client_text" placeholder="Some text here...">{{ client_text|safe }}</textarea>
                     </p>
