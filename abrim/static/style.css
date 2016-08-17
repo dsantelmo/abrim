@@ -1,106 +1,152 @@
 
-    html {
-        font-size: medium;
-    }
+html {
+    font-size: medium;
+}
 
-    body {
-        height:100%;
-        background-color: #fffff6;
-        color: #330;
-        font-family: georgia, times, serif;
-        margin: 2rem auto;
-        padding: 1.5em 2em;
-        max-width: 40em;
-        width: auto;
-        font-size: 1rem;
-        line-height: 1.4;
-    }
+body {
+    height:100%;
+    background-color: #fffff6;
+    color: #330;
+    font-family: Sans-Serif;
+    max-width: 40em;
+    width: auto;
+    font-size: 1rem;
+    line-height: 1.4;
+    margin: 0;
+    padding: 1em 1em;
+}
 
-    article {
-        background-color: #ffffff;
-        margin: 2rem auto;
-        padding: 1.5em 2em;
-        box-shadow: 3px 3px 39px -5px rgba(0,0,0,0.18);
-    }
+main {
+    background-color: #ffffff;
+    margin: 0.5em auto;
+    padding: 1.5em 2em;
+    box-shadow: 3px 3px 39px -5px rgba(0,0,0,0.18);
+}
 
-    a {
-        color: #1e6b8c;
-        font-size: 1em;
-        text-decoration: none;
-        transition-delay: 0.1s;
-        transition-duration: 0.3s;
-        transition-property: color, background-color;
-        transition-timing-function: linear;
-    }
 
-    a:visited {
-        color: #6f32ad;
-        font-size: 1em;
-    }
+section {
+    margin: 0.5em auto;
+    padding: 0.5em;
+}
 
-    a:hover {
-        background: #f0f0ff;
-        font-size: 1em;
-        text-decoration: underline;
-    }
+a {
+    color: #1e6b8c;
+    font-size: 1em;
+    text-decoration: none;
+    transition-delay: 0.1s;
+    transition-duration: 0.3s;
+    transition-property: color, background-color;
+    transition-timing-function: linear;
+}
 
-    a:active {
-        background-color: #427fed;
-        color: #fffff6;
-        color: white;
-        font-size: 1em;
-    }
+a:visited {
+    color: #6f32ad;
+    font-size: 1em;
+}
 
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6 {
-        color: #703820;
-        font-weight: bold;
-        line-height: 1.2;
-        margin-bottom: 0.5em;
-        margin-top: 1em;
-    }
+a:hover {
+    background: #f0f0ff;
+    font-size: 1em;
+    text-decoration: underline;
+}
 
-    h1 {
-        font-size: 2.2em;
-        text-align: center;
-    }
+a:active {
+    background-color: #427fed;
+    color: #fffff6;
+    color: white;
+    font-size: 1em;
+}
 
-    h2 {
-        font-size: 1.8em;
-        border-bottom: solid 0.1rem #703820;
-    }
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: georgia, times, serif;
+    color: #703820;
+    font-weight: bold;
+    line-height: 1.2;
+    margin-bottom: 0.5em;
+    margin-top: 1em;
+}
 
-    h3 {
-        font-size: 1.5em;
-    }
+h1 {
+    font-size: 2.2em;
+    text-align: center;
+}
 
-    h4 {
-        font-size: 1.3em;
-        text-decoration: underline;
-    }
+h2 {
+    font-size: 1.8em;
+    border-bottom: solid 0.1rem #703820;
+}
 
-    h5 {
-        font-size: 1.2em;
-        font-style: italic;
-    }
+h3 {
+    font-size: 1.5em;
+}
 
-    h6 {
-        font-size: 1.1em;
-        margin-bottom: 0.5rem;
-    }
+h4 {
+    font-size: 1.3em;
+    text-decoration: underline;
+}
 
-    pre,
-    code,
-    xmp {
-        font-family: courier;
-        font-size: 1rem;
-        line-height: 1.4;
-        white-space: pre-wrap;
-    }
+h5 {
+    font-size: 1.2em;
+    font-style: italic;
+}
+
+h6 {
+    font-size: 1.1em;
+    margin-bottom: 0.5rem;
+}
+
+pre,
+code,
+xmp {
+    font-family: courier;
+    font-size: 1rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+textarea {
+    background-color: #fffff6;
+    resize: none;
+    width: 100%;
+    height: 6em;
+}
+
+#main_title {
+    margin-top: 0.1em;
+}
+
+.sync_button {
+	box-shadow: 0px 1px 0px 0px #f0f7fa;
+	background:linear-gradient(to bottom, #33bdef 5%, #019ad2 100%);
+	filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#33bdef', endColorstr='#019ad2',GradientType=0);
+	background-color:#33bdef;
+	border-radius:6px;
+	border:1px solid #057fd0;
+	display:inline-block;
+	cursor:pointer;
+	color:#ffffff;
+	font-family:Arial;
+	font-size:15px;
+	font-weight:bold;
+	padding:6px 24px;
+	text-decoration:none;
+	text-shadow:0px -1px 0px #5b6178;
+}
+.sync_button:hover {
+	background:linear-gradient(to bottom, #019ad2 5%, #33bdef 100%);
+	filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#019ad2', endColorstr='#33bdef',GradientType=0);
+	background-color:#019ad2;
+}
+.sync_button:active {
+	position:relative;
+	top:1px;
+}
+
 
 .flash {
     position: absolute;
@@ -141,5 +187,4 @@
 
 .flashmessage {
     margin: 0.6em;
-    font-family: Sans-Serif;
 }
