@@ -10,6 +10,13 @@
     </head>
 
     <body>
+        {% if get_flashed_messages() %}
+        <div class="flash">
+            {% for message in get_flashed_messages() %}
+            <div class="flashmessage">{{ message|safe }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
         {% block body %}{% endblock %}
     </body>
 </html>

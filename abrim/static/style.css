@@ -1,95 +1,135 @@
+    html {
+      font-size: medium;
+    }
 
-        html {
-          font-size: medium;
-        }
+    body {
+      background-color: #fffff6;
+      color: #330;
+      font-family: georgia, times, serif;
+      margin: 2rem auto;
+      max-width: 40em;
+      padding: 0 2em;
+      width: auto;
+      font-size: 1rem;
+      line-height: 1.4;
+    }
 
-        body {
-          background-color: #fffff6;
-          color: #330;
-          font-family: georgia, times, serif;
-          margin: 2rem auto;
-          max-width: 40em;
-          padding: 0 2em;
-          width: auto;
-          font-size: 1rem;
-          line-height: 1.4;
-        }
+    a {
+      color: #1e6b8c;
+      font-size: 1em;
+      text-decoration: none;
+      transition-delay: 0.1s;
+      transition-duration: 0.3s;
+      transition-property: color, background-color;
+      transition-timing-function: linear;
+    }
 
-        a {
-          color: #1e6b8c;
-          font-size: 1em;
-          text-decoration: none;
-          transition-delay: 0.1s;
-          transition-duration: 0.3s;
-          transition-property: color, background-color;
-          transition-timing-function: linear;
-        }
+    a:visited {
+      color: #6f32ad;
+      font-size: 1em;
+    }
 
-        a:visited {
-          color: #6f32ad;
-          font-size: 1em;
-        }
+    a:hover {
+      background: #f0f0ff;
+      font-size: 1em;
+      text-decoration: underline;
+    }
 
-        a:hover {
-          background: #f0f0ff;
-          font-size: 1em;
-          text-decoration: underline;
-        }
+    a:active {
+      background-color: #427fed;
+      color: #fffff6;
+      color: white;
+      font-size: 1em;
+    }
 
-        a:active {
-          background-color: #427fed;
-          color: #fffff6;
-          color: white;
-          font-size: 1em;
-        }
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      color: #703820;
+      font-weight: bold;
+      line-height: 1.2;
+      margin-bottom: 0.5em;
+      margin-top: 1em;
+    }
 
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6 {
-          color: #703820;
-          font-weight: bold;
-          line-height: 1.2;
-          margin-bottom: 0.5em;
-          margin-top: 1em;
-        }
+    h1 {
+      font-size: 2.2em;
+      text-align: center;
+    }
 
-        h1 {
-          font-size: 2.2em;
-          text-align: center;
-        }
+    h2 {
+      font-size: 1.8em;
+      border-bottom: solid 0.1rem #703820;
+    }
 
-        h2 {
-          font-size: 1.8em;
-          border-bottom: solid 0.1rem #703820;
-        }
+    h3 {
+      font-size: 1.5em;
+    }
 
-        h3 {
-          font-size: 1.5em;
-        }
+    h4 {
+      font-size: 1.3em;
+      text-decoration: underline;
+    }
 
-        h4 {
-          font-size: 1.3em;
-          text-decoration: underline;
-        }
+    h5 {
+      font-size: 1.2em;
+      font-style: italic;
+    }
 
-        h5 {
-          font-size: 1.2em;
-          font-style: italic;
-        }
+    h6 {
+      font-size: 1.1em;
+      margin-bottom: 0.5rem;
+    }
 
-        h6 {
-          font-size: 1.1em;
-          margin-bottom: 0.5rem;
-        }
+    pre,
+    code,
+    xmp {
+      font-family: courier;
+      font-size: 1rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
 
-        pre,
-        code,
-        xmp {
-          font-family: courier;
-          font-size: 1rem;
-          line-height: 1.4;
-          white-space: pre-wrap;
+.flash {
+    position: absolute;
+    z-index: 101;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: #4f9;
+    color: white;
+    padding: 0.4em;
+    box-shadow: 0px 0px 0px 0px rgba(0,0,0,0);
+
+    text-align: center;
+
+    animation: vanish 4s forwards;
+}
+
+@keyframes vanish {
+    0%   {
+        opacity: 0;
         }
+    15%  {
+        opacity: 1;
+        color: white;
+        box-shadow: 0px 5px 25px 0px rgba(0,0,0,0.5);
+        }
+    50%  {
+        opacity: 1;
+        color: white;
+        box-shadow: 0px 5px 25px 0px rgba(0,0,0,0.5);
+        }
+    100% {
+        opacity: 0;
+        color: #4f9;
+        box-shadow: 0px 0px 0px 0px rgba(0,0,0,0);
+        }
+}
+
+.flashmessage {
+    margin: 0.6em;
+}
