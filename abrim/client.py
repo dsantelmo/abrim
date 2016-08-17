@@ -14,7 +14,9 @@ MAX_RECURSIVE_COUNT = 3
 # set FLASK_DEBUG=1
 # python -m flask run
 app = Flask(__name__)
-app.debug = True
+app.config.from_object(__name__)
+app.config.from_pyfile('abrim.cfg') #FIXME use instance folders
+app.config.from_envvar('ABRIM_SETTINGS', silent=True)
 
 
 #@app.route('/', methods=['POST',])

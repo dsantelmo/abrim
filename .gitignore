@@ -2,4 +2,5 @@
 *.pyc
 *.sqlite
 *.un~
+abrim.cfg
 geckodriver.log
