@@ -142,6 +142,7 @@ def show_sync(client_text, recursive_count):
 
     if not client_text:
         # nothing to update!
+        flash("nothing to sync...")
         return redirect(url_for('__main'), code=302)
 
     diff_obj = diff_match_patch.diff_match_patch()
@@ -164,6 +165,7 @@ def show_sync(client_text, recursive_count):
 
     if not text_patches:
         # nothing to update!
+        flash("no changes")
         return redirect(url_for('__main'), code=302)
     else:
         #print ("step 2 results: {}".format(text_patches))
@@ -332,4 +334,4 @@ def __send_shadow(url, client_id, client_shadow):
       )
 
 if __name__ == "__main__":
-    app.run(port=5001)
+    app.run(host='0.0.0.0', port=5001)
