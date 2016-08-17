@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from flask import Flask, request, redirect, url_for, abort
+from flask import Flask, request, redirect, url_for, abort, render_template
 import diff_match_patch
 import random
 import string
@@ -108,165 +108,16 @@ def __print_iter_contents(iter, depth, temp_string):
 
 
 def show_main_form():
-    main_form = ""
-    main_form1 = """
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <title>abrim</title>
-
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-        <style type="text/css">
-
-        html {
-          font-size: medium;
-        }
-
-        body {
-          background-color: #fffff6;
-          color: #330;
-          font-family: georgia, times, serif;
-          margin: 2rem auto;
-          max-width: 40em;
-          padding: 0 2em;
-          width: auto;
-          font-size: 1rem;
-          line-height: 1.4;
-        }
-
-        a {
-          color: #1e6b8c;
-          font-size: 1em;
-          text-decoration: none;
-          transition-delay: 0.1s;
-          transition-duration: 0.3s;
-          transition-property: color, background-color;
-          transition-timing-function: linear;
-        }
-
-        a:visited {
-          color: #6f32ad;
-          font-size: 1em;
-        }
-
-        a:hover {
-          background: #f0f0ff;
-          font-size: 1em;
-          text-decoration: underline;
-        }
-
-        a:active {
-          background-color: #427fed;
-          color: #fffff6;
-          color: white;
-          font-size: 1em;
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6 {
-          color: #703820;
-          font-weight: bold;
-          line-height: 1.2;
-          margin-bottom: 0.5em;
-          margin-top: 1em;
-        }
-
-        h1 {
-          font-size: 2.2em;
-          text-align: center;
-        }
-
-        h2 {
-          font-size: 1.8em;
-          border-bottom: solid 0.1rem #703820;
-        }
-
-        h3 {
-          font-size: 1.5em;
-        }
-
-        h4 {
-          font-size: 1.3em;
-          text-decoration: underline;
-        }
-
-        h5 {
-          font-size: 1.2em;
-          font-style: italic;
-        }
-
-        h6 {
-          font-size: 1.1em;
-          margin-bottom: 0.5rem;
-        }
-
-        pre,
-        code,
-        xmp {
-          font-family: courier;
-          font-size: 1rem;
-          line-height: 1.4;
-          white-space: pre-wrap;
-        }
-        </style>
-
-    </head>
-
-  <body>
-    <header>
-        <h1>Main</h1>
-    </header>
-    <nav>User: """ + CLIENT_ID + """ || <b>main</b> - <a href="/datastore">datastore</a></nav>
-    <main>
-        <article>
-            <header>
-              <h1>...</h1>
-              <p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
-              </p>
-            </header>
-            <section>
-                <form autocomplete="off" action="/sync" method="post">
-                    <p>
-                        <textarea name="client_text" placeholder="Some text here...">"""
-    main_form2 = """</textarea>
-                    </p>
-                    <p>
-                        <input name="submit" type="submit" value="Sync!">
-                    </p>
-                </form>
-            </section>
-            <section>
-                <form autocomplete="off">
-                  <textarea name="client_shadow" disabled placeholder="Shadow text...">
-"""
-
-    main_form3 = """</textarea>
-                </form>
-            </section>
-        </article>
-    </main>
-    <nav>recent nav</nav>
-    <nav>tags nav<nav>
-    <footer>footer</footer>
-  </body>
-</html>
-"""
     client_text = __get_client_attribute(CLIENT_ID, 'client_text')
     if not client_text:
         client_text = ""
     client_shadow = __get_client_attribute(CLIENT_ID, 'client_shadow')
     if not client_shadow:
         client_shadow= ""
-    main_form = main_form1 + client_text + \
-                main_form2 + client_shadow + \
-                main_form3
-    return main_form
+    return render_template('client.html',
+            CLIENT_ID=CLIENT_ID,
+            client_text=client_text,
+            client_shadow=client_shadow)
 
 
 import diff_match_patch

@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% block body %}
+    <header>
+        <h1>Main</h1>
+    </header>
+    <nav>User: {{ CLIENT_ID|safe }} || <b>main</b> - <a href="/datastore">datastore</a></nav>
+    <main>
+        <article>
+            <header>
+              <h1>...</h1>
+              <p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
+              </p>
+            </header>
+            <section>
+                <form autocomplete="off" action="/sync" method="post">
+                    <p>
+                        <textarea name="client_text" placeholder="Some text here...">{{ client_text|safe }}</textarea>
+                    </p>
+                    <p>
+                        <input name="submit" type="submit" value="Sync!">
+                    </p>
+                </form>
+            </section>
+            <section>
+                <form autocomplete="off">
+                    <textarea name="client_shadow" disabled placeholder="Shadow text...">{{ client_shadow|safe }}</textarea>
+                </form>
+            </section>
+        </article>
+    </main>
+    <nav>recent nav</nav>
+    <nav>tags nav<nav>
+    <footer>footer</footer>
+{% endblock %}
