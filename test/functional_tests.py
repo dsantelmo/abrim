@@ -39,6 +39,9 @@ class SendTextTest(unittest.TestCase):
         self.browser.find_element_by_name("submit").click()
 
         # The page loads again with the updated text and no errors
+
+        self.browser.get('http://127.0.0.1:5001/') #FIXME workaround for refresh, investigate this
+        self.browser.refresh()
         self.browser.implicitly_wait(10)
 
         self.browser.refresh()
@@ -51,9 +54,18 @@ class SendTextTest(unittest.TestCase):
 
         # She waits for the HTML to finish loading
         self.assertIn('</html>', self.browser.page_source)
-        self.assertIn( testing_text,
-          self.browser.find_element_by_name("client_text").get_attribute('value')
-        )
+
+        client_text2 = None
+        try:
+            print self.browser.find_element_by_name("client_text")
+            client_text2 = self.browser.find_element_by_name("client_text").get_attribute('value')
+        except TypeError:
+            pass
+
+        print(self.browser.page_source)
+        #self.assertIsNotNone(client_text2)
+
+        self.assertIn(testing_text, client_text2)
 
         #print(self.browser.page_source)
 
