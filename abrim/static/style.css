@@ -145,20 +145,17 @@ textarea {
     top:1px;
 }
 
-
 .flash {
     position: absolute;
     z-index: 101;
     top: 0;
     left: 0;
     right: 0;
-    background-color: #2b7;
     color: white;
-    padding: 0.4em;
+    margin: 0;
+    padding: 0;
     box-shadow: 0px 0px 0px 0px rgba(0,0,0,0);
-
     text-align: center;
-
     animation: vanish 4s forwards;
 }
 
@@ -168,21 +165,32 @@ textarea {
         }
     15%  {
         opacity: 1;
-        color: white;
         box-shadow: 0px 5px 25px 0px rgba(0,0,0,0.25);
         }
     50%  {
         opacity: 1;
-        color: white;
         box-shadow: 0px 5px 25px 0px rgba(0,0,0,0.25);
         }
     100% {
         opacity: 0;
-        color: #4f9;
         box-shadow: 0px 0px 0px 0px rgba(0,0,0,0);
         }
 }
 
-.flashmessage {
-    margin: 0.6em;
+.flash .info,
+.flash .warn,
+.flash .error {
+    margin: 0;
+    padding: 0.6em;
+}
+
+.flash .info {
+    background-color: #2b7;
+}
+.flash .warn {
+    background-color: #ff9;
+    color: black;
+}
+.flash .error {
+    background-color: #f93;
 }

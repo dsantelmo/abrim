@@ -142,7 +142,7 @@ def show_sync(client_text, recursive_count):
 
     if not client_text:
         # nothing to update!
-        flash("nothing to sync...")
+        flash("nothing to sync...", 'warn')
         return redirect(url_for('__main'), code=302)
 
     diff_obj = diff_match_patch.diff_match_patch()
@@ -165,7 +165,7 @@ def show_sync(client_text, recursive_count):
 
     if not text_patches:
         # nothing to update!
-        flash("no changes")
+        flash("no changes", 'warn')
         return redirect(url_for('__main'), code=302)
     else:
         #print("step 2 results: {}".format(text_patches))
@@ -208,7 +208,7 @@ def show_sync(client_text, recursive_count):
                         __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
                         __set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
                         print("sync seems to be going OK")
-                        flash("Sync OK!")
+                        flash("Sync OK!", 'info')
                         print("FIXME: CONTINUE HERE")
                         return redirect(url_for('__main'), code=302)
                 else:
@@ -248,7 +248,7 @@ def __manage_error_return(r_json, client_id, recursive_count):
                 if 'status' in r_send_text_json:
                     if r_send_text_json['status'] == "OK":
                         print("Text updated from client. Trying to sync again")
-                        flash("Text updated from client. Trying to sync again")
+                        flash("Text updated from client. Trying to sync again...", 'info')
                         error_return = show_sync(client_text, recursive_count)
                     else:
                         error_return = "ERROR: unable to send_text"
@@ -265,7 +265,7 @@ def __manage_error_return(r_json, client_id, recursive_count):
                 if 'status' in r_send_shadow_json:
                     if r_send_shadow_json['status'] == "OK":
                         print("Shadow updated from client. Trying to sync again")
-                        flash("Shadow updated from client. Trying to sync again")
+                        flash("Shadow updated from client. Trying to sync again...", 'info')
                         error_return =  show_sync(client_text, recursive_count)
                     else:
                         error_return = "ERROR: unable to send_shadow"
@@ -279,7 +279,7 @@ def __manage_error_return(r_json, client_id, recursive_count):
             if 'server_shadow' in r_json:
                 new_client_shadow = r_json['server_shadow']
                 print("Shadow updated from server. Trying to sync again")
-                flash("Shadow updated from server. Trying to sync again")
+                flash("Shadow updated from server. Trying to sync again...", 'error')
                 error_return =  show_sync(client_text, recursive_count)
             else:
                 error_return = "ERROR: unable to update shadow from server"
