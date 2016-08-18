@@ -75,9 +75,9 @@ def show_datastore_form():
         temp_string = "<h1>Datastore</h1><h3>" + temp_server_file_name + "</h3>"
         return __print_iter_contents(d, 6, temp_string)
 
-def __print_iter_contents(iter, depth, temp_string):
+def __print_iter_contents(iter_d, depth, temp_string):
     if depth > 0:
-        for k, element in iter.iteritems():
+        for k, element in iter_d.items():
             if isinstance(element, dict):
                 temp_string = temp_string + "<li><b>{0} :</b></li>".format(k)
                 temp_string = temp_string + "<ul>"
@@ -128,7 +128,6 @@ def send_sync(request):
         # if server_shadows[client_id] is empty ask for it
 
         client_id = req['client_id']
-        client_id = client_id.encode('utf-8')
         client_shadow_cksum = req['client_shadow_cksum']
 
         if not server_text:
@@ -144,9 +143,9 @@ def send_sync(request):
             if not server_shadow:
                 server_shadow_cksum = 0
             else:
-                server_shadow_cksum = hashlib.md5(server_shadow).hexdigest()
+                server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
             print("server_shadow_cksum {}".format(server_shadow_cksum))
-            print(server_shadow)
+            #print(server_shadow)
 
             if client_shadow_cksum != server_shadow_cksum:
                 #FIXME what happenson first sync?
@@ -320,7 +319,8 @@ def send_shadow(request):
 
             #d['server_text'] = req['client_shadow']
 
-            #print d['server_shadows']
+            #print("send_shadow: " + \
+            #        ''.join('{}{}'.format(key, val) for key, val in d.items()))
 
             res = {
                 'status': 'OK',

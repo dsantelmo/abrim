@@ -66,7 +66,8 @@ def __open_datastore():
     try:
         return shelve.open(temp_client_file_name)
     except:
-        return None
+        print("ERROR opening shelve")
+        raise
 
 
 def __get_client_attribute(client_id, attrib):
@@ -96,9 +97,9 @@ def show_datastore_form():
         temp_string = "<h1>Datastore</h1><h3>" + temp_client_file_name + "</h3>"
         return __print_iter_contents(d, 6, temp_string)
 
-def __print_iter_contents(iter, depth, temp_string):
+def __print_iter_contents(iter_d, depth, temp_string):
     if depth > 0:
-        for k, element in iter.iteritems():
+        for k, element in iter_d.items():
             if isinstance(element, dict):
                 temp_string = temp_string + "<li><b>{0} :</b></li>".format(k)
                 temp_string = temp_string + "<ul>"
@@ -126,7 +127,6 @@ import diff_match_patch
 import hashlib
 import requests
 import json
-import urllib2
 import sys
 
 def show_sync(client_text, recursive_count):
@@ -168,7 +168,7 @@ def show_sync(client_text, recursive_count):
         flash("no changes")
         return redirect(url_for('__main'), code=302)
     else:
-        #print ("step 2 results: {}".format(text_patches))
+        #print("step 2 results: {}".format(text_patches))
 
         try:
             #step 3
@@ -182,7 +182,7 @@ def show_sync(client_text, recursive_count):
                 print("client_shadow: None")
             else:
                 #print("client_shadow: " + client_shadow)
-                client_shadow_cksum =  hashlib.md5(client_shadow).hexdigest()
+                client_shadow_cksum =  hashlib.md5(client_shadow.encode('utf-8')).hexdigest()
             #print("_____________pre__cksum_______")
             #print(client_shadow_cksum)
 
@@ -196,7 +196,7 @@ def show_sync(client_text, recursive_count):
                 r_json = r.json()
                 if 'status' in r_json:
                     if not r_json['status'] == u"OK":
-                        #print("__manage_error_return")
+                        print("__manage_error_return")
                         error_return, new_client_shadow = __manage_error_return(r_json, CLIENT_ID, recursive_count)
                         __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
                         __set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
@@ -213,16 +213,13 @@ def show_sync(client_text, recursive_count):
                         return redirect(url_for('__main'), code=302)
                 else:
                     return "ERROR: send_sync response doesn't contain status"
-            except ValueError, e:
+            except ValueError:
                 return(r.text)
         except ValueError:
-            print "ValueError"
+            print("ValueError")
             return "ERROR: ValueError" #FIXME
-        except urllib2.URLError:
-            print "URLError"
-            return "ERROR: URLError" #FIXME
         except requests.exceptions.ConnectionError:
-            print "ConnectionError"
+            print("ConnectionError")
             return "ERROR: ConnectionError" #FIXME
 
     abort(500)
@@ -233,11 +230,11 @@ def __manage_error_return(r_json, client_id, recursive_count):
 
     client_text = __get_client_attribute(client_id, 'client_text')
     if not client_text:
-        print("no text in __manage_error_return")
+        raise Exception('There should be a client_text by now...')
 
     client_shadow = __get_client_attribute(client_id, 'client_shadow')
     if not client_shadow:
-        print("no shadow in __manage_error_return")
+        client_shadow = ""
 
     error_return = "Unknown error in response"
 
@@ -257,7 +254,7 @@ def __manage_error_return(r_json, client_id, recursive_count):
                         error_return = "ERROR: unable to send_text"
                 else:
                     error_return =  "ERROR: send_text response doesn't contain status"
-            except ValueError, e:
+            except ValueError:
                 error_return = r_send_text.text
         elif r_json['error_type'] == u"NoServerShadow":
             print("NoServerShadow")
@@ -274,7 +271,7 @@ def __manage_error_return(r_json, client_id, recursive_count):
                         error_return = "ERROR: unable to send_shadow"
                 else:
                     error_return = "ERROR: send_shadow response doesn't contain status"
-            except ValueError, e:
+            except ValueError:
                 error_return = r_send_shadow.text
         elif r_json['error_type'] == u"ServerShadowChecksumFailed":
             print("ServerShadowChecksumFailed")
@@ -302,6 +299,8 @@ def __send_sync(url, client_id, client_shadow_cksum, client_patches):
                'client_patches': client_patches,
               }
 
+    print("__send_sync: " + \
+            ''.join('{}{}'.format(key, val) for key, val in payload.items()))
     return requests.post(
       url,
       headers={'Content-Type': 'application/json'},
@@ -315,6 +314,8 @@ def __send_text(url, client_id, client_text, client_shadow):
                'client_shadow': client_shadow,
               }
 
+    print("__send_text: " + \
+            ''.join('{}{}'.format(key, val) for key, val in payload.items()))
     return requests.post(
       url,
       headers={'Content-Type': 'application/json'},
@@ -327,6 +328,8 @@ def __send_shadow(url, client_id, client_shadow):
                'client_shadow': client_shadow,
               }
 
+    print("__send_shadow: " + \
+            ''.join('{}{}'.format(key, val) for key, val in payload.items()))
     return requests.post(
       url,
       headers={'Content-Type': 'application/json'},
