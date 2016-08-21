@@ -383,24 +383,25 @@ def __manage_get_sync_error_return(r_json, client_id, recursive_count):
     error_return = "Unknown error in response"
 
     if 'error_type' in r_json:
-        if r_json['error_type'] == "NoServerText":
-            print("NoServerText")
-            # client sends its text:
-            r_send_text = __send_text_payload("http://127.0.0.1:5002/send_text", client_id, client_text, client_shadow)
-            try:
-                r_send_text_json = r_send_text.json()
-                if 'status' in r_send_text_json:
-                    if r_send_text_json['status'] == "OK":
-                        print("Text updated from client. Trying to sync again")
-                        flash("Text updated from client. Trying to sync again...", 'info')
-                        error_return = send_sync(client_text, recursive_count)
-                    else:
-                        error_return = "ERROR: unable to send_text"
-                else:
-                    error_return =  "ERROR: send_text response doesn't contain status"
-            except ValueError:
-                error_return = r_send_text.text
-        elif r_json['error_type'] == "NoServerShadow":
+        #if r_json['error_type'] == "NoServerText":
+        #    print("NoServerText")
+        #    # client sends its text:
+        #    r_send_text = __send_text_payload("http://127.0.0.1:5002/send_text", client_id, client_text, client_shadow)
+        #    try:
+        #        r_send_text_json = r_send_text.json()
+        #        if 'status' in r_send_text_json:
+        #            if r_send_text_json['status'] == "OK":
+        #                print("Text updated from client. Trying to sync again")
+        #                flash("Text updated from client. Trying to sync again...", 'info')
+        #                error_return = send_sync(client_text, recursive_count)
+        #            else:
+        #                error_return = "ERROR: unable to send_text"
+        #        else:
+        #            error_return =  "ERROR: send_text response doesn't contain status"
+        #    except ValueError:
+        #        error_return = r_send_text.text
+        #el
+        if r_json['error_type'] == "NoServerShadow":
             print("NoServerShadow")
             # client sends its shadow:
             r_send_shadow = __send_shadow_payload("http://127.0.0.1:5002/send_shadow", client_id, client_shadow)
@@ -450,24 +451,25 @@ def __manage_send_sync_error_return(r_json, client_id, recursive_count):
     error_return = "Unknown error in response"
 
     if 'error_type' in r_json:
-        if r_json['error_type'] == "NoServerText":
-            print("NoServerText")
-            # client sends its text:
-            r_send_text = __send_text_payload("http://127.0.0.1:5002/send_text", client_id, client_text, client_shadow)
-            try:
-                r_send_text_json = r_send_text.json()
-                if 'status' in r_send_text_json:
-                    if r_send_text_json['status'] == "OK":
-                        print("Text updated from client. Trying to sync again")
-                        flash("Text updated from client. Trying to sync again...", 'info')
-                        error_return = send_sync(client_text, recursive_count)
-                    else:
-                        error_return = "ERROR: unable to send_text"
-                else:
-                    error_return =  "ERROR: send_text response doesn't contain status"
-            except ValueError:
-                error_return = r_send_text.text
-        elif r_json['error_type'] == "NoServerShadow":
+        #if r_json['error_type'] == "NoServerText":
+        #    print("NoServerText")
+        #    # client sends its text:
+        #    r_send_text = __send_text_payload("http://127.0.0.1:5002/send_text", client_id, client_text, client_shadow)
+        #    try:
+        #        r_send_text_json = r_send_text.json()
+        #        if 'status' in r_send_text_json:
+        #            if r_send_text_json['status'] == "OK":
+        #                print("Text updated from client. Trying to sync again")
+        #                flash("Text updated from client. Trying to sync again...", 'info')
+        #                error_return = send_sync(client_text, recursive_count)
+        #            else:
+        #                error_return = "ERROR: unable to send_text"
+        #        else:
+        #            error_return =  "ERROR: send_text response doesn't contain status"
+        #    except ValueError:
+        #        error_return = r_send_text.text
+        #el
+        if r_json['error_type'] == "NoServerShadow":
             print("NoServerShadow")
             # client sends its shadow:
             r_send_shadow = __send_shadow_payload("http://127.0.0.1:5002/send_shadow", client_id, client_shadow)
@@ -518,20 +520,20 @@ def __send_sync_payload(url, client_id, client_shadow_cksum, client_patches):
       data=json.dumps(payload)
       )
 
-def __send_text_payload(url, client_id, client_text, client_shadow):
-    payload = {
-               'client_id': client_id,
-               'client_text': client_text,
-               'client_shadow': client_shadow,
-              }
-
-    print("__send_text_payload: " + \
-            ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return requests.post(
-      url,
-      headers={'Content-Type': 'application/json'},
-      data=json.dumps(payload)
-      )
+#def __send_text_payload(url, client_id, client_text, client_shadow):
+#    payload = {
+#               'client_id': client_id,
+#               'client_text': client_text,
+#               'client_shadow': client_shadow,
+#              }
+#
+#    print("__send_text_payload: " + \
+#            ''.join('{}{}'.format(key, val) for key, val in payload.items()))
+#    return requests.post(
+#      url,
+#      headers={'Content-Type': 'application/json'},
+#      data=json.dumps(payload)
+#      )
 
 def __send_shadow_payload(url, client_id, client_shadow):
     payload = {
