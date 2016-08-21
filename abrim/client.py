@@ -5,6 +5,7 @@ from flask import Flask, request, redirect, url_for, abort, render_template, fla
 import diff_match_patch
 import random
 import string
+import os
 
 DIFF_TIMEOUT = 0.1
 CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
@@ -58,13 +59,13 @@ import tempfile
 import os
 
 
-
-temp_client_file_name = os.path.join( tempfile.gettempdir(),
-  tempfile.gettempprefix() + "abrim_client_datastore")
+#FIXME clean me
+#temp_client_file_name = os.path.join( tempfile.gettempdir(),
+#  tempfile.gettempprefix() + "abrim_client_datastore")
 
 def __open_datastore():
     try:
-        return shelve.open(temp_client_file_name)
+        return shelve.open(app.config['DB_PATH'])
     except:
         print("ERROR opening shelve")
         raise
@@ -94,7 +95,7 @@ def __set_client_attribbute(client_id, attrib, value):
 
 def show_datastore_form():
     with closing(__open_datastore()) as d:
-        temp_string = "<h1>Datastore</h1><h3>" + temp_client_file_name + "</h3>"
+        temp_string = "<h1>Datastore</h1><h3>" + app.config['DB_PATH'] + "</h3>"
         return __print_iter_contents(d, 6, temp_string)
 
 def __print_iter_contents(iter_d, depth, temp_string):
@@ -208,8 +209,8 @@ def send_sync(client_text, recursive_count):
                 r_json = r.json()
                 if 'status' in r_json:
                     if not r_json['status'] == "OK":
-                        print("__manage_error_return")
-                        error_return, new_client_shadow = __manage_error_return(r_json, CLIENT_ID, recursive_count)
+                        print("__manage_send_sync_error_return")
+                        error_return, new_client_shadow = __manage_send_sync_error_return(r_json, CLIENT_ID, recursive_count)
                         __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
                         __set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
                         if new_client_shadow:
@@ -264,8 +265,8 @@ def get_sync(client_text, recursive_count):
         r_json = r.json()
         if 'status' in r_json:
             if not r_json['status'] == "OK":
-                #print("__manage_error_return")
-                #error_return, new_client_shadow = __manage_error_return(r_json, CLIENT_ID, recursive_count)
+                #print("__manage_get_sync_error_return")
+                #error_return, new_client_shadow = __manage_get_sync_error_return(r_json, CLIENT_ID, recursive_count)
                 #__set_client_attribbute(CLIENT_ID, 'client_text', client_text)
                 #__set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
                 #if new_client_shadow:
@@ -339,8 +340,8 @@ def get_sync(client_text, recursive_count):
                 r_json = r.json()
                 if 'status' in r_json:
                     if not r_json['status'] == "OK":
-                        print("__manage_error_return")
-                        error_return, new_client_shadow = __manage_error_return(r_json, CLIENT_ID, recursive_count)
+                        print("__manage_get_sync_error_return")
+                        error_return, new_client_shadow = __manage_get_sync_error_return(r_json, CLIENT_ID, recursive_count)
                         __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
                         __set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
                         if new_client_shadow:
@@ -368,23 +369,74 @@ def get_sync(client_text, recursive_count):
     abort(500)
 
 
+def __manage_get_sync_error_return(r_json, client_id, recursive_count):
+    new_client_shadow = None
+
+    client_text = __get_client_attribute(client_id, 'client_text')
+    if not client_text:
+        raise Exception('There should be a client_text by now...')
+
+    client_shadow = __get_client_attribute(client_id, 'client_shadow')
+    if not client_shadow:
+        client_shadow = ""
+
+    error_return = "Unknown error in response"
+
+    if 'error_type' in r_json:
+        if r_json['error_type'] == "NoServerText":
+            print("NoServerText")
+            # client sends its text:
+            r_send_text = __send_text_payload("http://127.0.0.1:5002/send_text", client_id, client_text, client_shadow)
+            try:
+                r_send_text_json = r_send_text.json()
+                if 'status' in r_send_text_json:
+                    if r_send_text_json['status'] == "OK":
+                        print("Text updated from client. Trying to sync again")
+                        flash("Text updated from client. Trying to sync again...", 'info')
+                        error_return = send_sync(client_text, recursive_count)
+                    else:
+                        error_return = "ERROR: unable to send_text"
+                else:
+                    error_return =  "ERROR: send_text response doesn't contain status"
+            except ValueError:
+                error_return = r_send_text.text
+        elif r_json['error_type'] == "NoServerShadow":
+            print("NoServerShadow")
+            # client sends its shadow:
+            r_send_shadow = __send_shadow_payload("http://127.0.0.1:5002/send_shadow", client_id, client_shadow)
+            try:
+                r_send_shadow_json = r_send_shadow.json()
+                if 'status' in r_send_shadow_json:
+                    if r_send_shadow_json['status'] == "OK":
+                        print("Shadow updated from client. Trying to sync again")
+                        flash("Shadow updated from client. Trying to sync again...", 'info')
+                        error_return =  send_sync(client_text, recursive_count)
+                    else:
+                        error_return = "ERROR: unable to send_shadow"
+                else:
+                    error_return = "ERROR: send_shadow response doesn't contain status"
+            except ValueError:
+                error_return = r_send_shadow.text
+        elif r_json['error_type'] == "ServerShadowChecksumFailed":
+            print("ServerShadowChecksumFailed")
+            # server sends its shadow:
+            if 'server_shadow' in r_json:
+                new_client_shadow = r_json['server_shadow']
+                print("Shadow updated from server. Trying to sync again")
+                flash("Shadow updated from server. Trying to sync again...", 'error')
+                error_return =  send_sync(client_text, recursive_count)
+            else:
+                error_return = "ERROR: unable to update shadow from server"
+        else:
+            error_return = "ERROR<br />" + r_json['error_type']
+            if  'error_message' in r_json:
+                error_return = error_return + "<br />" + r_json['error_message']
+                error_return = error_return + "<br />" + "FULL MESSAGE:<br />" + json.dumps(r_json)
+
+    return error_return, new_client_shadow
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def __manage_error_return(r_json, client_id, recursive_count):
+def __manage_send_sync_error_return(r_json, client_id, recursive_count):
     new_client_shadow = None
 
     client_text = __get_client_attribute(client_id, 'client_text')
@@ -510,5 +562,27 @@ def __get_sync_payload(url, client_id):
       )
 
 
+def _secure_filename(filename):
+    filename.lower()
+    filename = filename.replace(':','-')
+    filename = filename.replace(' ','_')
+    keep_chars = ('_','_','.',)
+    "".join(c for c in filename if c.isalnum() or c in keep_chars).strip()
+    return filename
+
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5001)
+    import argparse #FIXME
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--port", help="Port")
+    args = parser.parse_args()
+    client_port = 5001
+    if args.port and int(args.port) > 0:
+        client_port = int(args.port)
+    db_filename = _secure_filename('abrim-{}.abrimclientdb'.format(client_port))
+    app.config['DB_PATH'] = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        db_filename
+    )
+
+    app.run(host='0.0.0.0', port=client_port)

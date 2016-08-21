@@ -108,6 +108,8 @@ def send_sync(request):
     res = err_response('UnknownError', 'Non controlled error in server')
     if req and 'client_id' in req and 'client_shadow_cksum' in req and 'client_patches' in req:
 
+        # FIXME: create atomicity
+        #
         # steps 4 (atomic with 5, 6 & 7)
         #
         # The edits are applied to Server Text on a best-effort basis
@@ -178,10 +180,10 @@ def send_sync(request):
                 else:
                     server_shadow_patch_results = diff_obj.patch_apply(
                       patches2, server_shadow)
-                results = server_shadow_patch_results[1]
+                shadow_results = server_shadow_patch_results[1]
 
                 # len(set(list)) should be 1 if all elements are the same
-                if len(set(results)) == 1 and results[0]:
+                if len(set(shadow_results)) == 1 and shadow_results[0]:
                     # step 5
                     with closing(shelve.open(temp_server_file_name)) as d:
                         server_shadows = d['server_shadows']
@@ -190,21 +192,18 @@ def send_sync(request):
                         # should a break here be catastrophic ??
                         #
                         # step 6
+                        if not 'server_text' in d:
+                            d['server_text'] = ""
                         server_text = d['server_text']
 
-                        edits = diff_obj.diff_main(server_text, server_shadow_patch_results[0])
-                        diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
 
-                        server_text_patches = diff_obj.patch_make(edits)
-
+                        server_text_patch_results = None
                         server_text_patch_results = diff_obj.patch_apply(
-                          server_text_patches, server_text)
-                        server_text_patches_results = server_shadow_patch_results[1]
+                              patches2, server_text)
+                        text_results = server_text_patch_results[1]
 
-                        # len(set(list)) should be 1 if all elements are the same
-                        if len(set(server_text_patches_results)) == 1 and server_text_patches_results[0]:
-                            #
-                            #step 7
+                        if any(text_results):
+                            # step 7
                             d['server_text'] = server_text_patch_results[0]
                             res = { 'status': 'OK', }
                         else:
@@ -255,15 +254,12 @@ def send_text(request):
             if not 'server_shadows' in d:
                 d['server_shadows'] = {}
             server_shadows = d['server_shadows']
-
             client_id = req['client_id']
             server_shadows[client_id] = req['client_shadow']
             d['server_shadows'] = server_shadows
-
             res = {
                 'status': 'OK',
                 }
-
     else:
         if not req:
             res = err_response('NoPayload',
@@ -282,27 +278,13 @@ def send_text(request):
     return flask.jsonify(**res)
 
 
-
+# FIXME unify with send_text
 def send_shadow(request):
     #import pdb; pdb.set_trace()
     print("send_shadow")
     req = request.json
     res = None
     if req and 'client_id' in req and 'client_shadow' in req:
-
-        # steps 4 (atomic with 5, 6 & 7)
-        #
-        # The edits are applied to Server Text on a best-effort basis
-        # Server Text is updated with the result of the patch. Steps 4 and 5
-        # must be atomic, but they do not have to be blocking; they may be
-        # repeated until Server Text stays still long enough.
-        #
-        # Client Text and Server Shadow (or symmetrically Server Text and
-        # Client Shadow) must be absolutely identical after every half of the
-        # synchronization
-        #
-        # receive text_patches and client_shadow_cksum
-        #
         server_shadows = None
 
         res = err_response('UnknowErrorSendShadow',
@@ -312,27 +294,12 @@ def send_shadow(request):
             if not 'server_shadows' in d:
                 d['server_shadows'] = {}
             server_shadows = d['server_shadows']
-
-            # first check the server shadow cheksum
-            # if server_shadows[client_id] is empty ask for it
-
-            #print("saving shadow from " + req['client_id'])
-            #print("----")
-            #print(req['client_shadow'])
-            #print("----")
             client_id = req['client_id']
             server_shadows[client_id] = req['client_shadow']
             d['server_shadows'] = server_shadows
-
-            #d['server_text'] = req['client_shadow']
-
-            #print("send_shadow: " + \
-            #        ''.join('{}{}'.format(key, val) for key, val in d.items()))
-
             res = {
                 'status': 'OK',
                 }
-
     else:
         if not req:
             res = err_response('NoPayload',
@@ -433,7 +400,7 @@ def get_sync(request):
                     if not 'server_shadows' in d:
                         d['server_shadows'] = {}
                     server_shadows = d['server_shadows']
-                    server_shadows[client_id] = client_text
+                    server_shadows[client_id] = server_text
                     d['server_shadows'] = server_shadows
 
                 res = {
