@@ -338,7 +338,7 @@ def get_sync(client_text, recursive_count):
             try:
                 r_json = r.json()
                 if 'status' in r_json:
-                    if not r_json['status'] == u"OK":
+                    if not r_json['status'] == "OK":
                         print("__manage_error_return")
                         error_return, new_client_shadow = __manage_error_return(r_json, CLIENT_ID, recursive_count)
                         __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
@@ -398,7 +398,7 @@ def __manage_error_return(r_json, client_id, recursive_count):
     error_return = "Unknown error in response"
 
     if 'error_type' in r_json:
-        if r_json['error_type'] == u"NoServerText":
+        if r_json['error_type'] == "NoServerText":
             print("NoServerText")
             # client sends its text:
             r_send_text = __send_text_payload("http://127.0.0.1:5002/send_text", client_id, client_text, client_shadow)
@@ -415,7 +415,7 @@ def __manage_error_return(r_json, client_id, recursive_count):
                     error_return =  "ERROR: send_text response doesn't contain status"
             except ValueError:
                 error_return = r_send_text.text
-        elif r_json['error_type'] == u"NoServerShadow":
+        elif r_json['error_type'] == "NoServerShadow":
             print("NoServerShadow")
             # client sends its shadow:
             r_send_shadow = __send_shadow_payload("http://127.0.0.1:5002/send_shadow", client_id, client_shadow)
@@ -432,7 +432,7 @@ def __manage_error_return(r_json, client_id, recursive_count):
                     error_return = "ERROR: send_shadow response doesn't contain status"
             except ValueError:
                 error_return = r_send_shadow.text
-        elif r_json['error_type'] == u"ServerShadowChecksumFailed":
+        elif r_json['error_type'] == "ServerShadowChecksumFailed":
             print("ServerShadowChecksumFailed")
             # server sends its shadow:
             if 'server_shadow' in r_json:
