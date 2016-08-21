@@ -4,3 +4,4 @@
 *.un~
 abrim.cfg
 geckodriver.log
+*.abrimclientdb*
