@@ -19,6 +19,7 @@ app.debug = True
 def __root():
     abort(404)
 
+
 @app.route('/datastore')
 def __datastore():
     if request.method != 'GET':
@@ -27,9 +28,8 @@ def __datastore():
         return show_datastore_form()
 
 
-
 @app.route('/send_sync', methods=['POST'])
-def __sync():
+def _send_sync():
     if request.method != 'POST':
         abort(404)
     else:
@@ -37,7 +37,7 @@ def __sync():
 
 
 @app.route('/send_text', methods=['POST'])
-def __text():
+def _send_text():
     if request.method != 'POST':
         abort(404)
     else:
@@ -45,12 +45,19 @@ def __text():
 
 
 @app.route('/send_shadow', methods=['POST'])
-def __shadow():
+def _send_shadow():
     if request.method != 'POST':
         abort(404)
     else:
         return send_shadow(request)
 
+
+@app.route('/get_sync', methods=['POST'])
+def _get_sync():
+    if request.method != 'POST':
+        abort(404)
+    else:
+        return get_sync(request)
 
 
 from contextlib import closing
@@ -98,7 +105,7 @@ def send_sync(request):
     #import pdb; pdb.set_trace()
     print("send_sync")
     req = request.json
-    res = err_response('UnknownError', 'Not controlled error in server')
+    res = err_response('UnknownError', 'Non controlled error in server')
     if req and 'client_id' in req and 'client_shadow_cksum' in req and 'client_patches' in req:
 
         # steps 4 (atomic with 5, 6 & 7)
@@ -130,7 +137,7 @@ def send_sync(request):
         client_id = req['client_id']
         client_shadow_cksum = req['client_shadow_cksum']
 
-        if not server_text:
+        if server_text is None:
             print("NoServerText")
             res = err_response('NoServerText',
             'No text found in the server. Send it again')
@@ -352,6 +359,103 @@ def err_response(error_type, error_message):
         'error_message': error_message,
         }
 
+
+def get_sync(request):
+    #import pdb; pdb.set_trace()
+    print("get_sync")
+    req = request.json
+    res = err_response('UnknownError', 'Non controlled error in server')
+    if req and 'client_id' in req:
+        server_text = None
+        server_shadows = {}
+        with closing(shelve.open(temp_server_file_name)) as d:
+            if 'server_text' in d:
+                server_text = d['server_text']
+            if not 'server_shadows' in d:
+                d['server_shadows'] = {}
+            else:
+                server_shadows = d['server_shadows']
+
+        # if server_shadows[client_id] is empty ask for it
+
+        client_id = req['client_id']
+
+        if server_text is None:
+            print("NoServerText")
+            res = err_response('NoServerText',
+            'No text found in the server. Send it again')
+        elif not client_id in server_shadows:
+            print("NoServerShadow")
+            res = err_response('NoServerShadow',
+            'No shadow found in the server. Send it again')
+        else:
+
+            diff_obj = diff_match_patch.diff_match_patch()
+            diff_obj.Diff_Timeout = DIFF_TIMEOUT
+
+            # from https://neil.fraser.name/writing/sync/
+            # step 1 & 2
+            # Client Text is diffed against Shadow. This returns a list of edits which
+            # have been performed on Client Text
+
+            server_shadow = server_shadows[client_id]
+            edits = None
+            if not server_shadow:
+                edits = diff_obj.diff_main("", server_text)
+            else:
+                edits = diff_obj.diff_main(server_shadow, server_text)
+            diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
+
+            patches = diff_obj.patch_make(edits)
+            text_patches = diff_obj.patch_toText(patches)
+
+            if not text_patches:
+                # nothing to update!
+                res = err_response('NoUpdate',
+                'Nothing to update')
+            else:
+                #print("step 2 results: {}".format(text_patches))
+
+                #step 3
+                #
+                # Client Text is copied over to Shadow. This copy must be identical to
+                # the value of Client Text in step 1, so in a multi-threaded environment
+                # a snapshot of the text should have been taken.
+                server_shadow_cksum = 0
+                if not server_shadow:
+                    print("server_shadow: None")
+                else:
+                    server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
+                print("server_shadow_cksum {}".format(server_shadow_cksum))
+                #print(server_shadow)
+
+                with closing(shelve.open(temp_server_file_name)) as d:
+                    if not 'server_shadows' in d:
+                        d['server_shadows'] = {}
+                    server_shadows = d['server_shadows']
+                    server_shadows[client_id] = client_text
+                    d['server_shadows'] = server_shadows
+
+                res = {
+                    'status': 'OK',
+                    'client_id': client_id,
+                    'server_shadow_cksum': server_shadow_cksum,
+                    'text_patches': text_patches,
+                    }
+
+    else:
+        if not req:
+            res = err_response('NoPayload',
+            'No payload found in the request')
+        elif not 'client_id' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No client_id found in the request')
+        else:
+            print("get_sync 500")
+            abort(500)
+    print("response:")
+    print(res)
+    return flask.jsonify(**res)
 
 
 
