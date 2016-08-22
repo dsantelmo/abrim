@@ -161,9 +161,10 @@ import sys
 
 
 def _sync(req_form):
-    if req_form and 'get_text' in req_form:
-        return get_sync(request.form['client_text'], 0)
-    elif req_form and 'send_text' in req_form:
+    #if req_form and 'get_text' in req_form:
+    #    return get_sync(request.form['client_text'], 0)
+    #el
+    if req_form and 'send_text' in req_form:
         return send_sync(request.form['client_text'], 0)
     else:
         flash("Command not recognized", 'error')
