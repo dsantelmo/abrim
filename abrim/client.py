@@ -112,9 +112,37 @@ def __print_iter_contents(iter_d, depth, temp_string):
 
 
 def show_main_form():
+    print("show_main_form")
     client_text = __get_client_attribute(CLIENT_ID, 'client_text')
-    if not client_text:
+    if client_text is None:
         client_text = ""
+        print("show_main_form: not client_text")
+
+        url = "http://127.0.0.1:5002/get_text"
+        payload = { 'client_id': CLIENT_ID, }
+        try:
+            r = requests.post(
+              url,
+              headers={'Content-Type': 'application/json'},
+              data=json.dumps(payload)
+              )
+            r_json = r.json()
+            if 'status' in r_json:
+                if (r_json['status'] != "OK"
+                    or 'server_text' not in r_json
+                    ):
+                    return "ERROR: uncontrolled error in the server"
+                else:
+                    client_text = r_json['server_text']
+            else:
+                return "ERROR: failure contacting the server"
+        except requests.exceptions.ConnectionError:
+            flash("Server is unreachable", 'error')
+            #return redirect(url_for('__main'), code=302)
+        except:
+            return "ERROR: uncontrolled error in the client"
+        __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
+
     client_shadow = __get_client_attribute(CLIENT_ID, 'client_shadow')
     if not client_shadow:
         client_shadow= ""
@@ -322,7 +350,9 @@ def send_sync(client_text, recursive_count):
             return "ERROR: ValueError" #FIXME
         except requests.exceptions.ConnectionError:
             print("ConnectionError")
-            return "ERROR: ConnectionError" #FIXME
+            #return "ERROR: ConnectionError" #FIXME
+            flash("Server is unreachable", 'error')
+            return redirect(url_for('__main'), code=302)
 
     print("if we have got to here we have some coverage problems...")
     abort(500)

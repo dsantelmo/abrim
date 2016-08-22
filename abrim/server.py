@@ -52,12 +52,12 @@ def _send_shadow():
         return send_shadow(request)
 
 
-@app.route('/get_sync', methods=['POST'])
-def _get_sync():
+@app.route('/get_text', methods=['POST'])
+def _get_text():
     if request.method != 'POST':
         abort(404)
     else:
-        return get_sync(request)
+        return get_text(request)
 
 
 from contextlib import closing
@@ -174,6 +174,9 @@ def send_sync(request):
                 print("NoServerShadow")
                 res = err_response('NoServerShadow',
                 'No shadow found in the server. Send it again')
+            #print("NoServerShadow")
+            #res = err_response('NoServerShadow',
+            #'No shadow found in the server. Send it again')
         else:
             server_shadow = server_shadows[client_id]
             if not server_shadow:
@@ -237,6 +240,10 @@ def send_sync(request):
                             # Here starts second half of sync.
                             #
 
+                            print("""#
+# Here starts second half of sync.
+#""")
+
                             diff_obj = diff_match_patch.diff_match_patch()
                             diff_obj.Diff_Timeout = DIFF_TIMEOUT
 
@@ -288,9 +295,15 @@ def send_sync(request):
                                     'text_patches': text_patches,
                                     }
                         else:
-                            # I should try to patch again
-                            res = err_response('ServerPatchFailed',
-                            'Match-Patch failed in server')
+                            # should I try to patch again?
+                            print("ServerPatchFailed 1")
+                            res = {
+                                'status': 'ERROR',
+                                'error_type': 'ServerShadowChecksumFailed',
+                                'error_message': 'Shadows got desynced. Sending back the full server shadow',
+                                'server_shadow' : server_text
+                                }
+                            server_shadows[client_id] = hashlib.md5(server_text.encode('utf-8')).hexdigest()
                 else:
                     # I should try to patch again
                     res = err_response('ServerPatchFailed',
@@ -406,104 +419,124 @@ def err_response(error_type, error_message):
         'error_message': error_message,
         }
 
-
-def get_sync(request):
+def get_text(request):
     #import pdb; pdb.set_trace()
-    print("get_sync")
+    print("get_text")
     req = request.json
-    res = err_response('UnknownError', 'Non controlled error in server')
-    if req and 'client_id' in req:
-        server_text = None
-        server_shadows = {}
-        with closing(shelve.open(temp_server_file_name)) as d:
-            if 'server_text' in d:
-                server_text = d['server_text']
-            if not 'server_shadows' in d:
-                d['server_shadows'] = {}
-            else:
-                server_shadows = d['server_shadows']
 
-        # if server_shadows[client_id] is empty ask for it
-
-        client_id = req['client_id']
-
-        if server_text is None:
-            print("NoServerText")
-            res = err_response('NoServerText',
-            'No text found in the server. Send it again')
-        elif not client_id in server_shadows:
-            print("NoServerShadow")
-            res = err_response('NoServerShadow',
-            'No shadow found in the server. Send it again')
+    server_text = ""
+    with closing(shelve.open(temp_server_file_name)) as d:
+        if 'server_text' in d:
+            server_text = d['server_text']
         else:
+            d['server_text'] = ""
 
-            diff_obj = diff_match_patch.diff_match_patch()
-            diff_obj.Diff_Timeout = DIFF_TIMEOUT
-
-            # from https://neil.fraser.name/writing/sync/
-            # step 1 & 2
-            # Client Text is diffed against Shadow. This returns a list of edits which
-            # have been performed on Client Text
-
-            server_shadow = server_shadows[client_id]
-            edits = None
-            if not server_shadow:
-                edits = diff_obj.diff_main("", server_text)
-            else:
-                edits = diff_obj.diff_main(server_shadow, server_text)
-            diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
-
-            patches = diff_obj.patch_make(edits)
-            text_patches = diff_obj.patch_toText(patches)
-
-            if not text_patches:
-                # nothing to update!
-                res = err_response('NoUpdate',
-                'Nothing to update')
-            else:
-                #print("step 2 results: {}".format(text_patches))
-
-                #step 3
-                #
-                # Client Text is copied over to Shadow. This copy must be identical to
-                # the value of Client Text in step 1, so in a multi-threaded environment
-                # a snapshot of the text should have been taken.
-                server_shadow_cksum = 0
-                if not server_shadow:
-                    print("server_shadow: None")
-                else:
-                    server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
-                print("server_shadow_cksum {}".format(server_shadow_cksum))
-                #print(server_shadow)
-
-                with closing(shelve.open(temp_server_file_name)) as d:
-                    if not 'server_shadows' in d:
-                        d['server_shadows'] = {}
-                    server_shadows = d['server_shadows']
-                    server_shadows[client_id] = server_text
-                    d['server_shadows'] = server_shadows
-
-                res = {
-                    'status': 'OK',
-                    'client_id': client_id,
-                    'server_shadow_cksum': server_shadow_cksum,
-                    'text_patches': text_patches,
-                    }
-
-    else:
-        if not req:
-            res = err_response('NoPayload',
-            'No payload found in the request')
-        elif not 'client_id' in req:
-            res = err_response('PayloadMissingAttribute',
-            'No client_id found in the request')
-        else:
-            print("get_sync 500")
-            abort(500)
+    res = {
+        'status': 'OK',
+        'server_text': server_text,
+        }
     print("response:")
     print(res)
     return flask.jsonify(**res)
 
+
+#def get_sync(request):
+#    #import pdb; pdb.set_trace()
+#    print("get_sync")
+#    req = request.json
+#    res = err_response('UnknownError', 'Non controlled error in server')
+#    if req and 'client_id' in req:
+#        server_text = None
+#        server_shadows = {}
+#        with closing(shelve.open(temp_server_file_name)) as d:
+#            if 'server_text' in d:
+#                server_text = d['server_text']
+#            if not 'server_shadows' in d:
+#                d['server_shadows'] = {}
+#            else:
+#                server_shadows = d['server_shadows']
+#
+#        # if server_shadows[client_id] is empty ask for it
+#
+#        client_id = req['client_id']
+#
+#        if server_text is None:
+#            print("NoServerText")
+#            res = err_response('NoServerText',
+#            'No text found in the server. Send it again')
+#        elif not client_id in server_shadows:
+#            print("NoServerShadow")
+#            res = err_response('NoServerShadow',
+#            'No shadow found in the server. Send it again')
+#        else:
+#
+#            diff_obj = diff_match_patch.diff_match_patch()
+#            diff_obj.Diff_Timeout = DIFF_TIMEOUT
+#
+#            # from https://neil.fraser.name/writing/sync/
+#            # step 1 & 2
+#            # Client Text is diffed against Shadow. This returns a list of edits which
+#            # have been performed on Client Text
+#
+#            server_shadow = server_shadows[client_id]
+#            edits = None
+#            if not server_shadow:
+#                edits = diff_obj.diff_main("", server_text)
+#            else:
+#                edits = diff_obj.diff_main(server_shadow, server_text)
+#            diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
+#
+#            patches = diff_obj.patch_make(edits)
+#            text_patches = diff_obj.patch_toText(patches)
+#
+#            if not text_patches:
+#                # nothing to update!
+#                res = err_response('NoUpdate',
+#                'Nothing to update')
+#            else:
+#                #print("step 2 results: {}".format(text_patches))
+#
+#                #step 3
+#                #
+#                # Client Text is copied over to Shadow. This copy must be identical to
+#                # the value of Client Text in step 1, so in a multi-threaded environment
+#                # a snapshot of the text should have been taken.
+#                server_shadow_cksum = 0
+#                if not server_shadow:
+#                    print("server_shadow: None")
+#                else:
+#                    server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
+#                print("server_shadow_cksum {}".format(server_shadow_cksum))
+#                #print(server_shadow)
+#
+#                with closing(shelve.open(temp_server_file_name)) as d:
+#                    if not 'server_shadows' in d:
+#                        d['server_shadows'] = {}
+#                    server_shadows = d['server_shadows']
+#                    server_shadows[client_id] = server_text
+#                    d['server_shadows'] = server_shadows
+#
+#                res = {
+#                    'status': 'OK',
+#                    'client_id': client_id,
+#                    'server_shadow_cksum': server_shadow_cksum,
+#                    'text_patches': text_patches,
+#                    }
+#
+#    else:
+#        if not req:
+#            res = err_response('NoPayload',
+#            'No payload found in the request')
+#        elif not 'client_id' in req:
+#            res = err_response('PayloadMissingAttribute',
+#            'No client_id found in the request')
+#        else:
+#            print("get_sync 500")
+#            abort(500)
+#    print("response:")
+#    print(res)
+#    return flask.jsonify(**res)
+#
 
 
 if __name__ == "__main__":
