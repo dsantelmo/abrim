@@ -238,7 +238,8 @@ def send_sync(client_text, recursive_count):
                 r_json = r.json()
                 if 'status' in r_json:
                     if (r_json['status'] != "OK"
-                        and r_json['error_type'] != "NoUpdate" ):
+                        and r_json['error_type'] != "NoUpdate"
+                        and r_json['error_type']  != "FuzzyServerPatchFailed"):
                         print("__manage_send_sync_error_return")
                         error_return, new_client_shadow = __manage_send_sync_error_return(r_json, CLIENT_ID, recursive_count)
                         __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
@@ -264,6 +265,23 @@ def send_sync(client_text, recursive_count):
                             # no changes so nothing else to do
                             flash("Sync OK!", 'info')
                             return redirect(url_for('__main'), code=302)
+                        elif (r_json['status'] != "OK"
+                            and r_json['error_type'] == "FuzzyServerPatchFailed"):
+                            if 'server_text' in r_json:
+                                __set_client_attribbute(
+                                    CLIENT_ID,
+                                    'client_text',
+                                    r_json['server_text']
+                                )
+                                __set_client_attribbute(
+                                    CLIENT_ID,
+                                    'client_shadow',
+                                    r_json['server_text']
+                                )
+                                flash("Fuzzy patch failed. Data loss", 'error')
+                                return redirect(url_for('__main'), code=302)
+                            else:
+                                return "ERROR: malformed server response"
                         else:
                             if ('client_id' in r_json
                                 and 'server_shadow_cksum' in r_json

@@ -296,12 +296,12 @@ def send_sync(request):
                                     }
                         else:
                             # should I try to patch again?
-                            print("ServerPatchFailed 1")
+                            print("FuzzyServerPatchFailed")
                             res = {
                                 'status': 'ERROR',
-                                'error_type': 'ServerShadowChecksumFailed',
-                                'error_message': 'Shadows got desynced. Sending back the full server shadow',
-                                'server_shadow' : server_text
+                                'error_type': 'FuzzyServerPatchFailed',
+                                'error_message': 'Fuzzy patching failled. Sending back the full server text',
+                                'server_text' : server_text
                                 }
                             server_shadows[client_id] = hashlib.md5(server_text.encode('utf-8')).hexdigest()
                 else:
