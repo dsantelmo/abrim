@@ -154,9 +154,26 @@ def send_sync(request):
         #    'No text found in the server. Send it again')
         #el
         if not client_id in server_shadows:
-            print("NoServerShadow")
-            res = err_response('NoServerShadow',
-            'No shadow found in the server. Send it again')
+            if server_text:
+                print("ServerShadowChecksumFailed")
+                 # FIXME: Change ServerShadowChecksumFailed to its own type
+                res = {
+                    'status': 'ERROR',
+                    'error_type': 'ServerShadowChecksumFailed',
+                    'error_message': 'Shadows got desynced. Sending back the full server shadow',
+                    'server_shadow': server_text,
+                    }
+                with closing(shelve.open(temp_server_file_name)) as d:
+                    if not 'server_shadows' in d:
+                        d['server_shadows'] = {}
+                    else:
+                        server_shadows = d['server_shadows']
+                        server_shadows[client_id] = server_text
+                        d['server_shadows'] = server_shadows
+            else:
+                print("NoServerShadow")
+                res = err_response('NoServerShadow',
+                'No shadow found in the server. Send it again')
         else:
             server_shadow = server_shadows[client_id]
             if not server_shadow:
@@ -215,7 +232,61 @@ def send_sync(request):
                         if any(text_results):
                             # step 7
                             d['server_text'] = server_text_patch_results[0]
-                            res = { 'status': 'OK', }
+
+                            #
+                            # Here starts second half of sync.
+                            #
+
+                            diff_obj = diff_match_patch.diff_match_patch()
+                            diff_obj.Diff_Timeout = DIFF_TIMEOUT
+
+                            # from https://neil.fraser.name/writing/sync/
+                            # step 1 & 2
+                            # Client Text is diffed against Shadow. This returns a list of edits which
+                            # have been performed on Client Text
+
+                            server_shadow = server_shadows[client_id]
+                            server_text = d['server_text']
+                            edits = None
+                            if not server_shadow:
+                                edits = diff_obj.diff_main("", server_text)
+                            else:
+                                edits = diff_obj.diff_main(server_shadow, server_text)
+                            diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
+
+                            patches = diff_obj.patch_make(edits)
+                            text_patches = diff_obj.patch_toText(patches)
+
+                            if not text_patches:
+                                # nothing to update!
+                                res = err_response('NoUpdate',
+                                'Nothing to update')
+                            else:
+                                #print("step 2 results: {}".format(text_patches))
+
+                                #step 3
+                                #
+                                # Client Text is copied over to Shadow. This copy must be identical to
+                                # the value of Client Text in step 1, so in a multi-threaded environment
+                                # a snapshot of the text should have been taken.
+                                server_shadow_cksum = 0
+                                if not server_shadow:
+                                    print("server_shadow: None")
+                                else:
+                                    server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
+                                print("server_shadow_cksum {}".format(server_shadow_cksum))
+                                #print(server_shadow)
+
+                                server_shadows = d['server_shadows']
+                                server_shadows[client_id] = server_text
+                                d['server_shadows'] = server_shadows
+
+                                res = {
+                                    'status': 'OK',
+                                    'client_id': client_id,
+                                    'server_shadow_cksum': server_shadow_cksum,
+                                    'text_patches': text_patches,
+                                    }
                         else:
                             # I should try to patch again
                             res = err_response('ServerPatchFailed',
