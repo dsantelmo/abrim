@@ -114,7 +114,7 @@ def __print_iter_contents(iter_d, depth, temp_string):
 def show_main_form():
     print("show_main_form")
     client_text = __get_client_attribute(CLIENT_ID, 'client_text')
-    if client_text is None:
+    if client_text is None or client_text == "":
         client_text = ""
         print("show_main_form: not client_text")
 
