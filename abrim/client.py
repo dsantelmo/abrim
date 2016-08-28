@@ -15,18 +15,91 @@ from flask import Flask, request, redirect, url_for, abort, render_template, fla
 import diff_match_patch
 import hashlib
 import requests
+import appdirs
 
 DIFF_TIMEOUT = 0.1
 CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
 MAX_RECURSIVE_COUNT = 3
+
+EX_OK = 0 # successful termination
+
+EX__BASE = 64 # base value for error messages
+
+EX_USAGE = 64 # command line usage error
+EX_DATAERR = 65 # data format error
+EX_NOINPUT = 66 # cannot open input
+EX_NOUSER = 67 # addressee unknown
+EX_NOHOST = 68 # host name unknown
+EX_UNAVAILABLE = 69 # service unavailable
+EX_SOFTWARE = 70 # internal software error
+EX_OSERR = 71 # system error (e.g., can't fork)
+EX_OSFILE = 72 # critical OS file missing
+EX_CANTCREAT = 73 # can't create (user) output file
+EX_IOERR = 74 # input/output error
+EX_TEMPFAIL = 75 # temp failure; user is invited to retry
+EX_PROTOCOL = 76 # remote error in protocol
+EX_NOPERM = 77 # permission denied
+EX_CONFIG = 78 # configuration error
 
 # set FLASK_APP=client.py
 # set FLASK_DEBUG=1
 # python -m flask run
 app = Flask(__name__)
 app.config.from_object(__name__)
-app.config.from_pyfile('abrim.cfg') #FIXME use instance folders
-app.config.from_envvar('ABRIM_SETTINGS', silent=True)
+
+# FIXME: move these to external utils module
+def _secure_filename(filename):
+    filename.lower()
+    filename = filename.replace(':','-')
+    filename = filename.replace(' ','_')
+    keep_chars = ('_','_','.',)
+    "".join(c for c in filename if c.isalnum() or c in keep_chars).strip()
+    return filename
+
+def _get_db_filename(port):
+    string_to_format = 'abrim-{}.abrimclientdb'
+    return _secure_filename(string_to_format.format(port))
+
+
+appname = "AbrimSync"
+appauthor = "Abrim"
+
+default_cfg_filename = 'default.cfg'
+default_cfg_dir = appdirs.site_config_dir(appname, appauthor)
+default_cfg_path = os.path.join(
+    default_cfg_dir,
+    default_cfg_filename
+)
+print("Opening config at: {0}".format(default_cfg_path,))
+open(default_cfg_path, 'a').close()
+if not os.path.exists(default_cfg_dir):
+    os.makedirs(default_cfg_dir)
+try:
+    app.config.from_pyfile(default_cfg_path)
+except IOError:
+    print("IOError while opening config file at: {0}".format(default_cfg_path,))
+    sys.exit(EX_OSFILE)
+
+user_cfg_filename = 'abrim.cfg'
+user_cfg_dir = appdirs.user_config_dir(appname, appauthor)
+user_cfg_path = os.path.join(
+    user_cfg_dir,
+    user_cfg_filename
+)
+print("Opening config at: {0}".format(user_cfg_path,))
+open(user_cfg_path, 'a').close()
+if not os.path.exists(user_cfg_dir):
+    os.makedirs(user_cfg_dir)
+try:
+    app.config.from_pyfile(user_cfg_path)
+except IOError:
+    print("IOError while opening config file at: {0}".format(user_cfg_path,))
+    sys.exit(EX_OSFILE)
+
+app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
+
+if not app.secret_key:
+    app.secret_key = os.urandom(24)
 
 
 #@app.route('/', methods=['POST',])
@@ -688,15 +761,6 @@ def __get_sync_payload(url, client_id):
       )
 
 
-def _secure_filename(filename):
-    filename.lower()
-    filename = filename.replace(':','-')
-    filename = filename.replace(' ','_')
-    keep_chars = ('_','_','.',)
-    "".join(c for c in filename if c.isalnum() or c in keep_chars).strip()
-    return filename
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
@@ -704,10 +768,7 @@ if __name__ == "__main__":
     client_port = 5001
     if args.port and int(args.port) > 0:
         client_port = int(args.port)
-    db_filename = _secure_filename('abrim-{}.abrimclientdb'.format(client_port))
-    app.config['DB_PATH'] = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        db_filename
-    )
 
+    db_filename = _get_db_filename(client_port)
+    app.config['DB_PATH'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
     app.run(host='0.0.0.0', port=client_port)
