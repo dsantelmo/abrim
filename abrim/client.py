@@ -16,30 +16,12 @@ import diff_match_patch
 import hashlib
 import requests
 import appdirs
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from abrim.utils import exit_codes
 
 DIFF_TIMEOUT = 0.1
 CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
 MAX_RECURSIVE_COUNT = 3
-
-EX_OK = 0 # successful termination
-
-EX__BASE = 64 # base value for error messages
-
-EX_USAGE = 64 # command line usage error
-EX_DATAERR = 65 # data format error
-EX_NOINPUT = 66 # cannot open input
-EX_NOUSER = 67 # addressee unknown
-EX_NOHOST = 68 # host name unknown
-EX_UNAVAILABLE = 69 # service unavailable
-EX_SOFTWARE = 70 # internal software error
-EX_OSERR = 71 # system error (e.g., can't fork)
-EX_OSFILE = 72 # critical OS file missing
-EX_CANTCREAT = 73 # can't create (user) output file
-EX_IOERR = 74 # input/output error
-EX_TEMPFAIL = 75 # temp failure; user is invited to retry
-EX_PROTOCOL = 76 # remote error in protocol
-EX_NOPERM = 77 # permission denied
-EX_CONFIG = 78 # configuration error
 
 # set FLASK_APP=client.py
 # set FLASK_DEBUG=1
@@ -78,7 +60,7 @@ try:
     app.config.from_pyfile(default_cfg_path)
 except IOError:
     print("IOError while opening config file at: {0}".format(default_cfg_path,))
-    sys.exit(EX_OSFILE)
+    sys.exit(exit_codes.EX_OSFILE)
 
 user_cfg_filename = 'abrim.cfg'
 user_cfg_dir = appdirs.user_config_dir(appname, appauthor)
@@ -94,7 +76,7 @@ try:
     app.config.from_pyfile(user_cfg_path)
 except IOError:
     print("IOError while opening config file at: {0}".format(user_cfg_path,))
-    sys.exit(EX_OSFILE)
+    sys.exit(exit_codes.EX_OSFILE)
 
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
