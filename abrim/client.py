@@ -15,10 +15,12 @@ from flask import Flask, request, redirect, url_for, abort, render_template, fla
 import diff_match_patch
 import hashlib
 import requests
-import appdirs
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from abrim.utils import exit_codes
+from abrim.utils import config_files
+from abrim.utils.common import secure_filename
 
+APP_NAME = "AbrimSync"
+APP_AUTHOR = "Abrim"
 DIFF_TIMEOUT = 0.1
 CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
 MAX_RECURSIVE_COUNT = 3
@@ -29,54 +31,11 @@ MAX_RECURSIVE_COUNT = 3
 app = Flask(__name__)
 app.config.from_object(__name__)
 
-# FIXME: move these to external utils module
-def _secure_filename(filename):
-    filename.lower()
-    filename = filename.replace(':','-')
-    filename = filename.replace(' ','_')
-    keep_chars = ('_','_','.',)
-    "".join(c for c in filename if c.isalnum() or c in keep_chars).strip()
-    return filename
-
 def _get_db_filename(port):
     string_to_format = 'abrim-{}.abrimclientdb'
-    return _secure_filename(string_to_format.format(port))
+    return secure_filename(string_to_format.format(port))
 
-
-appname = "AbrimSync"
-appauthor = "Abrim"
-
-default_cfg_filename = 'default.cfg'
-default_cfg_dir = appdirs.site_config_dir(appname, appauthor)
-default_cfg_path = os.path.join(
-    default_cfg_dir,
-    default_cfg_filename
-)
-print("Opening config at: {0}".format(default_cfg_path,))
-open(default_cfg_path, 'a').close()
-if not os.path.exists(default_cfg_dir):
-    os.makedirs(default_cfg_dir)
-try:
-    app.config.from_pyfile(default_cfg_path)
-except IOError:
-    print("IOError while opening config file at: {0}".format(default_cfg_path,))
-    sys.exit(exit_codes.EX_OSFILE)
-
-user_cfg_filename = 'abrim.cfg'
-user_cfg_dir = appdirs.user_config_dir(appname, appauthor)
-user_cfg_path = os.path.join(
-    user_cfg_dir,
-    user_cfg_filename
-)
-print("Opening config at: {0}".format(user_cfg_path,))
-open(user_cfg_path, 'a').close()
-if not os.path.exists(user_cfg_dir):
-    os.makedirs(user_cfg_dir)
-try:
-    app.config.from_pyfile(user_cfg_path)
-except IOError:
-    print("IOError while opening config file at: {0}".format(user_cfg_path,))
-    sys.exit(exit_codes.EX_OSFILE)
+config_files.load(app)
 
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
