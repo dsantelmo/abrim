@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 
-from flask import Flask, request, redirect, url_for, abort, render_template, flash
-import diff_match_patch
+from contextlib import closing
+import os
 import random
 import string
-import os
+import shelve
+# FIXME Warning Because the shelve module is backed by pickle, it is insecure
+# to load a shelf from an untrusted source. Like with pickle, loading a shelf
+# can execute arbitrary code
+from flask import Flask, request, redirect, url_for, abort, render_template, flash
+import diff_match_patch
 
 DIFF_TIMEOUT = 0.1
 CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
@@ -46,21 +51,6 @@ def __sync():
     else:
         return _sync(request.form)
 
-
-
-
-from contextlib import closing
-import shelve
-# FIXME Warning Because the shelve module is backed by pickle, it is insecure
-# to load a shelf from an untrusted source. Like with pickle, loading a shelf
-# can execute arbitrary code.
-import tempfile
-import os
-
-
-#FIXME clean me
-#temp_client_file_name = os.path.join( tempfile.gettempdir(),
-#  tempfile.gettempprefix() + "abrim_client_datastore")
 
 def __open_datastore():
     try:

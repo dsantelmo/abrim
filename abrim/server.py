@@ -1,8 +1,18 @@
 #!/usr/bin/env python
 
+from contextlib import closing
+import os
+import tempfile #FIXME delete
+import shelve
+# FIXME Warning Because the shelve module is backed by pickle, it is insecure
+# to load a shelf from an untrusted source. Like with pickle, loading a shelf
+# can execute arbitrary code.
 from flask import Flask, request, redirect, url_for, abort
 import flask
 import diff_match_patch
+
+
+
 
 DIFF_TIMEOUT=0.1
 
@@ -58,14 +68,6 @@ def _get_text():
     else:
         return get_text(request)
 
-
-from contextlib import closing
-import shelve
-# FIXME Warning Because the shelve module is backed by pickle, it is insecure
-# to load a shelf from an untrusted source. Like with pickle, loading a shelf
-# can execute arbitrary code.
-import tempfile
-import os
 
 SERVER_ID='server1'
 
