@@ -4,12 +4,17 @@ from contextlib import closing
 import os
 import random
 import string
+import json
+import sys
+import argparse
 import shelve
 # FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
 # can execute arbitrary code
 from flask import Flask, request, redirect, url_for, abort, render_template, flash
 import diff_match_patch
+import hashlib
+import requests
 
 DIFF_TIMEOUT = 0.1
 CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
@@ -144,14 +149,6 @@ def show_main_form():
             CLIENT_ID=CLIENT_ID,
             client_text=client_text,
             client_shadow=client_shadow)
-
-
-import diff_match_patch
-import hashlib
-import requests
-import json
-import sys
-
 
 
 def _sync(req_form):
@@ -701,7 +698,6 @@ def _secure_filename(filename):
 
 
 if __name__ == "__main__":
-    import argparse #FIXME
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     args = parser.parse_args()

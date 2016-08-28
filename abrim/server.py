@@ -3,6 +3,8 @@
 from contextlib import closing
 import os
 import tempfile #FIXME delete
+import hashlib
+import json
 import shelve
 # FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
@@ -10,7 +12,7 @@ import shelve
 from flask import Flask, request, redirect, url_for, abort
 import flask
 import diff_match_patch
-
+import requests
 
 
 
@@ -95,12 +97,6 @@ def __print_iter_contents(iter_d, depth, temp_string):
                 temp_string = temp_string + "<li><b>{0}</b> : {1}</li>".format(k, element)
     return temp_string
 
-
-
-import diff_match_patch
-import hashlib
-import requests
-import json
 
 def send_sync(request):
     #import pdb; pdb.set_trace()
