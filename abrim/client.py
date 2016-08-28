@@ -115,21 +115,26 @@ def show_main_form():
               headers={'Content-Type': 'application/json'},
               data=json.dumps(payload)
               )
-            r_json = r.json()
-            if 'status' in r_json:
-                if (r_json['status'] != "OK"
-                    or 'server_text' not in r_json
-                    ):
-                    return "ERROR: uncontrolled error in the server"
-                else:
-                    client_text = r_json['server_text']
-            else:
-                return "ERROR: failure contacting the server"
         except requests.exceptions.ConnectionError:
             flash("Server is unreachable", 'error')
             #return redirect(url_for('__main'), code=302)
-        except:
-            return "ERROR: uncontrolled error in the client"
+        else:
+            try:
+                r_json = r.json()
+            except ValueError as e:
+                print("ValueError in show_main_form: {0}".format(e.message))
+                flash("Server response error, no JSON", 'error')
+                #return redirect(url_for('__main'), code=302)
+            else:
+                if 'status' in r_json:
+                    if (r_json['status'] != "OK"
+                        or 'server_text' not in r_json
+                        ):
+                        return "ERROR: uncontrolled error in the server"
+                    else:
+                        client_text = r_json['server_text']
+                else:
+                    return "ERROR: failure contacting the server"
         __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
 
     client_shadow = __get_client_attribute(CLIENT_ID, 'client_shadow')
