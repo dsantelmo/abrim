@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 from flask import Flask, request, redirect, url_for, abort, render_template, flash
 import diff_match_patch
