@@ -1,7 +1,7 @@
 *.swp
 *.pyc
 *.sqlite
+*.sqlite-journal
 *.un~
 abrim.cfg
 geckodriver.log
-*.abrimclientdb*
