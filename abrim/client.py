@@ -1,11 +1,14 @@
 #!/usr/bin/env python
-#!/usr/bin/env python
 
 from contextlib import closing
 import os
 import sys
 import json
 import argparse
+from passlib.hash import bcrypt
+#hash = bcrypt.encrypt(usersPassword, rounds=app.config['BCRYPT_ROUNDS'])
+## Validating a hash
+#if bcrypt.verify(usersPassword, hash):
 import shelve
 # FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
@@ -24,6 +27,7 @@ app = Flask(__name__)
 # Default config:
 app.config['APP_NAME'] = "Sync"
 app.config['APP_AUTHOR'] = "Abrim"
+app.config['BCRYPT_ROUNDS'] = 15
 app.config['DIFF_TIMEOUT'] = 0.1
 app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
@@ -31,8 +35,6 @@ app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 # Config from files and env vars:
 config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
-
-
 
 
 
@@ -66,6 +68,12 @@ def init_db():
         with app.open_resource('db\\schema.sql', mode='r') as f:
             db.cursor().executescript(f.read())
         db.commit()
+
+
+
+
+
+
 
 
 # FIXME: DELETE THIS ------
@@ -115,57 +123,106 @@ def close_db(error):
         g.sqlite_db.close()
 
 
-# FIXME: BIG SQL INJECTION!!!!
-def __get_client_attribute(client_id, attrib):
+def __get_text(user_id):
     db = get_db()
-    print('select ' + attrib + " from texts where client_id='" + client_id + "' order by client_id desc")
-    cur = db.execute('select ' + attrib + " from texts where client_id='" + client_id + "' order by client_id desc")
+    select_query = """
+                   SELECT content
+                   FROM texts
+                   WHERE user_id = ?
+                   """
+    # FIXME logging...
+    print("{0} -- {1}".format(select_query,user_id,))
+    cur = db.execute(select_query, (user_id,))
     try:
         result = cur.fetchone()[0]
         print("--->" + result + "<----")
         return result
     except TypeError:
-        print("""
-------------------------------------
-__get_client_attribute returned None
-------------------------------------
-""")
+        print("__get_text returned None")
         return None
     except:
-        print("""
-------------------------------------
-__get_client_attribute FAILED!!!!!!!
-------------------------------------
-""")
+        print("__get_text FAILED!!")
         raise
-        return None
 
-def __set_client_attribute(client_id, col, value):
-    if value is None:
-        value = ""
+
+def __get_shadow(user_id):
+    db = get_db()
+    select_query = """
+                   SELECT shadow
+                   FROM texts
+                   WHERE user_id = ?
+                   """
+    # FIXME logging...
+    print("{0} -- {1}".format(select_query, user_id,))
+    cur = db.execute(select_query, (user_id,))
+    try:
+        result = cur.fetchone()[0]
+        print("--->" + result + "<----")
+        return result
+    except TypeError:
+        print("__get_shadow returned None")
+        return None
+    except:
+        print("__get_shadow FAILED!!")
+        raise
+
+
+def __set_client(user_id, new_content):
+    if new_content is None:
+        new_content = ""
     try:
         db = get_db()
-        print('insert or ignore into texts (client_id, ' + col + ") values ('" + client_id + "','" + value + "')")
-        db.execute('insert or ignore into texts (client_id, ' + col + ") values ('" + client_id + "','" + value + "')")
-        print("update texts set " + col + "='" + value + "' where client_id='" + client_id + "', ")
-        db.execute("update texts set " + col + "='" + value + "' where client_id='" + client_id + "'")
+        insert_query = """
+                       INSERT OR IGNORE INTO texts
+                       (user_id, content)
+                       VALUES (?,?)
+                       """
+        update_query = """
+                       UPDATE texts
+                       SET (content = ?)
+                       WHERE (user_id = ?)
+                       """
+        # FIXME logging...
+        print("{0} -- {1} -- {2}".format(insert_query, user_id, new_content,))
+        db.execute(insert_query, (user_id, new_content,))
+
+        print("{0} -- {1} -- {2}".format(update_query, user_id, new_content,))
+        db.execute(update_query, (new_content, user_id,))
 
         db.commit()
         return True
     except:
-        print("""
-------------------------------------
-__set_client_attribute FAILED!!!!!!!
-------------------------------------
-""")
+        print("__set_client FAILED!!")
         raise
 
-#create table texts (
-#  id integer primary key autoincrement,
-#  'client_id' text not null,
-#  'text' text not null,
-#  'shadow' text not null
-#);
+
+def __set_shadow(user_id, new_shadow):
+    if new_shadow is None:
+        new_shadow = ""
+    try:
+        db = get_db()
+        insert_query = """
+                       INSERT OR IGNORE INTO texts
+                       (user_id, shadow)
+                       VALUES (?,?)
+                       """
+        update_query = """
+                       UPDATE texts
+                       SET (shadow = ?)
+                       WHERE user_id = ?
+                       """
+        # FIXME logging...
+        print("{0} -- {1} -- {2}".format(insert_query, user_id, new_shadow,))
+        db.execute(insert_query, (user_id, new_shadow,))
+
+        print("{0} -- {1} -- {2}".format(update_query, user_id, new_shadow,))
+        db.execute(update_query, (new_shadow, user_id,))
+
+        db.commit()
+        return True
+    except:
+        print("__set_shadow FAILED!!")
+        raise
 
 
 def show_datastore_form():
@@ -188,7 +245,7 @@ def __print_iter_contents(iter_d, depth, temp_string):
 
 def show_main_form():
     # FIXME: add logging - print("show_main_form")
-    client_text = __get_client_attribute(CLIENT_ID, 'client_text')
+    client_text = __get_text(CLIENT_ID)
     if client_text is None or client_text == "":
         client_text = ""
         print("show_main_form: not client_text")
@@ -221,9 +278,9 @@ def show_main_form():
                         client_text = r_json['server_text']
                 else:
                     return "ERROR: failure contacting the server"
-        __set_client_attribute(CLIENT_ID, 'client_text', client_text)
+        __set_client(CLIENT_ID, client_text)
 
-    client_shadow = __get_client_attribute(CLIENT_ID, 'client_shadow')
+    client_shadow = __get_shadow(CLIENT_ID)
     if not client_shadow:
         client_shadow= ""
     return render_template('client.html',
@@ -252,7 +309,7 @@ def send_sync(client_text, recursive_count):
 
     client_shadow = None
 
-    client_shadow = __get_client_attribute(CLIENT_ID, 'client_shadow')
+    client_shadow = __get_shadow(CLIENT_ID)
 
     if not client_text:
         # nothing to sync!
@@ -300,8 +357,8 @@ def send_sync(client_text, recursive_count):
             #print("_____________pre__cksum_______")
             #print(client_shadow_cksum)
 
-            __set_client_attribute(CLIENT_ID, 'client_text', client_text)
-            __set_client_attribute(CLIENT_ID, 'client_shadow', client_shadow)
+            __set_client(CLIENT_ID, client_text)
+            __set_shadow(CLIENT_ID, client_shadow)
 
             # send text_patches, client_id and client_shadow_cksum
             url = "http://127.0.0.1:5002/send_sync"
@@ -314,24 +371,16 @@ def send_sync(client_text, recursive_count):
                         and r_json['error_type']  != "FuzzyServerPatchFailed"):
                         print("__manage_send_sync_error_return")
                         error_return, new_client_shadow = __manage_send_sync_error_return(r_json, CLIENT_ID, recursive_count)
-                        __set_client_attribute(CLIENT_ID, 'client_text', client_text)
-                        __set_client_attribute(CLIENT_ID, 'client_shadow', client_text)
+                        __set_client(CLIENT_ID, client_text)
+                        __set_shadow(CLIENT_ID, client_text)
                         if new_client_shadow:
-                            __set_client_attribute(CLIENT_ID, 'client_shadow', new_client_shadow)
+                            __set_shadow(CLIENT_ID, new_client_shadow)
                             print("client shadow updated from the server")
-                            error_return = send_sync(__get_client_attribute(CLIENT_ID, 'client_text'), recursive_count)
+                            error_return = send_sync(__get_text(CLIENT_ID), recursive_count)
                         return error_return
                     else:
-                        __set_client_attribute(
-                            CLIENT_ID,
-                            'client_text',
-                            client_text
-                        )
-                        __set_client_attribute(
-                            CLIENT_ID,
-                            'client_shadow',
-                            client_text
-                        )
+                        __set_client(CLIENT_ID, client_text)
+                        __set_shadow(CLIENT_ID, client_text)
                         if (r_json['status'] != "OK"
                             and r_json['error_type'] == "NoUpdate"):
                             # no changes so nothing else to do
@@ -340,16 +389,8 @@ def send_sync(client_text, recursive_count):
                         elif (r_json['status'] != "OK"
                             and r_json['error_type'] == "FuzzyServerPatchFailed"):
                             if 'server_text' in r_json:
-                                __set_client_attribute(
-                                    CLIENT_ID,
-                                    'client_text',
-                                    r_json['server_text']
-                                )
-                                __set_client_attribute(
-                                    CLIENT_ID,
-                                    'client_shadow',
-                                    r_json['server_text']
-                                )
+                                __set_client(CLIENT_ID, r_json['server_text'])
+                                __set_shadow(CLIENT_ID, r_json['server_text'])
                                 flash("Fuzzy patch failed. Data loss", 'error')
                                 return redirect(url_for('__main'), code=302)
                             else:
@@ -401,9 +442,8 @@ def send_sync(client_text, recursive_count):
                                     # len(set(list)) should be 1 if all elements are the same
                                     if len(set(shadow_results)) == 1 and shadow_results[0]:
                                         # step 5
-                                        __set_client_attribute(
+                                        __set_shadow(
                                             CLIENT_ID,
-                                            'client_shadow',
                                             client_shadow_patch_results[0]
                                         )
                                         # should a break here be catastrophic ??
@@ -416,11 +456,7 @@ def send_sync(client_text, recursive_count):
 
                                         if any(text_results):
                                             # step 7
-                                            __set_client_attribute(
-                                                CLIENT_ID,
-                                                'client_text',
-                                                client_text_patch_results[0]
-                                            )
+                                            __set_client(CLIENT_ID, client_text_patch_results[0])
                                             #
                                             # Here finishes the full sync.
                                             #
@@ -645,11 +681,11 @@ def send_sync(client_text, recursive_count):
 def __manage_send_sync_error_return(r_json, client_id, recursive_count):
     new_client_shadow = None
 
-    client_text = __get_client_attribute(client_id, 'client_text')
+    client_text = __get_text(client_id)
     if not client_text:
         raise Exception('There should be a client_text by now...')
 
-    client_shadow = __get_client_attribute(client_id, 'client_shadow')
+    client_shadow = __get_shadow(client_id)
     if not client_shadow:
         client_shadow = ""
 
