@@ -19,29 +19,32 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim.utils import config_files
 from abrim.utils.common import secure_filename
 
+
+app = Flask(__name__)
+
+# Default config
 APP_NAME = "AbrimSync"
 APP_AUTHOR = "Abrim"
 DIFF_TIMEOUT = 0.1
 CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
 MAX_RECURSIVE_COUNT = 3
 
-# set FLASK_APP=client.py
-# set FLASK_DEBUG=1
-# python -m flask run
-app = Flask(__name__)
+# load random secret_key in case none is loaded with the config files
+default_secret_key = os.urandom(24)
+app.secret_key = default_secret_key
+
+# load config from different sources:
 app.config.from_object(__name__)
+config_files.load(app)
+app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
+
+if app.secret_key == default_secret_key:
+    print("""WARNING! No fixed secret_key has been set in config files.
+         Sessions will be lost every time the server is restarted""")
 
 def _get_db_filename(port):
     string_to_format = 'abrim-{}.abrimclientdb'
     return secure_filename(string_to_format.format(port))
-
-config_files.load(app)
-
-app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
-
-if not app.secret_key:
-    app.secret_key = os.urandom(24)
-
 
 #@app.route('/', methods=['POST',])
 @app.route('/', methods=['GET', 'POST'])
