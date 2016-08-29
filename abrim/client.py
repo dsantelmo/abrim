@@ -1,15 +1,16 @@
 #!/usr/bin/env python
+#!/usr/bin/env python
 
 from contextlib import closing
 import os
-import json
 import sys
+import json
 import argparse
 import shelve
 # FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
 # can execute arbitrary code
-from flask import Flask, request, redirect, url_for, abort, render_template, flash
+from flask import Flask, g, request, redirect, url_for, abort, render_template, flash
 import diff_match_patch
 import hashlib
 import requests
@@ -31,20 +32,45 @@ app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--port", help="Port")
-    args = parser.parse_args()
-    client_port = 5001
-    if args.port and int(args.port) > 0:
-        client_port = int(args.port)
 
-    app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], client_port)
-    db.connect_db(app.config['DB_PATH'])
-    # FIXME: define logging -> print(app.config['DB_PATH'])
 
-    print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
-    app.run(host='0.0.0.0', port=client_port)
+
+
+import sqlite3
+from abrim.utils.common import secure_filename
+
+def get_db_path(string_to_format, client_port):
+    db_filename = secure_filename(string_to_format.format(client_port))
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
+
+
+def connect_db():
+    """Connects to the specific database."""
+    rv = sqlite3.connect(app.config['DB_PATH'])
+    rv.row_factory = sqlite3.Row
+    return rv
+
+
+def get_db():
+    """Opens a new database connection if there is none yet for the
+    current application context.
+    """
+    if not hasattr(g, 'sqlite_db'):
+        g.sqlite_db = connect_db()
+    return g.sqlite_db
+
+
+def init_db():
+    with app.app_context():
+        db = get_db()
+        with app.open_resource('db\\schema.sql', mode='r') as f:
+            db.cursor().executescript(f.read())
+        db.commit()
+
+
+# FIXME: DELETE THIS ------
+CLIENT_ID = app.config['CLIENT_ID']
+# FIXME: DELETE THIS ------
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -81,26 +107,65 @@ def __open_datastore():
         raise
 
 
-def __get_client_attribute(client_id, attrib):
-    result = None
-    with closing(__open_datastore()) as d:
-        if client_id in d and attrib in d[client_id]:
-            result = d[client_id][attrib]
-        else:
-            print("no contents of " + attrib + " for " + client_id)
-            if not client_id in d:
-                d[client_id] = {}
-    return result
+@app.teardown_appcontext
+def close_db(error):
+    """Closes the database again at the end of the request."""
+    print("closing...")
+    if hasattr(g, 'sqlite_db'):
+        g.sqlite_db.close()
 
-def __set_client_attribbute(client_id, attrib, value):
-    result = False
-    with closing(__open_datastore()) as d:
-        if not client_id in d:
-            d[client_id] = {}
-        temp_client = d[client_id]
-        temp_client.update({attrib : value})
-        d[client_id] = temp_client
+
+# FIXME: BIG SQL INJECTION!!!!
+def __get_client_attribute(client_id, attrib):
+    db = get_db()
+    print('select ' + attrib + " from texts where client_id='" + client_id + "' order by client_id desc")
+    cur = db.execute('select ' + attrib + " from texts where client_id='" + client_id + "' order by client_id desc")
+    try:
+        result = cur.fetchone()[0]
+        print("--->" + result + "<----")
+        return result
+    except TypeError:
+        print("""
+------------------------------------
+__get_client_attribute returned None
+------------------------------------
+""")
+        return None
+    except:
+        print("""
+------------------------------------
+__get_client_attribute FAILED!!!!!!!
+------------------------------------
+""")
+        raise
+        return None
+
+def __set_client_attribute(client_id, col, value):
+    if value is None:
+        value = ""
+    try:
+        db = get_db()
+        print('insert or ignore into texts (client_id, ' + col + ") values ('" + client_id + "','" + value + "')")
+        db.execute('insert or ignore into texts (client_id, ' + col + ") values ('" + client_id + "','" + value + "')")
+        print("update texts set " + col + "='" + value + "' where client_id='" + client_id + "', ")
+        db.execute("update texts set " + col + "='" + value + "' where client_id='" + client_id + "'")
+
+        db.commit()
         return True
+    except:
+        print("""
+------------------------------------
+__set_client_attribute FAILED!!!!!!!
+------------------------------------
+""")
+        raise
+
+#create table texts (
+#  id integer primary key autoincrement,
+#  'client_id' text not null,
+#  'text' text not null,
+#  'shadow' text not null
+#);
 
 
 def show_datastore_form():
@@ -122,7 +187,7 @@ def __print_iter_contents(iter_d, depth, temp_string):
 
 
 def show_main_form():
-    print("show_main_form")
+    # FIXME: add logging - print("show_main_form")
     client_text = __get_client_attribute(CLIENT_ID, 'client_text')
     if client_text is None or client_text == "":
         client_text = ""
@@ -156,7 +221,7 @@ def show_main_form():
                         client_text = r_json['server_text']
                 else:
                     return "ERROR: failure contacting the server"
-        __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
+        __set_client_attribute(CLIENT_ID, 'client_text', client_text)
 
     client_shadow = __get_client_attribute(CLIENT_ID, 'client_shadow')
     if not client_shadow:
@@ -182,7 +247,7 @@ def send_sync(client_text, recursive_count):
 
     recursive_count += 1
 
-    if recursive_count > MAX_RECURSIVE_COUNT:
+    if recursive_count > app.config['MAX_RECURSIVE_COUNT']:
         return "MAX_RECURSIVE_COUNT"
 
     client_shadow = None
@@ -195,7 +260,7 @@ def send_sync(client_text, recursive_count):
         return redirect(url_for('__main'), code=302)
 
     diff_obj = diff_match_patch.diff_match_patch()
-    diff_obj.Diff_Timeout = DIFF_TIMEOUT
+    diff_obj.Diff_Timeout = app.config['DIFF_TIMEOUT']
 
     # from https://neil.fraser.name/writing/sync/
     # step 1 & 2
@@ -235,8 +300,8 @@ def send_sync(client_text, recursive_count):
             #print("_____________pre__cksum_______")
             #print(client_shadow_cksum)
 
-            __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
-            __set_client_attribbute(CLIENT_ID, 'client_shadow', client_shadow)
+            __set_client_attribute(CLIENT_ID, 'client_text', client_text)
+            __set_client_attribute(CLIENT_ID, 'client_shadow', client_shadow)
 
             # send text_patches, client_id and client_shadow_cksum
             url = "http://127.0.0.1:5002/send_sync"
@@ -249,20 +314,20 @@ def send_sync(client_text, recursive_count):
                         and r_json['error_type']  != "FuzzyServerPatchFailed"):
                         print("__manage_send_sync_error_return")
                         error_return, new_client_shadow = __manage_send_sync_error_return(r_json, CLIENT_ID, recursive_count)
-                        __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
-                        __set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
+                        __set_client_attribute(CLIENT_ID, 'client_text', client_text)
+                        __set_client_attribute(CLIENT_ID, 'client_shadow', client_text)
                         if new_client_shadow:
-                            __set_client_attribbute(CLIENT_ID, 'client_shadow', new_client_shadow)
+                            __set_client_attribute(CLIENT_ID, 'client_shadow', new_client_shadow)
                             print("client shadow updated from the server")
                             error_return = send_sync(__get_client_attribute(CLIENT_ID, 'client_text'), recursive_count)
                         return error_return
                     else:
-                        __set_client_attribbute(
+                        __set_client_attribute(
                             CLIENT_ID,
                             'client_text',
                             client_text
                         )
-                        __set_client_attribbute(
+                        __set_client_attribute(
                             CLIENT_ID,
                             'client_shadow',
                             client_text
@@ -275,12 +340,12 @@ def send_sync(client_text, recursive_count):
                         elif (r_json['status'] != "OK"
                             and r_json['error_type'] == "FuzzyServerPatchFailed"):
                             if 'server_text' in r_json:
-                                __set_client_attribbute(
+                                __set_client_attribute(
                                     CLIENT_ID,
                                     'client_text',
                                     r_json['server_text']
                                 )
-                                __set_client_attribbute(
+                                __set_client_attribute(
                                     CLIENT_ID,
                                     'client_shadow',
                                     r_json['server_text']
@@ -324,7 +389,7 @@ def send_sync(client_text, recursive_count):
                                     #print("shadows' checksums match")
 
                                     diff_obj = diff_match_patch.diff_match_patch()
-                                    diff_obj.Diff_Timeout = DIFF_TIMEOUT
+                                    diff_obj.Diff_Timeout = app.config['DIFF_TIMEOUT']
 
                                     patches = diff_obj.patch_fromText(r_json['text_patches'])
 
@@ -336,7 +401,7 @@ def send_sync(client_text, recursive_count):
                                     # len(set(list)) should be 1 if all elements are the same
                                     if len(set(shadow_results)) == 1 and shadow_results[0]:
                                         # step 5
-                                        __set_client_attribbute(
+                                        __set_client_attribute(
                                             CLIENT_ID,
                                             'client_shadow',
                                             client_shadow_patch_results[0]
@@ -351,7 +416,7 @@ def send_sync(client_text, recursive_count):
 
                                         if any(text_results):
                                             # step 7
-                                            __set_client_attribbute(
+                                            __set_client_attribute(
                                                 CLIENT_ID,
                                                 'client_text',
                                                 client_text_patch_results[0]
@@ -407,16 +472,16 @@ def send_sync(client_text, recursive_count):
 #                        CLIENT_ID,
 #                        recursive_count
 #                )
-#                #__set_client_attribbute(CLIENT_ID, 'client_text', client_text)
-#                #__set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
+#                #__set_client_attribute(CLIENT_ID, 'client_text', client_text)
+#                #__set_client_attribute(CLIENT_ID, 'client_shadow', client_text)
 #                #if new_client_shadow:
-#                #    __set_client_attribbute(CLIENT_ID, 'client_shadow', new_client_shadow)
+#                #    __set_client_attribute(CLIENT_ID, 'client_shadow', new_client_shadow)
 #                #    error_return = send_sync(__get_client_attribute(CLIENT_ID, 'client_text'), recursive_count)
 #                #return error_return
 #                return r_json['status']
 #            else:
-#                #__set_client_attribbute(CLIENT_ID, 'client_text', client_text)
-#                #__set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
+#                #__set_client_attribute(CLIENT_ID, 'client_text', client_text)
+#                #__set_client_attribute(CLIENT_ID, 'client_shadow', client_text)
 #                #print("sync seems to be going OK")
 #                #flash("Sync OK!", 'info')
 #                #print("FIXME: CONTINUE HERE")
@@ -470,8 +535,8 @@ def send_sync(client_text, recursive_count):
 #            #print("_____________pre__cksum_______")
 #            #print(client_shadow_cksum)
 #
-#            __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
-#            __set_client_attribbute(CLIENT_ID, 'client_shadow', client_shadow)
+#            __set_client_attribute(CLIENT_ID, 'client_text', client_text)
+#            __set_client_attribute(CLIENT_ID, 'client_shadow', client_shadow)
 #
 #            # send text_patches, client_id and client_shadow_cksum
 #            url = "http://127.0.0.1:5002/send_sync"
@@ -482,15 +547,15 @@ def send_sync(client_text, recursive_count):
 #                    if not r_json['status'] == "OK":
 #                        print("__manage_get_sync_error_return")
 #                        error_return, new_client_shadow = __manage_get_sync_error_return(r_json, CLIENT_ID, recursive_count)
-#                        __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
-#                        __set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
+#                        __set_client_attribute(CLIENT_ID, 'client_text', client_text)
+#                        __set_client_attribute(CLIENT_ID, 'client_shadow', client_text)
 #                        if new_client_shadow:
-#                            __set_client_attribbute(CLIENT_ID, 'client_shadow', new_client_shadow)
+#                            __set_client_attribute(CLIENT_ID, 'client_shadow', new_client_shadow)
 #                            error_return = send_sync(__get_client_attribute(CLIENT_ID, 'client_text'), recursive_count)
 #                        return error_return
 #                    else:
-#                        __set_client_attribbute(CLIENT_ID, 'client_text', client_text)
-#                        __set_client_attribbute(CLIENT_ID, 'client_shadow', client_text)
+#                        __set_client_attribute(CLIENT_ID, 'client_text', client_text)
+#                        __set_client_attribute(CLIENT_ID, 'client_shadow', client_text)
 #                        print("sync seems to be going OK")
 #                        flash("Sync OK!", 'info')
 #                        print("FIXME: CONTINUE HERE")
@@ -702,3 +767,20 @@ def __get_sync_payload(url, client_id):
       headers={'Content-Type': 'application/json'},
       data=json.dumps(payload)
       )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--port", help="Port")
+    args = parser.parse_args()
+    client_port = 5001
+    if args.port and int(args.port) > 0:
+        client_port = int(args.port)
+
+    app.config['DB_PATH'] = get_db_path(app.config['DB_FILENAME_FORMAT'], client_port)
+    connect_db()
+    # FIXME: define logging -> print(app.config['DB_PATH'])
+
+    print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
+    init_db()
+    app.run(host='0.0.0.0', port=client_port)

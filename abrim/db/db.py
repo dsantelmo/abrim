@@ -53,12 +53,3 @@ def _load_from_config_files(app, config_paths):
         except IndentationError:
             print("IndentationError while opening config file at: {0}".format(config_path,))
             sys.exit(exit_codes.EX_DATAERR)
-
-def get_db_path(string_to_format, client_port):
-    db_filename = secure_filename(string_to_format.format(client_port))
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
-
-def connect_db(db_path):
-    rv = sqlite3.connect(db_path)
-    rv.row_factory = sqlite3.Row
-    return rv
