@@ -35,12 +35,20 @@ app.secret_key = default_secret_key
 
 # load config from different sources:
 app.config.from_object(__name__)
-config_files.load(app)
+default_cfg_path, user_cfg_path = config_files.load(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
 if app.secret_key == default_secret_key:
-    print("""WARNING! No fixed secret_key has been set in config files.
-         Sessions will be lost every time the server is restarted""")
+    print("""
+WARNING! No fixed secret_key has been set in config files.
+  Sessions will be lost every time these server is restarted
+  Edit at least one of the config files:
+  {0}
+  or:
+  {1}
+  adding a line with SECRET_KEY = ' and a long random key:
+SECRET_KEY = '?\xbf,\xb4\x8d\xa3"<\x9c\xb0@\x0f5...'
+""".format(default_cfg_path, user_cfg_path))
 
 def _get_db_filename(port):
     string_to_format = 'abrim-{}.abrimclientdb'

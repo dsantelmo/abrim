@@ -28,6 +28,9 @@ def load(app):
     except IOError:
         print("IOError while opening config file at: {0}".format(default_cfg_path,))
         sys.exit(exit_codes.EX_OSFILE)
+    except IndentationError:
+        print("IndentationError while opening config file at: {0}".format(default_cfg_path,))
+        sys.exit(exit_codes.EX_DATAERR)
 
     user_cfg_dir = appdirs.user_config_dir(app.config['APP_NAME'], app.config['APP_AUTHOR'])
     user_cfg_path = os.path.join(
@@ -40,10 +43,15 @@ def load(app):
         print("Opening config at: {0}".format(user_cfg_path,))
         open(user_cfg_path, 'a').close()
     except FileNotFoundError:
-        print("IOError while opening config file at: {0}".format(default_cfg_path,))
+        print("IOError while opening config file at: {0}".format(user_cfg_path,))
         sys.exit(exit_codes.EX_OSFILE)
     try:
         app.config.from_pyfile(user_cfg_path)
     except IOError:
         print("IOError while opening config file at: {0}".format(user_cfg_path,))
         sys.exit(exit_codes.EX_OSFILE)
+    except IndentationError:
+        print("IndentationError while opening config file at: {0}".format(user_cfg_path,))
+        sys.exit(exit_codes.EX_DATAERR)
+
+    return default_cfg_path, user_cfg_path
