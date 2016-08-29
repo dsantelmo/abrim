@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import random
+import string
 
 def secure_filename(filename):
     filename.lower()
@@ -7,3 +9,6 @@ def secure_filename(filename):
     keep_chars = ('_','_','.',)
     "".join(c for c in filename if c.isalnum() or c in keep_chars).strip()
     return filename
+
+def generate_random_id(id_length):
+    return ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(id_length))

@@ -2,8 +2,6 @@
 
 from contextlib import closing
 import os
-import random
-import string
 import json
 import sys
 import argparse
@@ -17,44 +15,38 @@ import hashlib
 import requests
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim.utils import config_files
-from abrim.utils.common import secure_filename
+from abrim.utils.common import generate_random_id
+from abrim.db import db
 
 
 app = Flask(__name__)
-
-# Default config
-APP_NAME = "AbrimSync"
-APP_AUTHOR = "Abrim"
-DIFF_TIMEOUT = 0.1
-CLIENT_ID = ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5))
-MAX_RECURSIVE_COUNT = 3
-
-# load random secret_key in case none is loaded with the config files
-default_secret_key = os.urandom(24)
-app.secret_key = default_secret_key
-
-# load config from different sources:
-app.config.from_object(__name__)
-default_cfg_path, user_cfg_path = config_files.load(app)
+# Default config:
+app.config['APP_NAME'] = "Sync"
+app.config['APP_AUTHOR'] = "Abrim"
+app.config['DIFF_TIMEOUT'] = 0.1
+app.config['CLIENT_ID'] = generate_random_id(5)
+app.config['MAX_RECURSIVE_COUNT'] = 3
+app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
+# Config from files and env vars:
+config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
-if app.secret_key == default_secret_key:
-    print("""
-WARNING! No fixed secret_key has been set in config files.
-  Sessions will be lost every time these server is restarted
-  Edit at least one of the config files:
-  {0}
-  or:
-  {1}
-  adding a line with SECRET_KEY = ' and a long random key:
-SECRET_KEY = '?\xbf,\xb4\x8d\xa3"<\x9c\xb0@\x0f5...'
-""".format(default_cfg_path, user_cfg_path))
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--port", help="Port")
+    args = parser.parse_args()
+    client_port = 5001
+    if args.port and int(args.port) > 0:
+        client_port = int(args.port)
 
-def _get_db_filename(port):
-    string_to_format = 'abrim-{}.abrimclientdb'
-    return secure_filename(string_to_format.format(port))
+    app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], client_port)
+    db.connect_db(app.config['DB_PATH'])
+    # FIXME: define logging -> print(app.config['DB_PATH'])
 
-#@app.route('/', methods=['POST',])
+    print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
+    app.run(host='0.0.0.0', port=client_port)
+
+
 @app.route('/', methods=['GET', 'POST'])
 def __root():
     return redirect(url_for('__main'), code=307) #307 for POST redir
@@ -80,7 +72,6 @@ def __sync():
         abort(404)
     else:
         return _sync(request.form)
-
 
 def __open_datastore():
     try:
@@ -711,16 +702,3 @@ def __get_sync_payload(url, client_id):
       headers={'Content-Type': 'application/json'},
       data=json.dumps(payload)
       )
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--port", help="Port")
-    args = parser.parse_args()
-    client_port = 5001
-    if args.port and int(args.port) > 0:
-        client_port = int(args.port)
-
-    db_filename = _get_db_filename(client_port)
-    app.config['DB_PATH'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
-    app.run(host='0.0.0.0', port=client_port)
