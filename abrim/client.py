@@ -24,6 +24,10 @@ app.config['DIFF_TIMEOUT'] = 0.1
 app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
+app.config['URL_FOR_GET_SYNC'] = "http://127.0.0.1:5002/get_text"
+app.config['URL_FOR_SEND_SYNC'] = "http://127.0.0.1:5002/send_sync"
+app.config['URL_FOR_SEND_SHADOW'] = "http://127.0.0.1:5002/send_shadow"
+
 # Config from files and env vars:
 config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
@@ -63,7 +67,7 @@ def __main():
     if request.method == 'POST':
         pass
     else:
-        return show_main_form()
+        return show_main_form(app.config['URL_FOR_GET_SYNC'])
 
 @app.route('/sync', methods=['GET', 'POST'])
 def __sync():
@@ -107,18 +111,16 @@ from passlib.hash import bcrypt
 #if bcrypt.verify(usersPassword, hash):
 
 
-def show_main_form():
+def show_main_form(get_sync_url):
     # FIXME: add logging - print("show_main_form")
     client_text = __get_content(CLIENT_ID)
     if client_text is None or client_text == "":
         client_text = ""
-        print("show_main_form: not client_text")
-
-        url = "http://127.0.0.1:5002/get_text"
+        # print("show_main_form: not client_text")
         payload = { 'client_id': CLIENT_ID, }
         try:
             r = requests.post(
-              url,
+              get_sync_url,
               headers={'Content-Type': 'application/json'},
               data=json.dumps(payload)
               )
@@ -129,7 +131,7 @@ def show_main_form():
             try:
                 r_json = r.json()
             except ValueError as e:
-                print("ValueError in show_main_form: {0}".format(e.message))
+                # print("ValueError in show_main_form: {0}".format(e.message))
                 flash("Server response error, no JSON", 'error')
                 #return redirect(url_for('__main'), code=302)
             else:
@@ -158,13 +160,13 @@ def _sync(req_form):
     #    return get_sync(request.form['client_text'], 0)
     #el
     if req_form and 'send_text' in req_form:
-        return send_sync(request.form['client_text'], 0)
+        return send_sync(app.config['URL_FOR_SEND_SYNC'], app.config['URL_FOR_SEND_SHADOW'], request.form['client_text'], 0)
     else:
         flash("Command not recognized", 'error')
         return redirect(url_for('__main'), code=302)
 
 
-def send_sync(client_text, recursive_count):
+def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count):
 
     recursive_count += 1
 
@@ -203,7 +205,7 @@ def send_sync(client_text, recursive_count):
         flash("no changes", 'warn')
         return redirect(url_for('__main'), code=302)
     else:
-        print("step 2 results: {}".format(text_patches))
+        # print("step 2 results: {}".format(text_patches))
 
         try:
             #step 3
@@ -214,7 +216,8 @@ def send_sync(client_text, recursive_count):
 
             client_shadow_cksum = 0
             if not client_shadow:
-                print("client_shadow: None")
+                # print("client_shadow: None")
+                pass
             else:
                 #print("client_shadow: " + client_shadow)
                 client_shadow_cksum =  hashlib.md5(client_shadow.encode('utf-8')).hexdigest()
@@ -225,22 +228,21 @@ def send_sync(client_text, recursive_count):
             __set_shadow(CLIENT_ID, client_shadow)
 
             # send text_patches, client_id and client_shadow_cksum
-            url = "http://127.0.0.1:5002/send_sync"
-            r = __send_sync_payload(url, CLIENT_ID, client_shadow_cksum, text_patches)
+            r = __send_sync_payload(send_sync_url, CLIENT_ID, client_shadow_cksum, text_patches)
             try:
                 r_json = r.json()
                 if 'status' in r_json:
                     if (r_json['status'] != "OK"
                         and r_json['error_type'] != "NoUpdate"
                         and r_json['error_type']  != "FuzzyServerPatchFailed"):
-                        print("__manage_send_sync_error_return")
-                        error_return, new_client_shadow = __manage_send_sync_error_return(r_json, CLIENT_ID, recursive_count)
+                        # print("__manage_send_sync_error_return")
+                        error_return, new_client_shadow = __manage_send_sync_error_return(send_sync_url, send_shadow_url, r_json, CLIENT_ID, recursive_count)
                         __set_content(CLIENT_ID, client_text)
                         __set_shadow(CLIENT_ID, client_text)
                         if new_client_shadow:
                             __set_shadow(CLIENT_ID, new_client_shadow)
-                            print("client shadow updated from the server")
-                            error_return = send_sync(__get_content(CLIENT_ID), recursive_count)
+                            #print("client shadow updated from the server")
+                            error_return = send_sync(send_sync_url, send_shadow_url, __get_content(CLIENT_ID), recursive_count)
                         return error_return
                     else:
                         __set_content(CLIENT_ID, client_text)
@@ -286,7 +288,7 @@ def send_sync(client_text, recursive_count):
                                 #
                                 client_shadow = client_text
                                 client_shadow_cksum =  hashlib.md5(client_shadow.encode('utf-8')).hexdigest()
-                                print("client_shadow_cksum {}".format(client_shadow_cksum))
+                                #print("client_shadow_cksum {}".format(client_shadow_cksum))
 
                                 if client_shadow_cksum != r_json['server_shadow_cksum']:
                                     return "ERROR: client shadow checksum failed"
@@ -334,22 +336,22 @@ def send_sync(client_text, recursive_count):
                 else:
                     return "ERROR: send_sync response doesn't contain status"
             except ValueError:
-                print("ValueError")
+                #print("ValueError")
                 return(r.text)
         except ValueError:
-            print("ValueError")
+            #print("ValueError")
             return "ERROR: ValueError" #FIXME
         except requests.exceptions.ConnectionError:
-            print("ConnectionError")
+            #print("ConnectionError")
             #return "ERROR: ConnectionError" #FIXME
             flash("Server is unreachable", 'error')
             return redirect(url_for('__main'), code=302)
 
-    print("if we have got to here we have some coverage problems...")
+    #print("if we have got to here we have some coverage problems...")
     abort(500)
 
 
-def __manage_send_sync_error_return(r_json, client_id, recursive_count):
+def __manage_send_sync_error_return(send_sync_url, send_shadow_url, r_json, client_id, recursive_count):
     new_client_shadow = None
 
     client_text = __get_content(client_id)
@@ -364,16 +366,16 @@ def __manage_send_sync_error_return(r_json, client_id, recursive_count):
 
     if 'error_type' in r_json:
         if r_json['error_type'] == "NoServerShadow":
-            print("NoServerShadow")
+            #print("NoServerShadow")
             # client sends its shadow:
-            r_send_shadow = __send_shadow_payload("http://127.0.0.1:5002/send_shadow", client_id, client_shadow)
+            r_send_shadow = __send_shadow_payload(send_shadow_url, client_id, client_shadow)
             try:
                 r_send_shadow_json = r_send_shadow.json()
                 if 'status' in r_send_shadow_json:
                     if r_send_shadow_json['status'] == "OK":
-                        print("Shadow updated from client. Trying to sync again")
+                        #print("Shadow updated from client. Trying to sync again")
                         flash("Shadow updated from client. Trying to sync again...", 'info')
-                        error_return =  send_sync(client_text, recursive_count)
+                        error_return =  send_sync(send_sync_url, send_shadow_url, client_text, recursive_count)
                     else:
                         error_return = "ERROR: unable to send_shadow"
                 else:
@@ -381,11 +383,11 @@ def __manage_send_sync_error_return(r_json, client_id, recursive_count):
             except ValueError:
                 error_return = r_send_shadow.text
         elif r_json['error_type'] == "ServerShadowChecksumFailed":
-            print("ServerShadowChecksumFailed")
+            #print("ServerShadowChecksumFailed")
             # server sends its shadow:
             if 'server_shadow' in r_json:
                 new_client_shadow = r_json['server_shadow']
-                print("Shadow updated from server. Trying to sync again")
+                #print("Shadow updated from server. Trying to sync again")
                 flash("Shadow updated from server. Trying to sync again...", 'error')
                 error_return =  None
             else:
@@ -399,6 +401,14 @@ def __manage_send_sync_error_return(r_json, client_id, recursive_count):
     return error_return, new_client_shadow
 
 
+def __requests_post(url, payload):
+    return requests.post(
+      url,
+      headers={'Content-Type': 'application/json'},
+      data=json.dumps(payload)
+      )
+
+
 def __send_sync_payload(url, client_id, client_shadow_cksum, client_patches):
     payload = {
                'client_id': client_id,
@@ -406,13 +416,9 @@ def __send_sync_payload(url, client_id, client_shadow_cksum, client_patches):
                'client_patches': client_patches,
               }
 
-    print("__send_sync_payload: " + \
-            ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return requests.post(
-      url,
-      headers={'Content-Type': 'application/json'},
-      data=json.dumps(payload)
-      )
+    #print("__send_sync_payload: " + \
+    #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
+    return __requests_post(url, payload)
 
 
 def __send_shadow_payload(url, client_id, client_shadow):
@@ -421,27 +427,18 @@ def __send_shadow_payload(url, client_id, client_shadow):
                'client_shadow': client_shadow,
               }
 
-    print("__send_shadow_payload: " + \
-            ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return requests.post(
-      url,
-      headers={'Content-Type': 'application/json'},
-      data=json.dumps(payload)
-      )
-
+    #print("__send_shadow_payload: " + \
+    #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
+    return __requests_post(url, payload)
 
 def __get_sync_payload(url, client_id):
     payload = {
                'client_id': client_id,
               }
 
-    print("__get_sync_payload: " + \
-            ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return requests.post(
-      url,
-      headers={'Content-Type': 'application/json'},
-      data=json.dumps(payload)
-      )
+    #print("__get_sync_payload: " + \
+    #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
+    return __requests_post(url, payload)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -454,5 +451,5 @@ if __name__ == "__main__":
     app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], client_port)
     connect_db()
     init_db()
-    print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
+    #print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
     app.run(host='0.0.0.0', port=client_port)
