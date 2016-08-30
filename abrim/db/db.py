@@ -36,7 +36,7 @@ def init_db(app, g, db_path):
 
 def close_db(g, error):
     """Closes the database again at the end of the request."""
-    print("closing...")
+    #print("closing...")
     if hasattr(g, 'sqlite_db'):
         g.sqlite_db.close()
 
@@ -60,10 +60,10 @@ def get_content_or_shadow(g, db_path, user_id, content=True):
         # print("--->" + result + "<----")
         return result
     except TypeError:
-        print("__get_{} returned None".format(content_or_shadow))
+        #print("__get_{} returned None".format(content_or_shadow))
         return None
     except:
-        print("__get_{} FAILED!!".format(content_or_shadow))
+        #print("__get_{} FAILED!!".format(content_or_shadow))
         raise
 
 # FIXME: delete g and db_path from params...
@@ -94,5 +94,5 @@ def set_content_or_shadow(g, db_path, user_id, new_value, content=True):
         db.commit()
         return True
     except:
-        print("__set_{} FAILED!!".format(content_or_shadow))
+        #print("__set_{} FAILED!!".format(content_or_shadow))
         raise
