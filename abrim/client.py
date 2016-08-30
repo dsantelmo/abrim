@@ -37,43 +37,16 @@ config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
 
-
-import sqlite3
-from abrim.utils.common import secure_filename
-
-def get_db_path(string_to_format, client_port):
-    db_filename = secure_filename(string_to_format.format(client_port))
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
-
-
 def connect_db():
-    """Connects to the specific database."""
-    rv = sqlite3.connect(app.config['DB_PATH'])
-    rv.row_factory = sqlite3.Row
-    return rv
+    return db.connect_db(app.config['DB_PATH'])
 
 
 def get_db():
-    """Opens a new database connection if there is none yet for the
-    current application context.
-    """
-    if not hasattr(g, 'sqlite_db'):
-        g.sqlite_db = connect_db()
-    return g.sqlite_db
+    return db.get_db(g, app.config['DB_PATH'])
 
 
 def init_db():
-    with app.app_context():
-        db = get_db()
-        with app.open_resource('db\\schema.sql', mode='r') as f:
-            db.cursor().executescript(f.read())
-        db.commit()
-
-
-
-
-
-
+    db.init_db(app, g, app.config['DB_PATH'])
 
 
 # FIXME: DELETE THIS ------
@@ -107,108 +80,45 @@ def __sync():
     else:
         return _sync(request.form)
 
-def __open_datastore():
-    try:
-        return shelve.open(app.config['DB_PATH'])
-    except:
-        print("ERROR opening shelve")
-        raise
-
 
 @app.teardown_appcontext
 def close_db(error):
-    """Closes the database again at the end of the request."""
-    print("closing...")
-    if hasattr(g, 'sqlite_db'):
-        g.sqlite_db.close()
+    db.close_db(g, error)
 
-
-
-def __get_content_or_shadow(user_id, content=True):
-    content_or_shadow = 'shadow'
-    if content:
-        content_or_shadow = 'content'
-    db = get_db()
-    select_query = """
-                   SELECT {}
-                   FROM texts
-                   WHERE user_id = ?
-                   """.format(content_or_shadow)
-    # FIXME logging...
-    #print("{0} -- {1}".format(select_query,user_id,))
-    cur = db.execute(select_query, (user_id,))
-    try:
-        result = cur.fetchone()[0]
-        # print("--->" + result + "<----")
-        return result
-    except TypeError:
-        print("__get_{} returned None".format(content_or_shadow))
-        return None
-    except:
-        print("__get_{} FAILED!!".format(content_or_shadow))
-        raise
 
 def __get_content(user_id):
-    return __get_content_or_shadow(user_id, True)
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, True)
 
 
 def __get_shadow(user_id):
-    return __get_content_or_shadow(user_id, False)
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, False)
 
 
-def __set_content_or_shadow(user_id, new_value, content=True):
-    content_or_shadow = 'shadow'
-    if content:
-        content_or_shadow = 'content'
+def __set_content(user_id, value):
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, value, True)
 
-    if new_value is None:
-        new_value = ""
-    try:
-        db = get_db()
-        insert_query = """
-                       INSERT OR IGNORE INTO texts
-                       (user_id, {})
-                       VALUES (?,?)
-                       """.format(content_or_shadow)
-        update_query = """
-                       UPDATE texts
-                       SET {} = ?
-                       WHERE user_id = ?
-                       """.format(content_or_shadow)
-        # FIXME logging...
-        # print("{0} -- {1} -- {2}".format(insert_query, user_id, new_value,))
-        db.execute(insert_query, (user_id, new_value,))
-        # print("{0} -- {1} -- {2}".format(update_query, user_id, new_value))
-        db.execute(update_query, (new_value, user_id))
-        db.commit()
-        return True
-    except:
-        print("__set_{} FAILED!!".format(content_or_shadow))
-        raise
 
-def __set_content(user_id, new_content):
-    return __set_content_or_shadow(user_id, new_content, True)
-
-def __set_shadow(user_id, new_shadow):
-    return __set_content_or_shadow(user_id, new_content, False)
+def __set_shadow(user_id, value):
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, value, False)
 
 
 def show_datastore_form():
-    with closing(__open_datastore()) as d:
-        temp_string = "<h1>Datastore</h1><h3>" + app.config['DB_PATH'] + "</h3>"
-        return __print_iter_contents(d, 6, temp_string)
+    #with closing(__open_datastore()) as d:
+    #    temp_string = "<h1>Datastore</h1><h3>" + app.config['DB_PATH'] + "</h3>"
+    #    return __print_iter_contents(d, 6, temp_string)
+    return "WIP"
 
-def __print_iter_contents(iter_d, depth, temp_string):
-    if depth > 0:
-        for k, element in iter_d.items():
-            if isinstance(element, dict):
-                temp_string = temp_string + "<li><b>{0} :</b></li>".format(k)
-                temp_string = temp_string + "<ul>"
-                temp_string = __print_iter_contents(element, depth - 1, temp_string)
-                temp_string = temp_string + "</ul>"
-            else:
-                temp_string = temp_string + "<li><b>{0}</b> : {1}</li>".format(k, element)
-    return temp_string
+#def __print_iter_contents(iter_d, depth, temp_string):
+#    if depth > 0:
+#        for k, element in iter_d.items():
+#            if isinstance(element, dict):
+#                temp_string = temp_string + "<li><b>{0} :</b></li>".format(k)
+#                temp_string = temp_string + "<ul>"
+#                temp_string = __print_iter_contents(element, depth - 1, temp_string)
+#                temp_string = temp_string + "</ul>"
+#            else:
+#                temp_string = temp_string + "<li><b>{0}</b> : {1}</li>".format(k, element)
+#    return temp_string
 
 
 def show_main_form():
@@ -772,7 +682,6 @@ def __get_sync_payload(url, client_id):
       data=json.dumps(payload)
       )
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
@@ -781,10 +690,8 @@ if __name__ == "__main__":
     if args.port and int(args.port) > 0:
         client_port = int(args.port)
 
-    app.config['DB_PATH'] = get_db_path(app.config['DB_FILENAME_FORMAT'], client_port)
+    app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], client_port)
     connect_db()
-    # FIXME: define logging -> print(app.config['DB_PATH'])
-
-    print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
     init_db()
+    print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
     app.run(host='0.0.0.0', port=client_port)
