@@ -99,10 +99,13 @@ def __set_shadow(user_id, value):
 
 
 def show_datastore_form():
+    table_names = db.get_all_tables(g, app.config['DB_PATH'])
+    content= db.get_table_contents(g, app.config['DB_PATH'], table_names)
+    print(content)
     #with closing(__open_datastore()) as d:
     #    temp_string = "<h1>Datastore</h1><h3>" + app.config['DB_PATH'] + "</h3>"
     #    return __print_iter_contents(d, 6, temp_string)
-    return "WIP"
+    return render_template('datastore.html', CLIENT_ID=CLIENT_ID, content=content)
 
 
 from passlib.hash import bcrypt

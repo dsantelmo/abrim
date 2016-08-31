@@ -96,3 +96,23 @@ def set_content_or_shadow(g, db_path, user_id, new_value, content=True):
     except:
         #print("__set_{} FAILED!!".format(content_or_shadow))
         raise
+
+def get_all_tables(g, db_path):
+    db = get_db(g, db_path)
+    cur = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name<>'sqlite_sequence';")
+    # FIXME SANITIZE THIS! SQL injections...
+    return [table_name[0] for table_name in cur.fetchall()]
+
+
+def get_table_contents(g, db_path, table_names):
+    db = get_db(g, db_path)
+    contents = []
+    for table_name in table_names:
+        cur = db.execute("SELECT * FROM {}".format(table_name))
+        # FIXME SANITIZE THIS! SQL injections...
+        table_contents = []
+        table_contents.append(table_name)
+        table_contents.append([desc[0] for desc in cur.description])
+        table_contents.append(cur.fetchall())
+        contents.append(table_contents)
+    return contents

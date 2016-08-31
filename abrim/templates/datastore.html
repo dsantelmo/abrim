@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block body %}
+    <header>
+        <h1 id="main_title">datastore</h1>
+    </header>
+    <nav>User: {{ CLIENT_ID|safe }} || <a href="/main/">main</a> - <b>datastore</b></nav>
+    <main>
+        <article>
+            <section>
+                {% if content %}
+                <div class="table">
+                    {% for table_name, column_names, table_rows in content %}
+                        <h2>{{ table_name|safe }}</h2>
+                        {% if column_names %}
+                        <table>
+                            <tr>
+                            {% for column_name in column_names %}
+                                <th>{{ column_name|safe }}</th>
+                            {% endfor %}
+                            </tr>
+                            {% if table_rows %}
+                                {% for table_row in table_rows %}
+                                    <tr>
+                                    {% for content in table_row %}
+                                        <td>{{ content|safe }}</td>
+                                    {% endfor %}
+                                    <tr>
+                                {% endfor %}
+                            {% endif %}
+                        </table>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </section>
+
+        </article>
+    </main>
+    <nav>recent nav</nav>
+    <nav>tags nav<nav>
+    <footer>footer</footer>
+{% endblock %}
