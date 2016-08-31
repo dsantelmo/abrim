@@ -167,13 +167,10 @@ def _sync(req_form):
 
 
 def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count):
-
     recursive_count += 1
 
     if recursive_count > app.config['MAX_RECURSIVE_COUNT']:
         return "MAX_RECURSIVE_COUNT"
-
-    client_shadow = None
 
     client_shadow = __get_shadow(CLIENT_ID)
 
@@ -224,8 +221,9 @@ def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count):
             #print("_____________pre__cksum_______")
             #print(client_shadow_cksum)
 
+            client_shadow = client_text
             __set_content(CLIENT_ID, client_text)
-            __set_shadow(CLIENT_ID, client_shadow)
+            __set_shadow(CLIENT_ID, client_text)
 
             # send text_patches, client_id and client_shadow_cksum
             r = __send_sync_payload(send_sync_url, CLIENT_ID, client_shadow_cksum, text_patches)
@@ -286,7 +284,6 @@ def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count):
                                 #
                                 # first check the client shadow cheksum
                                 #
-                                client_shadow = client_text
                                 client_shadow_cksum =  hashlib.md5(client_shadow.encode('utf-8')).hexdigest()
                                 #print("client_shadow_cksum {}".format(client_shadow_cksum))
 
