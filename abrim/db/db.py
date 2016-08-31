@@ -78,17 +78,17 @@ def set_content_or_shadow(g, db_path, user_id, new_value, content=True):
         db = get_db(g, db_path)
         insert_query = """
                        INSERT OR IGNORE INTO texts
-                       (user_id, {})
-                       VALUES (?,?)
+                       (text_id, user_id, {})
+                       VALUES (?, ?,?)
                        """.format(content_or_shadow)
         update_query = """
                        UPDATE texts
                        SET {} = ?
-                       WHERE user_id = ?
+                       WHERE text_id = ?
                        """.format(content_or_shadow)
         # FIXME logging...
         # print("{0} -- {1} -- {2}".format(insert_query, user_id, new_value,))
-        db.execute(insert_query, (user_id, new_value,))
+        db.execute(insert_query, (user_id, user_id, new_value,))
         # print("{0} -- {1} -- {2}".format(update_query, user_id, new_value))
         db.execute(update_query, (new_value, user_id))
         db.commit()
