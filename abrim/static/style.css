@@ -12,6 +12,7 @@ body {
     line-height: 1.4;
     margin: 0 auto;
     padding: 1em 1em;
+    text-rendering: optimizeLegibility;
 }
 
 main {
@@ -66,35 +67,35 @@ h6 {
     font-weight: bold;
     line-height: 1.2;
     margin-bottom: 0.5em;
-    margin-top: 1em;
+    margin-top: 0.8em;
 }
 
 h1 {
-    font-size: 2.2em;
+    font-size: 1.5em;
     text-align: center;
 }
 
 h2 {
-    font-size: 1.8em;
+    font-size: 1.3em;
     border-bottom: solid 0.1rem #703820;
 }
 
 h3 {
-    font-size: 1.5em;
+    font-size: 1.2em;
 }
 
 h4 {
-    font-size: 1.3em;
+    font-size: 1.1em;
     text-decoration: underline;
 }
 
 h5 {
-    font-size: 1.2em;
+    font-size: 1em;
     font-style: italic;
 }
 
 h6 {
-    font-size: 1.1em;
+    font-size: 1em;
     margin-bottom: 0.5rem;
 }
 
@@ -145,6 +146,10 @@ textarea {
     top:1px;
 }
 
+/* BUTTON END * /
+
+/* FLASH START */
+
 .flash {
     position: absolute;
     z-index: 101;
@@ -194,3 +199,138 @@ textarea {
 .flash .error {
     background-color: #f93;
 }
+
+
+
+
+/* TABLE START */
+
+/* http://codepen.io/alassetter/full/cyrfB/ */
+
+div.table-title {
+   display: block;
+  margin: auto;
+  max-width: 600px;
+  padding:0.3em;
+  width: 100%;
+}
+
+.table-title h3 {
+   color: #777;
+   font-size: 1.2em;
+   font-style:normal;
+   font-family: helvetica, arial, sans-serif;
+}
+
+
+.table-fill {
+  background: white;
+  border-radius:3px;
+  border-collapse: collapse;
+  margin: auto;
+  padding:0.3em;
+  width: 100%;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
+  animation: float 5s infinite;
+}
+
+th {
+  color:#D5DDE5;;
+  background:#1b1e24;
+  border-bottom:4px solid #9ea7af;
+  border-right: 1px solid #343a45;
+  font-size: 0.9em;
+  padding:0.7em;
+  text-align:left;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+  vertical-align:middle;
+}
+
+th:first-child {
+  border-top-left-radius:3px;
+}
+
+th:last-child {
+  border-top-right-radius:3px;
+  border-right:none;
+}
+
+tr {
+  border-top: 1px solid #C1C3D1;
+  border-bottom-: 1px solid #C1C3D1;
+  color:#666B85;
+  font-weight:normal;
+  text-shadow: 0 1px 1px rgba(256, 256, 256, 0.1);
+}
+
+tr:hover td {
+  background:#4E5066;
+  color:#FFFFFF;
+  border-top: 1px solid #22262e;
+  border-bottom: 1px solid #22262e;
+}
+
+tr:first-child {
+  border-top:none;
+}
+
+tr:last-child {
+  border-bottom:none;
+}
+
+tr:nth-child(odd) td {
+  background:#EBEBEB;
+}
+
+tr:nth-child(odd):hover td {
+  background:#4E5066;
+}
+
+tr:last-child td:first-child {
+  border-bottom-left-radius:3px;
+}
+
+tr:last-child td:last-child {
+  border-bottom-right-radius:3px;
+}
+
+td {
+  background:#FFFFFF;
+  padding:1em;
+  text-align:left;
+  vertical-align:middle;
+  font-size: 0.7em;
+  text-shadow: -1px -1px 1px rgba(0, 0, 0, 0.1);
+  border-right: 1px solid #C1C3D1;
+}
+
+td:last-child {
+  border-right: 0px;
+}
+
+th.text-left {
+  text-align: left;
+}
+
+th.text-center {
+  text-align: center;
+}
+
+th.text-right {
+  text-align: right;
+}
+
+td.text-left {
+  text-align: left;
+}
+
+td.text-center {
+  text-align: center;
+}
+
+td.text-right {
+  text-align: right;
+}
+
+
+/* TABLE END */

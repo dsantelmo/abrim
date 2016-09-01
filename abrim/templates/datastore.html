@@ -10,22 +10,28 @@
                 {% if content %}
                 <div class="table">
                     {% for table_name, column_names, table_rows in content %}
-                        <h2>{{ table_name|safe }}</h2>
+                        <div class="table-title">
+                            <h3>{{ table_name|safe }}</h3>
+                        </div>
                         {% if column_names %}
-                        <table>
-                            <tr>
-                            {% for column_name in column_names %}
-                                <th>{{ column_name|safe }}</th>
-                            {% endfor %}
-                            </tr>
+                        <table class="table-fill">
+                            <thead>
+                                <tr>
+                                {% for column_name in column_names %}
+                                    <th>{{ column_name|safe }}</th>
+                                {% endfor %}
+                                </tr>
+                            </thead>
                             {% if table_rows %}
+                                <tbody class="table-hover">
                                 {% for table_row in table_rows %}
                                     <tr>
                                     {% for content in table_row %}
-                                        <td>{{ content|safe }}</td>
+                                        <td class="text-left">{{ content|safe }}</td>
                                     {% endfor %}
                                     <tr>
                                 {% endfor %}
+                                </tbody>
                             {% endif %}
                         </table>
                         {% endif %}
