@@ -118,31 +118,9 @@ def receive_sync(request):
         client_id = req['client_id']
         client_shadow_cksum = req['client_shadow_cksum']
 
-        server_text = None
-        server_shadows = {}
-        with closing(shelve.open(temp_server_file_name)) as d:
-            if not 'server_shadows' in d:
-                d['server_shadows'] = {}
-            else:
-                server_shadows = d['server_shadows']
-
-            if 'server_text' in d:
-                server_text = d['server_text']
-            else:
-                if client_id in server_shadows:
-                    # FIXME check if doing this is OK
-                    server_text = server_shadows[client_id]
-                    d['server_text'] = server_shadows[client_id]
-                else:
-                    server_text = ""
-                    d['server_text'] = server_text
-
-        #if server_text is None:
-        #    print("NoServerText")
-        #    res = err_response('NoServerText',
-        #    'No text found in the server. Send it again')
-        #el
-        if not client_id in server_shadows:
+        server_text = __get_server_text()
+        server_shadow = __get_shadow(client_id)
+        if server_shadow is None:
             if server_text:
                 print("ServerShadowChecksumFailed")
                  # FIXME: Change ServerShadowChecksumFailed to its own type
@@ -152,13 +130,7 @@ def receive_sync(request):
                     'error_message': 'Shadows got desynced. Sending back the full server shadow',
                     'server_shadow': server_text,
                     }
-                with closing(shelve.open(temp_server_file_name)) as d:
-                    if not 'server_shadows' in d:
-                        d['server_shadows'] = {}
-                    else:
-                        server_shadows = d['server_shadows']
-                        server_shadows[client_id] = server_text
-                        d['server_shadows'] = server_shadows
+                __set_shadow(client_id, server_text)
             else:
                 print("NoServerShadow")
                 res = err_response('NoServerShadow',
@@ -167,8 +139,7 @@ def receive_sync(request):
             #res = err_response('NoServerShadow',
             #'No shadow found in the server. Send it again')
         else:
-            server_shadow = server_shadows[client_id]
-            if not server_shadow:
+            if not server_shadow: # FIXME coverage should show that it should never enter here
                 server_shadow_cksum = 0
             else:
                 server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
@@ -204,95 +175,84 @@ def receive_sync(request):
                 # len(set(list)) should be 1 if all elements are the same
                 if len(set(shadow_results)) == 1 and shadow_results[0]:
                     # step 5
-                    with closing(shelve.open(temp_server_file_name)) as d:
-                        server_shadows = d['server_shadows']
-                        server_shadows[client_id] = server_shadow_patch_results[0]
-                        d['server_shadows'] = server_shadows
-                        # should a break here be catastrophic ??
+                    __set_shadow(client_id, server_shadow_patch_results[0])
+                    server_text = __get_server_text()
+
+
+                    server_text_patch_results = None
+                    server_text_patch_results = diff_obj.patch_apply(
+                          patches2, server_text)
+                    text_results = server_text_patch_results[1]
+
+                    if any(text_results):
+                        # step 7
+                        __set_server_text(server_text_patch_results[0])
+
                         #
-                        # step 6
-                        if not 'server_text' in d:
-                            d['server_text'] = ""
-                        server_text = d['server_text']
+                        # Here starts second half of sync.
+                        #
 
-
-                        server_text_patch_results = None
-                        server_text_patch_results = diff_obj.patch_apply(
-                              patches2, server_text)
-                        text_results = server_text_patch_results[1]
-
-                        if any(text_results):
-                            # step 7
-                            d['server_text'] = server_text_patch_results[0]
-
-                            #
-                            # Here starts second half of sync.
-                            #
-
-                            print("""#
+                        print("""#
 # Here starts second half of sync.
 #""")
 
-                            diff_obj = diff_match_patch.diff_match_patch()
-                            diff_obj.Diff_Timeout = DIFF_TIMEOUT
+                        diff_obj = diff_match_patch.diff_match_patch()
+                        diff_obj.Diff_Timeout = DIFF_TIMEOUT
 
-                            # from https://neil.fraser.name/writing/sync/
-                            # step 1 & 2
-                            # Client Text is diffed against Shadow. This returns a list of edits which
-                            # have been performed on Client Text
+                        # from https://neil.fraser.name/writing/sync/
+                        # step 1 & 2
+                        # Client Text is diffed against Shadow. This returns a list of edits which
+                        # have been performed on Client Text
 
-                            server_shadow = server_shadows[client_id]
-                            server_text = d['server_text']
-                            edits = None
-                            if not server_shadow:
-                                edits = diff_obj.diff_main("", server_text)
-                            else:
-                                edits = diff_obj.diff_main(server_shadow, server_text)
-                            diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
-
-                            patches = diff_obj.patch_make(edits)
-                            text_patches = diff_obj.patch_toText(patches)
-
-                            if not text_patches:
-                                # nothing to update!
-                                res = err_response('NoUpdate',
-                                'Nothing to update')
-                            else:
-                                #print("step 2 results: {}".format(text_patches))
-
-                                #step 3
-                                #
-                                # Client Text is copied over to Shadow. This copy must be identical to
-                                # the value of Client Text in step 1, so in a multi-threaded environment
-                                # a snapshot of the text should have been taken.
-                                server_shadow_cksum = 0
-                                if not server_shadow:
-                                    print("server_shadow: None")
-                                else:
-                                    server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
-                                print("server_shadow_cksum {}".format(server_shadow_cksum))
-                                #print(server_shadow)
-
-                                server_shadows = d['server_shadows']
-                                server_shadows[client_id] = server_text
-                                d['server_shadows'] = server_shadows
-
-                                res = {
-                                    'status': 'OK',
-                                    'client_id': client_id,
-                                    'server_shadow_cksum': server_shadow_cksum,
-                                    'text_patches': text_patches,
-                                    }
+                        server_shadow = __get_shadow(client_id)
+                        server_text = __get_server_text()
+                        edits = None
+                        if not server_shadow:
+                            edits = diff_obj.diff_main("", server_text)
                         else:
-                            # should I try to patch again?
-                            print("FuzzyServerPatchFailed")
+                            edits = diff_obj.diff_main(server_shadow, server_text)
+                        diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
+
+                        patches = diff_obj.patch_make(edits)
+                        text_patches = diff_obj.patch_toText(patches)
+
+                        if not text_patches:
+                            # nothing to update!
+                            res = err_response('NoUpdate',
+                            'Nothing to update')
+                        else:
+                            #print("step 2 results: {}".format(text_patches))
+
+                            #step 3
+                            #
+                            # Client Text is copied over to Shadow. This copy must be identical to
+                            # the value of Client Text in step 1, so in a multi-threaded environment
+                            # a snapshot of the text should have been taken.
+                            server_shadow_cksum = 0
+                            if not server_shadow:
+                                print("server_shadow: None")
+                            else:
+                                server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
+                            print("server_shadow_cksum {}".format(server_shadow_cksum))
+                            #print(server_shadow)
+
+                            _set_shadow(client_id, server_text)
+
                             res = {
-                                'status': 'ERROR',
-                                'error_type': 'FuzzyServerPatchFailed',
-                                'error_message': 'Fuzzy patching failled. Sending back the full server text',
-                                'server_text' : server_text
+                                'status': 'OK',
+                                'client_id': client_id,
+                                'server_shadow_cksum': server_shadow_cksum,
+                                'text_patches': text_patches,
                                 }
-                            server_shadows[client_id] = hashlib.md5(server_text.encode('utf-8')).hexdigest()
+                    else:
+                        # should I try to patch again?
+                        print("FuzzyServerPatchFailed")
+                        res = {
+                            'status': 'ERROR',
+                            'error_type': 'FuzzyServerPatchFailed',
+                            'error_message': 'Fuzzy patching failled. Sending back the full server text',
+                            'server_text' : server_text
+                            }
                 else:
                     # I should try to patch again
                     res = err_response('ServerPatchFailed',
@@ -326,21 +286,14 @@ def receive_shadow(request):
     req = request.json
     res = None
     if req and 'client_id' in req and 'client_shadow' in req:
-        server_shadows = None
-
         res = err_response('UnknowErrorSendShadow',
         'Unknown error in receive_shadow')
 
-        with closing(shelve.open(temp_server_file_name)) as d:
-            if not 'server_shadows' in d:
-                d['server_shadows'] = {}
-            server_shadows = d['server_shadows']
-            client_id = req['client_id']
-            server_shadows[client_id] = req['client_shadow']
-            d['server_shadows'] = server_shadows
-            res = {
-                'status': 'OK',
-                }
+        _set_shadow(req['client_id'], req['client_shadow'])
+
+        res = {
+            'status': 'OK',
+            }
     else:
         if not req:
             res = err_response('NoPayload',
@@ -367,17 +320,50 @@ def err_response(error_type, error_message):
         'error_message': error_message,
         }
 
-def get_text(request):
-    #import pdb; pdb.set_trace()
-    print("get_text")
-    req = request.json
 
-    server_text = ""
+def __set_server_text(text):
+    with closing(shelve.open(temp_server_file_name)) as d:
+        d['server_text'] = text
+
+
+def __get_server_text():
     with closing(shelve.open(temp_server_file_name)) as d:
         if 'server_text' in d:
-            server_text = d['server_text']
+            return d['server_text']
         else:
-            d['server_text'] = ""
+            return ""
+
+
+def __set_server_shadow(shadows):
+    with closing(shelve.open(temp_server_file_name)) as d:
+        d['server_shadows'] = shadows
+
+
+def __set_shadow(client_id, value):
+    shadows = __get_server_shadow()
+    shadows[client_id] = value
+    __set_server_shadow(shadows)
+
+
+def __get_server_shadow():
+    with closing(shelve.open(temp_server_file_name)) as d:
+        if 'server_shadows' in d:
+            return d['server_shadows']
+        else:
+            return {}
+
+def __get_shadow(client_id):
+    shadows = __get_server_shadow()
+    shadow = None
+    if client_id in shadows:
+        shadow = shadows[client_id]
+    return shadow
+
+
+def get_text(request):
+    #import pdb; pdb.set_trace()
+    #print("get_text")
+    server_text = __get_server_text()
 
     res = {
         'status': 'OK',
