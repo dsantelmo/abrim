@@ -2,17 +2,21 @@
 
 from contextlib import closing
 import os
+import sys
 import tempfile #FIXME delete
 import hashlib
 import json
+import argparse
 import shelve
 # FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
 # can execute arbitrary code.
-from flask import Flask, request, redirect, url_for, abort
+from flask import Flask, g, request, redirect, url_for, abort
 import flask
 import diff_match_patch
 import requests
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from abrim.db import db
 
 
 
@@ -23,6 +27,21 @@ DIFF_TIMEOUT=0.1
 # python -m flask run
 app = Flask(__name__)
 app.debug = True
+app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
+app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
+
+
+def connect_db():
+    return db.connect_db(app.config['DB_PATH'])
+
+
+def get_db():
+    return db.get_db(g, app.config['DB_PATH'])
+
+
+def init_db():
+    db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
+
 
 
 #@app.route('/', methods=['POST',])
@@ -375,4 +394,15 @@ def get_text(request):
 
 
 if __name__ == "__main__":
-    app.run(port=5002)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--port", help="Port")
+    args = parser.parse_args()
+    client_port = 5002
+    if args.port and int(args.port) > 0:
+        client_port = int(args.port)
+
+    app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], client_port)
+    connect_db()
+    init_db()
+    #print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
+    app.run(host='0.0.0.0', port=client_port)

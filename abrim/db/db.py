@@ -27,10 +27,10 @@ def get_db(g, db_path):
     return g.sqlite_db
 
 
-def init_db(app, g, db_path):
+def init_db(app, g, db_path, schema_path):
     with app.app_context():
         db = get_db(g, db_path)
-        with app.open_resource('db\\schema.sql', mode='r') as f:
+        with app.open_resource(schema_path, mode='r') as f:
             db.cursor().executescript(f.read())
         db.commit()
 
@@ -42,7 +42,7 @@ def close_db(g, error):
 
 
 # FIXME: delete g and db_path from params...
-def get_content_or_shadow(g, db_path, user_id, content=True):
+def get_content_or_shadow(g, db_path, text_id, user_id, content=True):
     content_or_shadow = 'shadow'
     if content:
         content_or_shadow = 'content'
@@ -50,11 +50,11 @@ def get_content_or_shadow(g, db_path, user_id, content=True):
     select_query = """
                    SELECT {}
                    FROM texts
-                   WHERE user_id = ?
+                   WHERE text_id = ?
                    """.format(content_or_shadow)
     # FIXME logging...
-    #print("{0} -- {1}".format(select_query,user_id,))
-    cur = db.execute(select_query, (user_id,))
+    #print("{0} -- {1}".format(select_query,text_id,))
+    cur = db.execute(select_query, (text_id,))
     try:
         result = cur.fetchone()[0]
         # print("--->" + result + "<----")
@@ -67,7 +67,7 @@ def get_content_or_shadow(g, db_path, user_id, content=True):
         raise
 
 # FIXME: delete g and db_path from params...
-def set_content_or_shadow(g, db_path, user_id, new_value, content=True):
+def set_content_or_shadow(g, db_path, text_id, user_id, new_value, content=True):
     content_or_shadow = 'shadow'
     if content:
         content_or_shadow = 'content'
@@ -79,18 +79,18 @@ def set_content_or_shadow(g, db_path, user_id, new_value, content=True):
         insert_query = """
                        INSERT OR IGNORE INTO texts
                        (text_id, user_id, {})
-                       VALUES (?, ?,?)
+                       VALUES (?, ?, ?)
                        """.format(content_or_shadow)
         update_query = """
                        UPDATE texts
                        SET {} = ?
-                       WHERE text_id = ?
+                       WHERE text_id = ? AND user_id = ?
                        """.format(content_or_shadow)
         # FIXME logging...
         # print("{0} -- {1} -- {2}".format(insert_query, user_id, new_value,))
-        db.execute(insert_query, (user_id, user_id, new_value,))
+        db.execute(insert_query, (text_id, user_id, new_value,))
         # print("{0} -- {1} -- {2}".format(update_query, user_id, new_value))
-        db.execute(update_query, (new_value, user_id))
+        db.execute(update_query, (new_value, text_id, user_id))
         db.commit()
         return True
     except:

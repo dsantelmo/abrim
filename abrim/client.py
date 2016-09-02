@@ -3,11 +3,11 @@
 from contextlib import closing
 import os
 import sys
+import hashlib
 import json
 import argparse
 from flask import Flask, g, request, redirect, url_for, abort, render_template, flash
 import diff_match_patch
-import hashlib
 import requests
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim.utils import config_files
@@ -24,6 +24,7 @@ app.config['DIFF_TIMEOUT'] = 0.1
 app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
+app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
 app.config['URL_FOR_GET_SYNC'] = "http://127.0.0.1:5002/get_text"
 app.config['URL_FOR_SEND_SYNC'] = "http://127.0.0.1:5002/send_sync"
 app.config['URL_FOR_SEND_SHADOW'] = "http://127.0.0.1:5002/send_shadow"
@@ -31,23 +32,6 @@ app.config['URL_FOR_SEND_SHADOW'] = "http://127.0.0.1:5002/send_shadow"
 # Config from files and env vars:
 config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
-
-
-def connect_db():
-    return db.connect_db(app.config['DB_PATH'])
-
-
-def get_db():
-    return db.get_db(g, app.config['DB_PATH'])
-
-
-def init_db():
-    db.init_db(app, g, app.config['DB_PATH'])
-
-
-# FIXME: DELETE THIS ------
-CLIENT_ID = app.config['CLIENT_ID']
-# FIXME: DELETE THIS ------
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -82,20 +66,37 @@ def close_db(error):
     db.close_db(g, error)
 
 
+def connect_db():
+    return db.connect_db(app.config['DB_PATH'])
+
+
+def get_db():
+    return db.get_db(g, app.config['DB_PATH'])
+
+
+def init_db():
+    db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
+
+
+# FIXME: DELETE THIS ------
+CLIENT_ID = app.config['CLIENT_ID']
+# FIXME: DELETE THIS ------
+
+
 def __get_content(user_id):
-    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, True)
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, True)
 
 
 def __get_shadow(user_id):
-    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, False)
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, False)
 
 
 def __set_content(user_id, value):
-    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, value, True)
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, True)
 
 
 def __set_shadow(user_id, value):
-    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, value, False)
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, False)
 
 
 def show_datastore_form():
