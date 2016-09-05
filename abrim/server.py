@@ -255,7 +255,7 @@ def receive_sync(request):
                             print("server_shadow_cksum {}".format(server_shadow_cksum))
                             #print(server_shadow)
 
-                            _set_shadow(client_id, server_text)
+                            __set_shadow(client_id, server_text)
 
                             res = {
                                 'status': 'OK',
@@ -308,7 +308,7 @@ def receive_shadow(request):
         res = err_response('UnknowErrorSendShadow',
         'Unknown error in receive_shadow')
 
-        _set_shadow(req['client_id'], req['client_shadow'])
+        __set_shadow(req['client_id'], req['client_shadow'])
 
         res = {
             'status': 'OK',
