@@ -170,7 +170,7 @@ def _sync(req_form):
         return redirect(url_for('__main'), code=302)
 
 
-def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count):
+def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count, previously_shadow_updated_from_client=False):
     recursive_count += 1
 
     if recursive_count > app.config['MAX_RECURSIVE_COUNT']:
@@ -203,7 +203,10 @@ def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count):
 
     if not text_patches:
         # nothing to sync!
-        flash("no changes", 'warn')
+        if not previously_shadow_updated_from_client:
+            flash("no changes", 'warn')
+        else:
+            flash("Sync OK!", 'info')
         return redirect(url_for('__main'), code=302)
     else:
         # print("step 2 results: {}".format(text_patches))
@@ -375,8 +378,9 @@ def __manage_send_sync_error_return(send_sync_url, send_shadow_url, r_json, clie
                 if 'status' in r_send_shadow_json:
                     if r_send_shadow_json['status'] == "OK":
                         #print("Shadow updated from client. Trying to sync again")
-                        flash("Shadow updated from client. Trying to sync again...", 'info')
-                        error_return =  send_sync(send_sync_url, send_shadow_url, client_text, recursive_count)
+                        #flash("Shadow updated from client. Trying to sync again...", 'info')
+                        previously_shadow_updated_from_client = True
+                        error_return =  send_sync(send_sync_url, send_shadow_url, client_text, recursive_count, previously_shadow_updated_from_client)
                     else:
                         error_return = "ERROR: unable to send_shadow"
                 else:

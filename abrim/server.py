@@ -343,6 +343,10 @@ def receive_shadow(request):
 
         __set_shadow(req['client_id'], req['client_shadow'])
 
+        # check if there is server content, as this can be the 1st sync
+        if __get_server_text() == "":
+            __set_server_text(req['client_shadow'])
+
         res = {
             'status': 'OK',
             }
