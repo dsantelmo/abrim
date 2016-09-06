@@ -11,11 +11,12 @@ import shelve
 # FIXME Warning Because the shelve module is backed by pickle, it is insecure
 # to load a shelf from an untrusted source. Like with pickle, loading a shelf
 # can execute arbitrary code.
-from flask import Flask, g, request, redirect, url_for, abort
+from flask import Flask, g, request, redirect, url_for, abort, render_template
 import flask
 import diff_match_patch
 import requests
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from abrim.utils.common import generate_random_id
 from abrim.db import db
 
 
@@ -29,19 +30,7 @@ app = Flask(__name__)
 app.debug = True
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
-
-
-def connect_db():
-    return db.connect_db(app.config['DB_PATH'])
-
-
-def get_db():
-    return db.get_db(g, app.config['DB_PATH'])
-
-
-def init_db():
-    db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
-
+app.config['CLIENT_ID'] = generate_random_id(5)
 
 
 #@app.route('/', methods=['POST',])
@@ -49,6 +38,13 @@ def init_db():
 def __root():
     abort(404)
 
+
+#@app.route('/datastore.OLD')
+#def __datastore_OLD():
+#    if request.method != 'GET':
+#        abort(404)
+#    else:
+#        return show_datastore_form_OLD()
 
 @app.route('/datastore')
 def __datastore():
@@ -82,31 +78,68 @@ def _get_text():
         return get_text(request)
 
 
-SERVER_ID='server1'
+#SERVER_ID='server1'
+#
+#temp_server_file_name = os.path.join( tempfile.gettempdir(),
+#  tempfile.gettempprefix() + SERVER_ID)
 
-temp_server_file_name = os.path.join( tempfile.gettempdir(),
-  tempfile.gettempprefix() + SERVER_ID)
+
+@app.teardown_appcontext
+def close_db(error):
+    db.close_db(g, error)
 
 
+def connect_db():
+    return db.connect_db(app.config['DB_PATH'])
 
+
+def get_db():
+    return db.get_db(g, app.config['DB_PATH'])
+
+
+def init_db():
+    db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
+
+
+def __get_content(user_id):
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.CONTENT)
+
+
+def __get_shadow(user_id):
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.SHADOW)
+
+
+def __set_content(user_id, value):
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, db.CONTENT)
+
+
+def __set_shadow(user_id, value):
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, db.SHADOW)
 
 
 def show_datastore_form():
-    with closing(shelve.open(temp_server_file_name)) as d:
-        temp_string = "<h1>Datastore</h1><h3>" + temp_server_file_name + "</h3>"
-        return __print_iter_contents(d, 6, temp_string)
+    table_names = db.get_all_tables(g, app.config['DB_PATH'])
+    content= db.get_table_contents(g, app.config['DB_PATH'], table_names)
+    return render_template('datastore.html', CLIENT_ID=app.config['CLIENT_ID'], content=content)
 
-def __print_iter_contents(iter_d, depth, temp_string):
-    if depth > 0:
-        for k, element in iter_d.items():
-            if isinstance(element, dict):
-                temp_string = temp_string + "<li><b>{0} :</b></li>".format(k)
-                temp_string = temp_string + "<ul>"
-                temp_string = __print_iter_contents(element, depth - 1, temp_string)
-                temp_string = temp_string + "</ul>"
-            else:
-                temp_string = temp_string + "<li><b>{0}</b> : {1}</li>".format(k, element)
-    return temp_string
+
+#def show_datastore_form_OLD():
+#    with closing(shelve.open(temp_server_file_name)) as d:
+#        temp_string = "<h1>Datastore</h1><h3>" + temp_server_file_name + "</h3>"
+#        return __print_iter_contents(d, 6, temp_string)
+#
+#
+#def __print_iter_contents(iter_d, depth, temp_string):
+#    if depth > 0:
+#        for k, element in iter_d.items():
+#            if isinstance(element, dict):
+#                temp_string = temp_string + "<li><b>{0} :</b></li>".format(k)
+#                temp_string = temp_string + "<ul>"
+#                temp_string = __print_iter_contents(element, depth - 1, temp_string)
+#                temp_string = temp_string + "</ul>"
+#            else:
+#                temp_string = temp_string + "<li><b>{0}</b> : {1}</li>".format(k, element)
+#    return temp_string
 
 
 def receive_sync(request):
@@ -341,42 +374,49 @@ def err_response(error_type, error_message):
 
 
 def __set_server_text(text):
-    with closing(shelve.open(temp_server_file_name)) as d:
-        d['server_text'] = text
+    __set_content(app.config['CLIENT_ID'], text)
+    #with closing(shelve.open(temp_server_file_name)) as d:
+    #    d['server_text'] = text
 
 
 def __get_server_text():
-    with closing(shelve.open(temp_server_file_name)) as d:
-        if 'server_text' in d:
-            return d['server_text']
-        else:
-            return ""
+    content = __get_content(app.config['CLIENT_ID'])
+    if content is None:
+        content = ""
+    return content
+    #with closing(shelve.open(temp_server_file_name)) as d:
+    #    if 'server_text' in d:
+    #        return d['server_text']
+    #    else:
+    #        return ""
 
 
-def __set_server_shadow(shadows):
-    with closing(shelve.open(temp_server_file_name)) as d:
-        d['server_shadows'] = shadows
-
-
-def __set_shadow(client_id, value):
-    shadows = __get_server_shadow()
-    shadows[client_id] = value
-    __set_server_shadow(shadows)
-
-
-def __get_server_shadow():
-    with closing(shelve.open(temp_server_file_name)) as d:
-        if 'server_shadows' in d:
-            return d['server_shadows']
-        else:
-            return {}
-
-def __get_shadow(client_id):
-    shadows = __get_server_shadow()
-    shadow = None
-    if client_id in shadows:
-        shadow = shadows[client_id]
-    return shadow
+#def __set_server_shadow(shadows):
+#    with closing(shelve.open(temp_server_file_name)) as d:
+#        d['server_shadows'] = shadows
+#
+#
+#def __set_shadow(client_id, value):
+#    __set_shadow2(client_id, value)
+#    #shadows = __get_server_shadow()
+#    #shadows[client_id] = value
+#    #__set_server_shadow(shadows)
+#
+#
+#def __get_server_shadow():
+#    with closing(shelve.open(temp_server_file_name)) as d:
+#        if 'server_shadows' in d:
+#            return d['server_shadows']
+#        else:
+#            return {}
+#
+#def __get_shadow(client_id):
+#    return __get_shadow2(client_id)
+#    #shadows = __get_server_shadow()
+#    #shadow = None
+#    #if client_id in shadows:
+#    #    shadow = shadows[client_id]
+#    #return shadow
 
 
 def get_text(request):

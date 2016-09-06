@@ -84,25 +84,25 @@ CLIENT_ID = app.config['CLIENT_ID']
 
 
 def __get_content(user_id):
-    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, True)
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.CONTENT)
 
 
 def __get_shadow(user_id):
-    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, False)
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.SHADOW)
 
 
 def __set_content(user_id, value):
-    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, True)
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, db.CONTENT)
 
 
 def __set_shadow(user_id, value):
-    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, False)
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, db.SHADOW)
 
 
 def show_datastore_form():
     table_names = db.get_all_tables(g, app.config['DB_PATH'])
     content= db.get_table_contents(g, app.config['DB_PATH'], table_names)
-    print(content)
+    #print(content)
     #with closing(__open_datastore()) as d:
     #    temp_string = "<h1>Datastore</h1><h3>" + app.config['DB_PATH'] + "</h3>"
     #    return __print_iter_contents(d, 6, temp_string)

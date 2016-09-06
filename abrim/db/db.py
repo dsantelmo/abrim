@@ -5,6 +5,9 @@ import sqlite3
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim.utils.common import secure_filename
 
+CONTENT=True
+SHADOW=False
+
 
 def get_db_path(string_to_format, client_port):
     db_filename = secure_filename(string_to_format.format(client_port))
@@ -53,7 +56,7 @@ def get_content_or_shadow(g, db_path, text_id, user_id, content=True):
                    WHERE text_id = ?
                    """.format(content_or_shadow)
     # FIXME logging...
-    #print("{0} -- {1}".format(select_query,text_id,))
+    print("{0} -- {1}".format(select_query,text_id,))
     cur = db.execute(select_query, (text_id,))
     try:
         result = cur.fetchone()[0]
@@ -87,9 +90,9 @@ def set_content_or_shadow(g, db_path, text_id, user_id, new_value, content=True)
                        WHERE text_id = ? AND user_id = ?
                        """.format(content_or_shadow)
         # FIXME logging...
-        # print("{0} -- {1} -- {2}".format(insert_query, user_id, new_value,))
+        print("{0} -- {1} -- {2} -- {3}".format(insert_query, text_id, user_id, new_value,))
         db.execute(insert_query, (text_id, user_id, new_value,))
-        # print("{0} -- {1} -- {2}".format(update_query, user_id, new_value))
+        print("{0} -- {1} -- {2} -- {3}".format(update_query, new_value, text_id, user_id,))
         db.execute(update_query, (new_value, text_id, user_id))
         db.commit()
         return True
