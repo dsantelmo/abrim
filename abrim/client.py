@@ -25,7 +25,7 @@ app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
-app.config['URL_FOR_GET_SYNC'] = "http://127.0.0.1:5002/get_text"
+app.config['URL_FOR_GET_TEXT'] = "http://127.0.0.1:5002/get_text"
 app.config['URL_FOR_SEND_SYNC'] = "http://127.0.0.1:5002/send_sync"
 app.config['URL_FOR_SEND_SHADOW'] = "http://127.0.0.1:5002/send_shadow"
 
@@ -51,7 +51,7 @@ def __main():
     if request.method == 'POST':
         pass
     else:
-        return show_main_form(app.config['URL_FOR_GET_SYNC'])
+        return show_main_form(app.config['URL_FOR_GET_TEXT'])
 
 @app.route('/sync', methods=['GET', 'POST'])
 def __sync():
@@ -115,7 +115,7 @@ from passlib.hash import bcrypt
 #if bcrypt.verify(usersPassword, hash):
 
 
-def show_main_form(get_sync_url):
+def show_main_form(get_text_url):
     # FIXME: add logging - print("show_main_form")
     client_text = __get_content(CLIENT_ID)
     if client_text is None or client_text == "":
@@ -124,7 +124,7 @@ def show_main_form(get_sync_url):
         payload = { 'client_id': CLIENT_ID, }
         try:
             r = requests.post(
-              get_sync_url,
+              get_text_url,
               headers={'Content-Type': 'application/json'},
               data=json.dumps(payload)
               )
@@ -176,7 +176,7 @@ def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count, prev
     if recursive_count > app.config['MAX_RECURSIVE_COUNT']:
         return "MAX_RECURSIVE_COUNT"
 
-    client_shadow = __get_shadow(CLIENT_ID)
+    client_shadow = __get_shadow(app.config['CLIENT_ID'])
 
     if not client_text:
         # nothing to sync!
@@ -202,13 +202,29 @@ def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count, prev
     text_patches = diff_obj.patch_toText(patches)
 
     if not text_patches:
-        # nothing to sync!
+        # nothing new to sync in this side. Check the other side for updates
         if not previously_shadow_updated_from_client:
-            flash("no changes", 'warn')
+            #flash("no changes", 'warn')
+            r = __get_text_payload(app.config['URL_FOR_GET_TEXT'], app.config['CLIENT_ID'])
+            try:
+                r_json = r.json()
+                if 'status' in r_json:
+                    if (r_json['status'] != "OK"
+                        and r_json['error_type'] != "NoUpdate"
+                        and r_json['error_type']  != "FuzzyServerPatchFailed"):
+                        pass
+                    fixme_text = """
+Continue with a function of "Here starts second half of sync" from below
+"""
+                    return(r.text + fixme_text)
+            except ValueError:
+                #print("ValueError")
+                return(r.text)
         else:
             flash("Sync OK!", 'info')
         return redirect(url_for('__main'), code=302)
     else:
+        # changes in this side that need to sync
         # print("step 2 results: {}".format(text_patches))
 
         try:
@@ -393,7 +409,7 @@ def __manage_send_sync_error_return(send_sync_url, send_shadow_url, r_json, clie
             if 'server_shadow' in r_json:
                 new_client_shadow = r_json['server_shadow']
                 #print("Shadow updated from server. Trying to sync again")
-                flash("Shadow updated from server. Trying to sync again...", 'error')
+                #flash("Shadow updated from server. Trying to sync again...", 'error')
                 error_return =  None
             else:
                 error_return = "ERROR: unable to update shadow from server"
@@ -436,12 +452,12 @@ def __send_shadow_payload(url, client_id, client_shadow):
     #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
     return __requests_post(url, payload)
 
-def __get_sync_payload(url, client_id):
+def __get_text_payload(url, client_id):
     payload = {
                'client_id': client_id,
               }
 
-    #print("__get_sync_payload: " + \
+    #print("__get_text_payload: " + \
     #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
     return __requests_post(url, payload)
 
