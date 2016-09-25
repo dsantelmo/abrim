@@ -6,7 +6,7 @@ import sys
 import hashlib
 import json
 import argparse
-from flask import Flask, g, request, redirect, url_for, abort, render_template, flash
+from flask import Flask, g, request, redirect, url_for, abort, render_template, flash, jsonify
 import diff_match_patch
 import requests
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -59,6 +59,30 @@ def __sync():
         abort(404)
     else:
         return _sync(request.form)
+
+
+@app.route('/send_sync', methods=['POST'])
+def _send_sync():
+    if request.method != 'POST':
+        abort(404)
+    else:
+        return receive_sync(request)
+
+
+@app.route('/send_shadow', methods=['POST'])
+def _send_shadow():
+    if request.method != 'POST':
+        abort(404)
+    else:
+        return receive_shadow(request)
+
+
+@app.route('/get_text', methods=['POST'])
+def _get_text():
+    if request.method != 'POST':
+        abort(404)
+    else:
+        return get_text(request)
 
 
 @app.teardown_appcontext
@@ -452,6 +476,7 @@ def __send_shadow_payload(url, client_id, client_shadow):
     #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
     return __requests_post(url, payload)
 
+
 def __get_text_payload(url, client_id):
     payload = {
                'client_id': client_id,
@@ -460,6 +485,271 @@ def __get_text_payload(url, client_id):
     #print("__get_text_payload: " + \
     #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
     return __requests_post(url, payload)
+
+
+# "server" stuff
+
+def receive_sync(request):
+    #import pdb; pdb.set_trace()
+    print("send_sync")
+    req = request.json
+    res = err_response('UnknownError', 'Non controlled error in server')
+    if req and 'client_id' in req and 'client_shadow_cksum' in req and 'client_patches' in req:
+
+        # FIXME: create atomicity
+        #
+        # steps 4 (atomic with 5, 6 & 7)
+        #
+        # The edits are applied to Server Text on a best-effort basis
+        # Server Text is updated with the result of the patch. Steps 4 and 5
+        # must be atomic, but they do not have to be blocking; they may be
+        # repeated until Server Text stays still long enough.
+        #
+        # Client Text and Server Shadow (or symmetrically Server Text and
+        # Client Shadow) must be absolutely identical after every half of the
+        # synchronization
+        #
+        # receive text_patches and client_shadow_cksum
+        #
+        # first check the server shadow cheksum
+        # if server_shadows[client_id] is empty ask for it
+
+        client_id = req['client_id']
+        client_shadow_cksum = req['client_shadow_cksum']
+
+        server_text = __get_server_text()
+        server_shadow = __get_shadow(client_id)
+        if server_shadow is None:
+            if server_text:
+                print("ServerShadowChecksumFailed")
+                 # FIXME: Change ServerShadowChecksumFailed to its own type
+                res = {
+                    'status': 'ERROR',
+                    'error_type': 'ServerShadowChecksumFailed',
+                    'error_message': 'Shadows got desynced. Sending back the full server shadow',
+                    'server_shadow': server_text,
+                    }
+                __set_shadow(client_id, server_text)
+            else:
+                print("NoServerShadow")
+                res = err_response('NoServerShadow',
+                'No shadow found in the server. Send it again')
+            #print("NoServerShadow")
+            #res = err_response('NoServerShadow',
+            #'No shadow found in the server. Send it again')
+        else:
+            if not server_shadow: # FIXME coverage should show that it should never enter here
+                server_shadow_cksum = 0
+            else:
+                server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
+            print("server_shadow_cksum {}".format(server_shadow_cksum))
+            #print(server_shadow)
+
+            if client_shadow_cksum != server_shadow_cksum:
+                #FIXME what happenson first sync?
+                print("ServerShadowChecksumFailed")
+                res = {
+                    'status': 'ERROR',
+                    'error_type': 'ServerShadowChecksumFailed',
+                    'error_message': 'Shadows got desynced. Sending back the full server shadow',
+                    'server_shadow' : server_shadow
+                    }
+            else:
+                #print("shadows' checksums match")
+
+                diff_obj = diff_match_patch.diff_match_patch()
+                diff_obj.Diff_Timeout = app.config['DIFF_TIMEOUT']
+
+                patches2 = diff_obj.patch_fromText(req['client_patches'])
+
+                server_shadow_patch_results = None
+                if not server_shadow:
+                    server_shadow_patch_results = diff_obj.patch_apply(
+                      patches2, "")
+                else:
+                    server_shadow_patch_results = diff_obj.patch_apply(
+                      patches2, server_shadow)
+                shadow_results = server_shadow_patch_results[1]
+
+                # len(set(list)) should be 1 if all elements are the same
+                if len(set(shadow_results)) == 1 and shadow_results[0]:
+                    # step 5
+                    __set_shadow(client_id, server_shadow_patch_results[0])
+                    server_text = __get_server_text()
+
+
+                    server_text_patch_results = None
+                    server_text_patch_results = diff_obj.patch_apply(
+                          patches2, server_text)
+                    text_results = server_text_patch_results[1]
+
+                    if any(text_results):
+                        # step 7
+                        __set_server_text(server_text_patch_results[0])
+
+                        #
+                        # Here starts second half of sync.
+                        #
+
+                        print("""#
+# Here starts second half of sync.
+#""")
+
+                        diff_obj = diff_match_patch.diff_match_patch()
+                        diff_obj.Diff_Timeout = app.config['DIFF_TIMEOUT']
+
+                        # from https://neil.fraser.name/writing/sync/
+                        # step 1 & 2
+                        # Client Text is diffed against Shadow. This returns a list of edits which
+                        # have been performed on Client Text
+
+                        server_shadow = __get_shadow(client_id)
+                        server_text = __get_server_text()
+                        edits = None
+                        if not server_shadow:
+                            edits = diff_obj.diff_main("", server_text)
+                        else:
+                            edits = diff_obj.diff_main(server_shadow, server_text)
+                        diff_obj.diff_cleanupSemantic(edits) # FIXME: optional?
+
+                        patches = diff_obj.patch_make(edits)
+                        text_patches = diff_obj.patch_toText(patches)
+
+                        if not text_patches:
+                            # nothing to update!
+                            res = err_response('NoUpdate',
+                            'Nothing to update')
+                        else:
+                            #print("step 2 results: {}".format(text_patches))
+
+                            #step 3
+                            #
+                            # Client Text is copied over to Shadow. This copy must be identical to
+                            # the value of Client Text in step 1, so in a multi-threaded environment
+                            # a snapshot of the text should have been taken.
+                            server_shadow_cksum = 0
+                            if not server_shadow:
+                                print("server_shadow: None")
+                            else:
+                                server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
+                            print("server_shadow_cksum {}".format(server_shadow_cksum))
+                            #print(server_shadow)
+
+                            __set_shadow(client_id, server_text)
+
+                            res = {
+                                'status': 'OK',
+                                'client_id': client_id,
+                                'server_shadow_cksum': server_shadow_cksum,
+                                'text_patches': text_patches,
+                                }
+                    else:
+                        # should I try to patch again?
+                        print("FuzzyServerPatchFailed")
+                        res = {
+                            'status': 'ERROR',
+                            'error_type': 'FuzzyServerPatchFailed',
+                            'error_message': 'Fuzzy patching failled. Sending back the full server text',
+                            'server_text' : server_text
+                            }
+                else:
+                    # I should try to patch again
+                    res = err_response('ServerPatchFailed',
+                    'Match-Patch failed in server')
+    else:
+        if not req:
+            res = err_response('NoPayload',
+            'No payload found in the request')
+        elif not 'client_id' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No client_id found in the request')
+        elif not 'client_shadow_cksum' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No client_shadow_cksum found in the request')
+        elif not 'client_patches' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No client_patches found in the request')
+        else:
+            print("receive_sync 500")
+            abort(500)
+    print("response:")
+    print(res)
+    return jsonify(**res)
+
+
+
+
+def receive_shadow(request):
+    #import pdb; pdb.set_trace()
+    print("receive_shadow")
+    req = request.json
+    res = None
+    if req and 'client_id' in req and 'client_shadow' in req:
+        res = err_response('UnknowErrorSendShadow',
+        'Unknown error in receive_shadow')
+
+        __set_shadow(req['client_id'], req['client_shadow'])
+
+        # check if there is server content, as this can be the 1st sync
+        if __get_server_text() == "":
+            __set_server_text(req['client_shadow'])
+
+        res = {
+            'status': 'OK',
+            }
+    else:
+        if not req:
+            res = err_response('NoPayload',
+            'No payload found in the request')
+        elif not 'client_id' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No client_id found in the request')
+        elif not 'client_shadow' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No client_shadow found in the request')
+        else:
+            print("receive_shadow 500")
+            abort(500)
+    print("response:")
+    print(res)
+    return jsonify(**res)
+
+
+
+def err_response(error_type, error_message):
+    return {
+        'status': 'ERROR',
+        'error_type': error_type,
+        'error_message': error_message,
+        }
+
+
+def __set_server_text(text):
+    __set_content(app.config['CLIENT_ID'], text)
+    #with closing(shelve.open(temp_server_file_name)) as d:
+    #    d['server_text'] = text
+
+
+def __get_server_text():
+    content = __get_content(app.config['CLIENT_ID'])
+    if content is None:
+        content = ""
+    return content
+
+
+def get_text(request):
+    #import pdb; pdb.set_trace()
+    #print("get_text")
+    server_text = __get_server_text()
+
+    res = {
+        'status': 'OK',
+        'server_text': server_text,
+        }
+    print("response:")
+    print(res)
+    return jsonify(**res)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
