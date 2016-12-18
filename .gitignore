@@ -5,3 +5,4 @@
 *.un~
 abrim.cfg
 geckodriver.log
+.idea
