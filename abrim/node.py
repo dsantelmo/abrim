@@ -188,13 +188,13 @@ def _sync(req_form):
     #    return get_sync(request.form['client_text'], 0)
     #el
     if req_form and 'send_text' in req_form:
-        return send_sync(app.config['URL_FOR_SEND_SYNC'], app.config['URL_FOR_SEND_SHADOW'], request.form['client_text'], 0)
+        return send_sync(request.form['client_text'], 0)
     else:
         flash("Command not recognized", 'error')
         return redirect(url_for('__main'), code=302)
 
 
-def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count, previously_shadow_updated_from_client=False):
+def send_sync(client_text, recursive_count, previously_shadow_updated_from_client=False):
     recursive_count += 1
 
     if recursive_count > app.config['MAX_RECURSIVE_COUNT']:
@@ -229,7 +229,7 @@ def send_sync(send_sync_url, send_shadow_url, client_text, recursive_count, prev
         # nothing new to sync in this side. Check the other side for updates
         if not previously_shadow_updated_from_client:
             #flash("no changes", 'warn')
-            r = __get_text_payload(app.config['URL_FOR_GET_TEXT'], app.config['CLIENT_ID'])
+            r = __get_text_payload()
             try:
                 r_json = r.json()
                 if 'status' in r_json:
@@ -273,7 +273,7 @@ Continue with a function of "Here starts second half of sync" from below
             __set_shadow(CLIENT_ID, client_text)
 
             # send text_patches, client_id and client_shadow_cksum
-            r = __send_sync_payload(send_sync_url, CLIENT_ID, client_shadow_cksum, text_patches)
+            r = __send_sync_payload(client_shadow_cksum, text_patches)
             try:
                 r_json = r.json()
                 if 'status' in r_json:
@@ -281,13 +281,13 @@ Continue with a function of "Here starts second half of sync" from below
                         and r_json['error_type'] != "NoUpdate"
                         and r_json['error_type']  != "FuzzyServerPatchFailed"):
                         # print("__manage_send_sync_error_return")
-                        error_return, new_client_shadow = __manage_send_sync_error_return(send_sync_url, send_shadow_url, r_json, CLIENT_ID, recursive_count)
+                        error_return, new_client_shadow = __manage_send_sync_error_return(r_json, recursive_count)
                         __set_content(CLIENT_ID, client_text)
                         __set_shadow(CLIENT_ID, client_text)
                         if new_client_shadow:
                             __set_shadow(CLIENT_ID, new_client_shadow)
                             #print("client shadow updated from the server")
-                            error_return = send_sync(send_sync_url, send_shadow_url, __get_content(CLIENT_ID), recursive_count)
+                            error_return = send_sync(__get_content(CLIENT_ID), recursive_count)
                         return error_return
                     else:
                         __set_content(CLIENT_ID, client_text)
@@ -395,14 +395,14 @@ Continue with a function of "Here starts second half of sync" from below
     abort(500)
 
 
-def __manage_send_sync_error_return(send_sync_url, send_shadow_url, r_json, client_id, recursive_count):
+def __manage_send_sync_error_return(r_json, recursive_count):
     new_client_shadow = None
 
-    client_text = __get_content(client_id)
+    client_text = __get_content(app.config['CLIENT_ID'])
     if not client_text:
         raise Exception('There should be a client_text by now...')
 
-    client_shadow = __get_shadow(client_id)
+    client_shadow = __get_shadow(app.config['CLIENT_ID'])
     if not client_shadow:
         client_shadow = ""
 
@@ -412,7 +412,7 @@ def __manage_send_sync_error_return(send_sync_url, send_shadow_url, r_json, clie
         if r_json['error_type'] == "NoServerShadow":
             #print("NoServerShadow")
             # client sends its shadow:
-            r_send_shadow = __send_shadow_payload(send_shadow_url, client_id, client_shadow)
+            r_send_shadow = __send_shadow_payload(client_shadow)
             try:
                 r_send_shadow_json = r_send_shadow.json()
                 if 'status' in r_send_shadow_json:
@@ -420,7 +420,7 @@ def __manage_send_sync_error_return(send_sync_url, send_shadow_url, r_json, clie
                         #print("Shadow updated from client. Trying to sync again")
                         #flash("Shadow updated from client. Trying to sync again...", 'info')
                         previously_shadow_updated_from_client = True
-                        error_return =  send_sync(send_sync_url, send_shadow_url, client_text, recursive_count, previously_shadow_updated_from_client)
+                        error_return =  send_sync(client_text, recursive_count, previously_shadow_updated_from_client)
                     else:
                         error_return = "ERROR: unable to send_shadow"
                 else:
@@ -454,37 +454,37 @@ def __requests_post(url, payload):
       )
 
 
-def __send_sync_payload(url, client_id, client_shadow_cksum, client_patches):
+def __send_sync_payload(client_shadow_cksum, client_patches):
     payload = {
-               'client_id': client_id,
+               'client_id': app.config['CLIENT_ID'],
                'client_shadow_cksum': client_shadow_cksum,
                'client_patches': client_patches,
               }
 
     #print("__send_sync_payload: " + \
     #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return __requests_post(url, payload)
+    return __requests_post(app.config['URL_FOR_SEND_SYNC'], payload)
 
 
-def __send_shadow_payload(url, client_id, client_shadow):
+def __send_shadow_payload(client_shadow):
     payload = {
-               'client_id': client_id,
+               'client_id': app.config['CLIENT_ID'],
                'client_shadow': client_shadow,
               }
 
     #print("__send_shadow_payload: " + \
     #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return __requests_post(url, payload)
+    return __requests_post(app.config['URL_FOR_SEND_SHADOW'], payload)
 
 
-def __get_text_payload(url, client_id):
+def __get_text_payload():
     payload = {
-               'client_id': client_id,
+               'client_id': app.config['CLIENT_ID'],
               }
 
     #print("__get_text_payload: " + \
     #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return __requests_post(url, payload)
+    return __requests_post(app.config['URL_FOR_GET_TEXT'], payload)
 
 
 # "server" stuff
