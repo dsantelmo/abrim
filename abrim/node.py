@@ -102,11 +102,6 @@ def init_db():
     db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
 
 
-# FIXME: DELETE THIS ------
-CLIENT_ID = app.config['CLIENT_ID']
-# FIXME: DELETE THIS ------
-
-
 def __get_content(user_id):
     return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.CONTENT)
 
@@ -130,7 +125,7 @@ def show_datastore_form():
     #with closing(__open_datastore()) as d:
     #    temp_string = "<h1>Datastore</h1><h3>" + app.config['DB_PATH'] + "</h3>"
     #    return __print_iter_contents(d, 6, temp_string)
-    return render_template('datastore.html', CLIENT_ID=CLIENT_ID, content=content)
+    return render_template('datastore.html', CLIENT_ID=app.config['CLIENT_ID'], content=content)
 
 
 from passlib.hash import bcrypt
@@ -141,11 +136,11 @@ from passlib.hash import bcrypt
 
 def show_main_form(get_text_url):
     # FIXME: add logging - print("show_main_form")
-    client_text = __get_content(CLIENT_ID)
+    client_text = __get_content(app.config['CLIENT_ID'])
     if client_text is None or client_text == "":
         client_text = ""
         # print("show_main_form: not client_text")
-        payload = { 'client_id': CLIENT_ID, }
+        payload = { 'client_id': app.config['CLIENT_ID'], }
         try:
             r = requests.post(
               get_text_url,
@@ -172,13 +167,13 @@ def show_main_form(get_text_url):
                         client_text = r_json['server_text']
                 else:
                     return "ERROR: failure contacting the server"
-        __set_content(CLIENT_ID, client_text)
+        __set_content(app.config['CLIENT_ID'], client_text)
 
-    client_shadow = __get_shadow(CLIENT_ID)
+    client_shadow = __get_shadow(app.config['CLIENT_ID'])
     if not client_shadow:
         client_shadow= ""
     return render_template('client.html',
-            CLIENT_ID=CLIENT_ID,
+            CLIENT_ID=app.config['CLIENT_ID'],
             client_text=client_text,
             client_shadow=client_shadow)
 
@@ -269,8 +264,8 @@ Continue with a function of "Here starts second half of sync" from below
             #print(client_shadow_cksum)
 
             client_shadow = client_text
-            __set_content(CLIENT_ID, client_text)
-            __set_shadow(CLIENT_ID, client_text)
+            __set_content(app.config['CLIENT_ID'], client_text)
+            __set_shadow(app.config['CLIENT_ID'], client_text)
 
             # send text_patches, client_id and client_shadow_cksum
             r = __send_sync_payload(client_shadow_cksum, text_patches)
@@ -282,16 +277,16 @@ Continue with a function of "Here starts second half of sync" from below
                         and r_json['error_type']  != "FuzzyServerPatchFailed"):
                         # print("__manage_send_sync_error_return")
                         error_return, new_client_shadow = __manage_send_sync_error_return(r_json, recursive_count)
-                        __set_content(CLIENT_ID, client_text)
-                        __set_shadow(CLIENT_ID, client_text)
+                        __set_content(app.config['CLIENT_ID'], client_text)
+                        __set_shadow(app.config['CLIENT_ID'], client_text)
                         if new_client_shadow:
-                            __set_shadow(CLIENT_ID, new_client_shadow)
+                            __set_shadow(app.config['CLIENT_ID'], new_client_shadow)
                             #print("client shadow updated from the server")
-                            error_return = send_sync(__get_content(CLIENT_ID), recursive_count)
+                            error_return = send_sync(__get_content(app.config['CLIENT_ID']), recursive_count)
                         return error_return
                     else:
-                        __set_content(CLIENT_ID, client_text)
-                        __set_shadow(CLIENT_ID, client_text)
+                        __set_content(app.config['CLIENT_ID'], client_text)
+                        __set_shadow(app.config['CLIENT_ID'], client_text)
                         if (r_json['status'] != "OK"
                             and r_json['error_type'] == "NoUpdate"):
                             # no changes so nothing else to do
@@ -300,8 +295,8 @@ Continue with a function of "Here starts second half of sync" from below
                         elif (r_json['status'] != "OK"
                             and r_json['error_type'] == "FuzzyServerPatchFailed"):
                             if 'server_text' in r_json:
-                                __set_content(CLIENT_ID, r_json['server_text'])
-                                __set_shadow(CLIENT_ID, r_json['server_text'])
+                                __set_content(app.config['CLIENT_ID'], r_json['server_text'])
+                                __set_shadow(app.config['CLIENT_ID'], r_json['server_text'])
                                 flash("Fuzzy patch failed. Data loss", 'error')
                                 return redirect(url_for('__main'), code=302)
                             else:
@@ -353,7 +348,7 @@ Continue with a function of "Here starts second half of sync" from below
                                     if len(set(shadow_results)) == 1 and shadow_results[0]:
                                         # step 5
                                         __set_shadow(
-                                            CLIENT_ID,
+                                            app.config['CLIENT_ID'],
                                             client_shadow_patch_results[0]
                                         )
                                         # should a break here be catastrophic ??
@@ -366,7 +361,7 @@ Continue with a function of "Here starts second half of sync" from below
 
                                         if any(text_results):
                                             # step 7
-                                            __set_content(CLIENT_ID, client_text_patch_results[0])
+                                            __set_content(app.config['CLIENT_ID'], client_text_patch_results[0])
                                             #
                                             # Here finishes the full sync.
                                             #
