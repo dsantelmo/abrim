@@ -25,9 +25,7 @@ app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
-app.config['URL_FOR_GET_TEXT'] = "http://127.0.0.1:5002/items"
-app.config['URL_FOR_SEND_SYNC'] = "http://127.0.0.1:5002/items"
-app.config['URL_FOR_SEND_SHADOW'] = "http://127.0.0.1:5002/send_shadow"
+app.config['API_URL'] = "http://127.0.0.1:5002/items"
 app.config['CLIENT_PORT'] = 5001
 
 # Config from files and env vars:
@@ -90,12 +88,12 @@ def _get_sync(item_id):
         abort(404)
 
 
-@app.route('/send_shadow', methods=['POST'])
-def _send_shadow():
+@app.route('/items/<string:item_id>/shadow', methods=['POST'])
+def _send_shadow(item_id):
     if request.method != 'POST':
         abort(404)
     else:
-        return receive_shadow(request)
+        return receive_shadow(item_id, request)
 
 
 def close_db(error):
@@ -158,6 +156,7 @@ def show_main_form():
             flash("Server is unreachable", 'error')
             #return redirect(url_for('__main'), code=302)
         else:
+
             try:
                 r_json = r.json()
             except ValueError as e:
@@ -410,7 +409,7 @@ def __manage_send_sync_error_return(r_json, recursive_count):
         if r_json['error_type'] == "NoServerShadow":
             #print("NoServerShadow")
             # client sends its shadow:
-            r_send_shadow = __send_shadow_payload(client_shadow)
+            r_send_shadow = __send_shadow_payload("this_should_be_the_item_id", client_shadow)
             try:
                 r_send_shadow_json = r_send_shadow.json()
                 if 'status' in r_send_shadow_json:
@@ -459,22 +458,23 @@ def __items_send_post(client_shadow_cksum, client_patches):
                'client_patches': client_patches,
               }
 
-    return __requests_post(app.config['URL_FOR_SEND_SYNC'], payload)
+    return __requests_post(app.config['API_URL'], payload)
 
 
-def __send_shadow_payload(client_shadow):
+def __send_shadow_payload(item_id, item_shadow):
+    # FIXME use item_id not  client_id
     payload = {
                'client_id': app.config['CLIENT_ID'],
-               'client_shadow': client_shadow,
+               'client_shadow': item_shadow,
               }
 
-    #print("__send_shadow_payload: " + \
-    #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return __requests_post(app.config['URL_FOR_SEND_SHADOW'], payload)
+    # FIXME SANITIZE THIS
+    url_for_shadow = app.config['API_URL'] + "/" + item_id + "/shadow"
+    return __requests_post(url_for_shadow, payload)
 
 
 def items_send_get(item_id):
-    url_for_get = app.config['URL_FOR_GET_TEXT'] + "/" + item_id  # FIXME SANITIZE THIS
+    url_for_get = app.config['API_URL'] + "/" + item_id  # FIXME SANITIZE THIS
 
     return requests.get(
       url_for_get,
@@ -512,7 +512,7 @@ def items_receive_post(request):
         client_id = req['client_id']
         client_shadow_cksum = req['client_shadow_cksum']
 
-        server_text = __get_server_text()
+        server_text = __get_server_text("this_should_be_the_item_id")
         server_shadow = __get_shadow(client_id)
         if server_shadow is None:
             if server_text:
@@ -570,7 +570,7 @@ def items_receive_post(request):
                 if len(set(shadow_results)) == 1 and shadow_results[0]:
                     # step 5
                     __set_shadow(client_id, server_shadow_patch_results[0])
-                    server_text = __get_server_text()
+                    server_text = __get_server_text("this_should_be_the_item_id")
 
 
                     server_text_patch_results = None
@@ -599,7 +599,7 @@ def items_receive_post(request):
                         # have been performed on Client Text
 
                         server_shadow = __get_shadow(client_id)
-                        server_text = __get_server_text()
+                        server_text = __get_server_text("this_should_be_the_item_id")
                         edits = None
                         if not server_shadow:
                             edits = diff_obj.diff_main("", server_text)
@@ -673,7 +673,7 @@ def items_receive_post(request):
 
 
 
-def receive_shadow(request):
+def receive_shadow(item_id, request):
     #import pdb; pdb.set_trace()
     print("receive_shadow")
     req = request.json
@@ -685,7 +685,7 @@ def receive_shadow(request):
         __set_shadow(req['client_id'], req['client_shadow'])
 
         # check if there is server content, as this can be the 1st sync
-        if __get_server_text() == "":
+        if __get_server_text(item_id) == "":
             __set_server_text(req['client_shadow'])
 
         res = {
