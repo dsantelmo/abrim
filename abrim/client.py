@@ -25,7 +25,7 @@ app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
-app.config['URL_FOR_GET_TEXT'] = "http://127.0.0.1:5002/get_text"
+app.config['URL_FOR_GET_TEXT'] = "http://127.0.0.1:5002/items"
 app.config['URL_FOR_SEND_SYNC'] = "http://127.0.0.1:5002/items"
 app.config['URL_FOR_SEND_SHADOW'] = "http://127.0.0.1:5002/send_shadow"
 app.config['CLIENT_PORT'] = 5001
@@ -69,12 +69,23 @@ def __ui_press_sync():
 
 
 # API
-@app.route('/items', methods=['POST', 'GET'])
+@app.route('/items', methods=['POST'])
 def _send_sync():
     if request.method == 'POST':
         return items_receive_post(request)
     elif request.method == 'GET':
-        return get_text(request)
+        abort(404)
+    else:
+        abort(404)
+
+
+# API
+@app.route('/items/<string:item_id>', methods=['GET'])
+def _get_sync(item_id):
+    if request.method == 'POST':
+        abort(404)
+    elif request.method == 'GET':
+        return items_receive_get(item_id)
     else:
         abort(404)
 
@@ -85,14 +96,6 @@ def _send_shadow():
         abort(404)
     else:
         return receive_shadow(request)
-
-
-@app.route('/get_text', methods=['POST'])
-def _get_text():
-    if request.method != 'POST':
-        abort(404)
-    else:
-        return get_text(request)
 
 
 def close_db(error):
@@ -149,13 +152,8 @@ def show_main_form():
     if client_text is None or client_text == "":
         client_text = ""
         # print("show_main_form: not client_text")
-        payload = { 'client_id': app.config['CLIENT_ID'], }
         try:
-            r = requests.post(
-              app.config['URL_FOR_GET_TEXT'],
-              headers={'Content-Type': 'application/json'},
-              data=json.dumps(payload)
-              )
+            r = items_send_get("this_should_be_the_item_id")
         except requests.exceptions.ConnectionError:
             flash("Server is unreachable", 'error')
             #return redirect(url_for('__main'), code=302)
@@ -188,9 +186,6 @@ def show_main_form():
 
 
 def _ui_press_sync(req_form):
-    #if req_form and 'get_text' in req_form:
-    #    return get_sync(request.form['client_text'], 0)
-    #el
     if req_form and 'send_text' in req_form:
         return items_send_post(request.form['client_text'], 0)
     else:
@@ -234,7 +229,7 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
         # nothing new to sync in this side. Check the other side for updates
         if not previously_shadow_updated_from_client:
             #flash("no changes", 'warn')
-            r = __get_text_payload()
+            r = items_send_get("this_should_be_the_item_id")
             try:
                 r_json = r.json()
                 if 'status' in r_json:
@@ -478,14 +473,13 @@ def __send_shadow_payload(client_shadow):
     return __requests_post(app.config['URL_FOR_SEND_SHADOW'], payload)
 
 
-def __get_text_payload():
-    payload = {
-               'client_id': app.config['CLIENT_ID'],
-              }
+def items_send_get(item_id):
+    url_for_get = app.config['URL_FOR_GET_TEXT'] + "/" + item_id  # FIXME SANITIZE THIS
 
-    #print("__get_text_payload: " + \
-    #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
-    return __requests_post(app.config['URL_FOR_GET_TEXT'], payload)
+    return requests.get(
+      url_for_get,
+      headers={'Content-Type': 'application/json'}
+      )
 
 
 # "server" stuff
@@ -730,17 +724,17 @@ def __set_server_text(text):
     #    d['server_text'] = text
 
 
-def __get_server_text():
+def __get_server_text(item_id):
+    # FIXME change to use item_id
     content = __get_content(app.config['CLIENT_ID'])
     if content is None:
         content = ""
     return content
 
 
-def get_text(request):
+def items_receive_get(item_id):
     #import pdb; pdb.set_trace()
-    #print("get_text")
-    server_text = __get_server_text()
+    server_text = __get_server_text(item_id)
 
     res = {
         'status': 'OK',
