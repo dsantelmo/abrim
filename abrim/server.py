@@ -25,9 +25,10 @@ app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
-app.config['URL_FOR_GET_TEXT'] = "http://127.0.0.1:5002/get_text"
-app.config['URL_FOR_SEND_SYNC'] = "http://127.0.0.1:5002/send_sync"
-app.config['URL_FOR_SEND_SHADOW'] = "http://127.0.0.1:5002/send_shadow"
+app.config['URL_FOR_GET_TEXT'] = "http://127.0.0.1:5001/get_text"
+app.config['URL_FOR_SEND_SYNC'] = "http://127.0.0.1:5001/items"
+app.config['URL_FOR_SEND_SHADOW'] = "http://127.0.0.1:5001/send_shadow"
+app.config['CLIENT_PORT'] = 5002
 
 # Config from files and env vars:
 config_files.load_app_config(app)
@@ -53,15 +54,15 @@ def __main():
     else:
         return show_main_form(app.config['URL_FOR_GET_TEXT'])
 
-@app.route('/sync', methods=['GET', 'POST'])
-def __sync():
+@app.route('/ui_press_sync', methods=['GET', 'POST'])
+def __ui_press_sync():
     if request.method != 'POST':
         abort(404)
     else:
-        return _sync(request.form)
+        return _ui_press_sync(request.form)
 
 
-@app.route('/send_sync', methods=['POST'])
+@app.route('/items', methods=['POST'])
 def _send_sync():
     if request.method != 'POST':
         abort(404)
@@ -178,18 +179,19 @@ def show_main_form(get_text_url):
             client_shadow=client_shadow)
 
 
-def _sync(req_form):
+def __ui_press_sync(req_form):
     #if req_form and 'get_text' in req_form:
     #    return get_sync(request.form['client_text'], 0)
     #el
     if req_form and 'send_text' in req_form:
-        return send_sync(request.form['client_text'], 0)
+        return items_post(request.form['client_text'], 0)
     else:
         flash("Command not recognized", 'error')
         return redirect(url_for('__main'), code=302)
 
 
-def send_sync(client_text, recursive_count, previously_shadow_updated_from_client=False):
+def items_post(client_text, recursive_count, previously_shadow_updated_from_client=False):
+    """send a new client text to the server part"""
     recursive_count += 1
 
     if recursive_count > app.config['MAX_RECURSIVE_COUNT']:
@@ -268,7 +270,7 @@ Continue with a function of "Here starts second half of sync" from below
             __set_shadow(app.config['CLIENT_ID'], client_text)
 
             # send text_patches, client_id and client_shadow_cksum
-            r = __send_sync_payload(client_shadow_cksum, text_patches)
+            r = __items_post(client_shadow_cksum, text_patches)
             try:
                 r_json = r.json()
                 if 'status' in r_json:
@@ -282,7 +284,7 @@ Continue with a function of "Here starts second half of sync" from below
                         if new_client_shadow:
                             __set_shadow(app.config['CLIENT_ID'], new_client_shadow)
                             #print("client shadow updated from the server")
-                            error_return = send_sync(__get_content(app.config['CLIENT_ID']), recursive_count)
+                            error_return = items_post(__get_content(app.config['CLIENT_ID']), recursive_count)
                         return error_return
                     else:
                         __set_content(app.config['CLIENT_ID'], client_text)
@@ -415,7 +417,7 @@ def __manage_send_sync_error_return(r_json, recursive_count):
                         #print("Shadow updated from client. Trying to sync again")
                         #flash("Shadow updated from client. Trying to sync again...", 'info')
                         previously_shadow_updated_from_client = True
-                        error_return =  send_sync(client_text, recursive_count, previously_shadow_updated_from_client)
+                        error_return =  items_post(client_text, recursive_count, previously_shadow_updated_from_client)
                     else:
                         error_return = "ERROR: unable to send_shadow"
                 else:
@@ -449,15 +451,13 @@ def __requests_post(url, payload):
       )
 
 
-def __send_sync_payload(client_shadow_cksum, client_patches):
+def __items_post(client_shadow_cksum, client_patches):
     payload = {
                'client_id': app.config['CLIENT_ID'],
                'client_shadow_cksum': client_shadow_cksum,
                'client_patches': client_patches,
               }
 
-    #print("__send_sync_payload: " + \
-    #        ''.join('{}{}'.format(key, val) for key, val in payload.items()))
     return __requests_post(app.config['URL_FOR_SEND_SYNC'], payload)
 
 
@@ -750,7 +750,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     args = parser.parse_args()
-    client_port = 5001
+    client_port = app.config['CLIENT_PORT']
     if args.port and int(args.port) > 0:
         client_port = int(args.port)
 
