@@ -56,7 +56,7 @@ def __main():
     if request.method == 'POST':
         pass
     else:
-        return show_main_form(app.config['URL_FOR_GET_TEXT'])
+        return show_main_form()
 
 
 # UI
@@ -69,12 +69,14 @@ def __ui_press_sync():
 
 
 # API
-@app.route('/items', methods=['POST'])
+@app.route('/items', methods=['POST', 'GET'])
 def _send_sync():
-    if request.method != 'POST':
-        abort(404)
-    else:
+    if request.method == 'POST':
         return items_receive_post(request)
+    elif request.method == 'GET':
+        return get_text(request)
+    else:
+        abort(404)
 
 
 @app.route('/send_shadow', methods=['POST'])
@@ -93,7 +95,6 @@ def _get_text():
         return get_text(request)
 
 
-@app.teardown_appcontext
 def close_db(error):
     db.close_db(g, error)
 
@@ -142,7 +143,7 @@ def show_datastore_form():
 # if bcrypt.verify(usersPassword, hash):
 
 
-def show_main_form(get_text_url):
+def show_main_form():
     # FIXME: add logging - print("show_main_form")
     client_text = __get_content(app.config['CLIENT_ID'])
     if client_text is None or client_text == "":
@@ -151,7 +152,7 @@ def show_main_form(get_text_url):
         payload = { 'client_id': app.config['CLIENT_ID'], }
         try:
             r = requests.post(
-              get_text_url,
+              app.config['URL_FOR_GET_TEXT'],
               headers={'Content-Type': 'application/json'},
               data=json.dumps(payload)
               )
@@ -186,7 +187,7 @@ def show_main_form(get_text_url):
             client_shadow=client_shadow)
 
 
-def __ui_press_sync(req_form):
+def _ui_press_sync(req_form):
     #if req_form and 'get_text' in req_form:
     #    return get_sync(request.form['client_text'], 0)
     #el

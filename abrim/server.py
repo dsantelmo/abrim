@@ -19,7 +19,7 @@ app = Flask(__name__)
 # Default config:
 app.config['APP_NAME'] = "Sync"
 app.config['APP_AUTHOR'] = "Abrim"
-app.config['BCRYPT_ROUNDS'] = 15
+# app.config['BCRYPT_ROUNDS'] = 15
 app.config['DIFF_TIMEOUT'] = 0.1
 app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
@@ -35,11 +35,13 @@ config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
 
+# UI
 @app.route('/', methods=['GET', 'POST'])
 def __root():
     return redirect(url_for('__main'), code=307) #307 for POST redir
 
 
+# UI
 @app.route('/datastore')
 def __datastore():
     if request.method != 'GET':
@@ -47,13 +49,17 @@ def __datastore():
     else:
         return show_datastore_form()
 
+
+# UI
 @app.route('/main/', methods=['GET', 'POST'])
 def __main():
     if request.method == 'POST':
         pass
     else:
-        return show_main_form(app.config['URL_FOR_GET_TEXT'])
+        return show_main_form()
 
+
+# UI
 @app.route('/ui_press_sync', methods=['GET', 'POST'])
 def __ui_press_sync():
     if request.method != 'POST':
@@ -62,12 +68,15 @@ def __ui_press_sync():
         return _ui_press_sync(request.form)
 
 
-@app.route('/items', methods=['POST'])
+# API
+@app.route('/items', methods=['POST', 'GET'])
 def _send_sync():
-    if request.method != 'POST':
-        abort(404)
+    if request.method == 'POST':
+        return items_receive_post(request)
+    elif request.method == 'GET':
+        return get_text(request)
     else:
-        return receive_sync(request)
+        abort(404)
 
 
 @app.route('/send_shadow', methods=['POST'])
@@ -86,7 +95,6 @@ def _get_text():
         return get_text(request)
 
 
-@app.teardown_appcontext
 def close_db(error):
     db.close_db(g, error)
 
@@ -129,13 +137,13 @@ def show_datastore_form():
     return render_template('datastore.html', CLIENT_ID=app.config['CLIENT_ID'], content=content)
 
 
-from passlib.hash import bcrypt
-#hash = bcrypt.encrypt(usersPassword, rounds=app.config['BCRYPT_ROUNDS'])
-## Validating a hash
-#if bcrypt.verify(usersPassword, hash):
+# from passlib.hash import bcrypt
+# hash = bcrypt.encrypt(usersPassword, rounds=app.config['BCRYPT_ROUNDS'])
+# # Validating a hash
+# if bcrypt.verify(usersPassword, hash):
 
 
-def show_main_form(get_text_url):
+def show_main_form():
     # FIXME: add logging - print("show_main_form")
     client_text = __get_content(app.config['CLIENT_ID'])
     if client_text is None or client_text == "":
@@ -144,7 +152,7 @@ def show_main_form(get_text_url):
         payload = { 'client_id': app.config['CLIENT_ID'], }
         try:
             r = requests.post(
-              get_text_url,
+              app.config['URL_FOR_GET_TEXT'],
               headers={'Content-Type': 'application/json'},
               data=json.dumps(payload)
               )
@@ -184,13 +192,13 @@ def __ui_press_sync(req_form):
     #    return get_sync(request.form['client_text'], 0)
     #el
     if req_form and 'send_text' in req_form:
-        return items_post(request.form['client_text'], 0)
+        return items_send_post(request.form['client_text'], 0)
     else:
         flash("Command not recognized", 'error')
         return redirect(url_for('__main'), code=302)
 
 
-def items_post(client_text, recursive_count, previously_shadow_updated_from_client=False):
+def items_send_post(client_text, recursive_count, previously_shadow_updated_from_client=False):
     """send a new client text to the server part"""
     recursive_count += 1
 
@@ -234,9 +242,7 @@ def items_post(client_text, recursive_count, previously_shadow_updated_from_clie
                         and r_json['error_type'] != "NoUpdate"
                         and r_json['error_type']  != "FuzzyServerPatchFailed"):
                         pass
-                    fixme_text = """
-Continue with a function of "Here starts second half of sync" from below
-"""
+                    fixme_text = """Continue with a function of "Here starts second half of sync" from below"""
                     return(r.text + fixme_text)
             except ValueError:
                 #print("ValueError")
@@ -270,7 +276,7 @@ Continue with a function of "Here starts second half of sync" from below
             __set_shadow(app.config['CLIENT_ID'], client_text)
 
             # send text_patches, client_id and client_shadow_cksum
-            r = __items_post(client_shadow_cksum, text_patches)
+            r = __items_send_post(client_shadow_cksum, text_patches)
             try:
                 r_json = r.json()
                 if 'status' in r_json:
@@ -284,7 +290,7 @@ Continue with a function of "Here starts second half of sync" from below
                         if new_client_shadow:
                             __set_shadow(app.config['CLIENT_ID'], new_client_shadow)
                             #print("client shadow updated from the server")
-                            error_return = items_post(__get_content(app.config['CLIENT_ID']), recursive_count)
+                            error_return = items_send_post(__get_content(app.config['CLIENT_ID']), recursive_count)
                         return error_return
                     else:
                         __set_content(app.config['CLIENT_ID'], client_text)
@@ -417,7 +423,7 @@ def __manage_send_sync_error_return(r_json, recursive_count):
                         #print("Shadow updated from client. Trying to sync again")
                         #flash("Shadow updated from client. Trying to sync again...", 'info')
                         previously_shadow_updated_from_client = True
-                        error_return =  items_post(client_text, recursive_count, previously_shadow_updated_from_client)
+                        error_return =  items_send_post(client_text, recursive_count, previously_shadow_updated_from_client)
                     else:
                         error_return = "ERROR: unable to send_shadow"
                 else:
@@ -451,7 +457,7 @@ def __requests_post(url, payload):
       )
 
 
-def __items_post(client_shadow_cksum, client_patches):
+def __items_send_post(client_shadow_cksum, client_patches):
     payload = {
                'client_id': app.config['CLIENT_ID'],
                'client_shadow_cksum': client_shadow_cksum,
@@ -484,7 +490,7 @@ def __get_text_payload():
 
 # "server" stuff
 
-def receive_sync(request):
+def items_receive_post(request):
     #import pdb; pdb.set_trace()
     print("send_sync")
     req = request.json
@@ -665,7 +671,6 @@ def receive_sync(request):
             res = err_response('PayloadMissingAttribute',
             'No client_patches found in the request')
         else:
-            print("receive_sync 500")
             abort(500)
     print("response:")
     print(res)
