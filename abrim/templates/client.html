@@ -3,7 +3,7 @@
     <header>
         <h1 id="main_title">main</h1>
     </header>
-    <nav>User: {{ CLIENT_ID|safe }} || <b>main</b> - <a href="/datastore">datastore</a></nav>
+    <nav>User: {{ user_id|safe }} || Node: {{ node_id|safe }} || <b>main</b> - <a href="/datastore">datastore</a></nav>
     <main>
         <article>
             <header>
@@ -13,12 +13,12 @@
             </header>
             <section>
                 {% if content %}
-                {% for client_text, item_id in content %}
+                {% for item, item_id in content %}
                 <form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
                     <p> {{ item_id|safe }}
                     </p>
                     <p>
-                        <textarea name="client_text" placeholder="Some text here...">{{ client_text|safe }}</textarea>
+                        <textarea name="client_text" placeholder="Some text here...">{{ item|safe }}</textarea>
                     </p>
                     <p>
                         <!-- <input class="sync_button" name="get_text" type="submit" value="Get server text"> -->

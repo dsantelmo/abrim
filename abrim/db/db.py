@@ -45,19 +45,19 @@ def close_db(g, error):
 
 
 # FIXME: delete g and db_path from params...
-def get_content_or_shadow(g, db_path, text_id, user_id, content=True):
+def get_content_or_shadow(g, db_path, item_id, node_id, user_id, content=True):
     content_or_shadow = 'shadow'
     if content:
         content_or_shadow = 'content'
     db = get_db(g, db_path)
     select_query = """
                    SELECT {}
-                   FROM texts
-                   WHERE text_id = ?
+                   FROM items
+                   WHERE item_id = ? and node_id = ?
                    """.format(content_or_shadow)
     # FIXME logging...
     # print("{0} -- {1}".format(select_query,text_id,))
-    cur = db.execute(select_query, (text_id,))
+    cur = db.execute(select_query, (item_id, node_id, ))
     try:
         result = cur.fetchone()[0]
         # print("--->" + result + "<----")
@@ -70,7 +70,7 @@ def get_content_or_shadow(g, db_path, text_id, user_id, content=True):
         raise
 
 # FIXME: delete g and db_path from params...
-def set_content_or_shadow(g, db_path, text_id, user_id, new_value, content=True):
+def set_content_or_shadow(g, db_path, item_id, user_id, new_value, content=True):
     content_or_shadow = 'shadow'
     if content:
         content_or_shadow = 'content'
@@ -80,20 +80,20 @@ def set_content_or_shadow(g, db_path, text_id, user_id, new_value, content=True)
     try:
         db = get_db(g, db_path)
         insert_query = """
-                       INSERT OR IGNORE INTO texts
-                       (text_id, user_id, {})
+                       INSERT OR IGNORE INTO items
+                       (item_id, user_id, {})
                        VALUES (?, ?, ?)
                        """.format(content_or_shadow)
         update_query = """
-                       UPDATE texts
+                       UPDATE items
                        SET {} = ?
-                       WHERE text_id = ? AND user_id = ?
+                       WHERE item_id = ? AND user_id = ?
                        """.format(content_or_shadow)
         # FIXME logging...
         # print("{0} -- {1} -- {2} -- {3}".format(insert_query, text_id, user_id, new_value,))
-        db.execute(insert_query, (text_id, user_id, new_value,))
+        db.execute(insert_query, (item_id, user_id, new_value,))
         # print("{0} -- {1} -- {2} -- {3}".format(update_query, new_value, text_id, user_id,))
-        db.execute(update_query, (new_value, text_id, user_id))
+        db.execute(update_query, (new_value, item_id, user_id))
         db.commit()
         return True
     except:
@@ -121,19 +121,22 @@ def get_table_contents(g, db_path, table_names):
     return contents
 
 
-def get_all_user_content(g, db_path, user_id):
+def get_all_user_content(g, db_path, user_id, node_id):
     result = []
     db = get_db(g, db_path)
     select_query = """
-                   SELECT content, text_id
-                   FROM texts
-                   WHERE user_id = ?
+                   SELECT content, item_id
+                   FROM items
+                   WHERE user_id = ? and node_id = ?
                    """
     # FIXME logging...
     # print("{0} -- {1}".format(select_query,text_id,))
-    cur = db.execute(select_query, (user_id,))
+    print(select_query, (user_id, node_id, ))
+    cur = db.execute(select_query, (user_id, node_id, ))
+    result = []
     try:
-        result = cur.fetchall()
+        for row in cur.fetchall():
+            result.append([row["content"], row["item_id"]])
         # print("--->" + result + "<----")
         return result
     except TypeError:

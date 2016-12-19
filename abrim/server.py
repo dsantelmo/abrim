@@ -21,12 +21,16 @@ app.config['APP_NAME'] = "Sync"
 app.config['APP_AUTHOR'] = "Abrim"
 # app.config['BCRYPT_ROUNDS'] = 15
 app.config['DIFF_TIMEOUT'] = 0.1
-app.config['CLIENT_ID'] = generate_random_id(5)
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
-app.config['API_URL'] = "http://127.0.0.1:5001/items"
-app.config['CLIENT_PORT'] = 5002
+
+# FIXME client side config
+app.config['USER_ID'] = "the_user"
+app.config['NODE_ID'] = "node5002"
+app.config['API_URL'] = "http://127.0.0.1:5001"
+app.config['NODE_PORT'] = 5002
+
 
 # Config from files and env vars:
 config_files.load_app_config(app)
@@ -67,29 +71,29 @@ def __ui_press_sync():
 
 
 # API
-@app.route('/items', methods=['POST'])
-def _send_sync():
+@app.route('/users/<string:user_id>/nodes/<string:node_id>/items', methods=['POST', 'GET'])
+def _send_sync(user_id, node_id):
     if request.method == 'POST':
-        return items_receive_post(request)
+        return items_receive_post(user_id, node_id, request)  # FIXME check response correctness here
     elif request.method == 'GET':
-        abort(404)
+        return items_receive_get(user_id, node_id)
     else:
         abort(404)
 
 
 # API
-@app.route('/items/<string:item_id>', methods=['GET'])
-def _get_sync(item_id):
+@app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET'])
+def _get_sync(user_id, node_id, item_id):
     if request.method == 'POST':
         abort(404)
     elif request.method == 'GET':
-        return items_receive_get(item_id)
+        return items_receive_get(user_id, node_id, item_id)
     else:
         abort(404)
 
 # API
-@app.route('/items/<string:item_id>/shadow', methods=['POST'])
-def _send_shadow(item_id):
+@app.route('/users/<string:user_id>/items/<string:item_id>/shadow', methods=['POST'])
+def _send_shadow(user_id, item_id):
     if request.method != 'POST':
         abort(404)
     else:
@@ -112,23 +116,23 @@ def init_db():
     db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
 
 
-def __get_content(user_id):
-    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.CONTENT)
+def __getdb_content(user_id, node_id, item_id):
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, db.CONTENT)
 
 
-def __get_all_user_content(user_id):
-    return db.get_all_user_content(g, app.config['DB_PATH'], user_id)
+def __getdb_all_user_content(user_id, node_id):
+    return db.get_all_user_content(g, app.config['DB_PATH'], user_id, node_id)
 
 
-def __get_shadow(user_id):
+def __getdb_shadow(user_id):
     return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.SHADOW)
 
 
-def __set_content(user_id, value):
+def __setdb_content(user_id, value):
     return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, db.CONTENT)
 
 
-def __set_shadow(user_id, value):
+def __setdb_shadow(user_id, value):
     return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, db.SHADOW)
 
 
@@ -139,7 +143,7 @@ def show_datastore_form():
     #with closing(__open_datastore()) as d:
     #    temp_string = "<h1>Datastore</h1><h3>" + app.config['DB_PATH'] + "</h3>"
     #    return __print_iter_contents(d, 6, temp_string)
-    return render_template('datastore.html', CLIENT_ID=app.config['CLIENT_ID'], content=content)
+    return render_template('datastore.html', user_id=app.config['USER_ID'], node_id=app.config['NODE_ID'], content=content)
 
 
 # from passlib.hash import bcrypt
@@ -149,39 +153,34 @@ def show_datastore_form():
 
 
 def show_main_form():
-    # FIXME: add logging - print("show_main_form")
-    client_text = __get_content(app.config['CLIENT_ID'])
-    if client_text is None or client_text == "":
-        client_text = ""
-        # print("show_main_form: not client_text")
+    try:
+        r = items_send_get(app.config['NODE_ID'])
+    except requests.exceptions.ConnectionError:
+        flash("Server is unreachable", 'error')
+        #return redirect(url_for('__main'), code=302)
+    else:
         try:
-            r = items_send_get("this_should_be_the_item_id")
-        except requests.exceptions.ConnectionError:
-            flash("Server is unreachable", 'error')
+            r_json = r.json()
+        except ValueError as e:
+            # print("ValueError in show_main_form: {0}".format(e.message))
+            flash("Server response error, no JSON", 'error')
             #return redirect(url_for('__main'), code=302)
         else:
-            try:
-                r_json = r.json()
-            except ValueError as e:
-                # print("ValueError in show_main_form: {0}".format(e.message))
-                flash("Server response error, no JSON", 'error')
-                #return redirect(url_for('__main'), code=302)
-            else:
-                if 'status' in r_json:
-                    if (r_json['status'] != "OK"
-                        or 'server_text' not in r_json
-                        ):
-                        return "ERROR: uncontrolled error in the server"
-                    else:
-                        client_text = r_json['server_text']
+            if 'status' in r_json:
+                if (r_json['status'] != "OK"
+                    or 'items' not in r_json
+                    ):
+                    return "ERROR: uncontrolled error in the server"
                 else:
-                    return "ERROR: failure contacting the server"
-        __set_content(app.config['CLIENT_ID'], client_text)
+                    items = r_json['items']
+            else:
+                return "ERROR: failure contacting the server"
+    #__setdb_content(app.config['NODE_ID'], items)
 
-    content = __get_all_user_content(app.config['CLIENT_ID'])
     return render_template('client.html',
-            CLIENT_ID=app.config['CLIENT_ID'],
-            content=content)
+            user_id=app.config['USER_ID'],
+            node_id=app.config['NODE_ID'],
+            content=items)
 
 
 def _ui_press_sync(req_form):
@@ -199,7 +198,7 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
     if recursive_count > app.config['MAX_RECURSIVE_COUNT']:
         return "MAX_RECURSIVE_COUNT"
 
-    client_shadow = __get_shadow(app.config['CLIENT_ID'])
+    client_shadow = __getdb_shadow(app.config['CLIENT_ID'])
 
     if not client_text:
         # nothing to sync!
@@ -228,7 +227,7 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
         # nothing new to sync in this side. Check the other side for updates
         if not previously_shadow_updated_from_client:
             #flash("no changes", 'warn')
-            r = items_send_get("this_should_be_the_item_id")
+            r = items_send_get("NODE_ID", "this_should_be_the_item_id")
             try:
                 r_json = r.json()
                 if 'status' in r_json:
@@ -266,8 +265,8 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
             #print(client_shadow_cksum)
 
             client_shadow = client_text
-            __set_content(app.config['CLIENT_ID'], client_text)
-            __set_shadow(app.config['CLIENT_ID'], client_text)
+            __setdb_content(app.config['CLIENT_ID'], client_text)
+            __setdb_shadow(app.config['CLIENT_ID'], client_text)
 
             # send text_patches, client_id and client_shadow_cksum
             r = __items_send_post(client_shadow_cksum, text_patches)
@@ -279,16 +278,16 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
                         and r_json['error_type']  != "FuzzyServerPatchFailed"):
                         # print("__manage_send_sync_error_return")
                         error_return, new_client_shadow = __manage_send_sync_error_return(r_json, recursive_count)
-                        __set_content(app.config['CLIENT_ID'], client_text)
-                        __set_shadow(app.config['CLIENT_ID'], client_text)
+                        __setdb_content(app.config['CLIENT_ID'], client_text)
+                        __setdb_shadow(app.config['CLIENT_ID'], client_text)
                         if new_client_shadow:
-                            __set_shadow(app.config['CLIENT_ID'], new_client_shadow)
+                            __setdb_shadow(app.config['CLIENT_ID'], new_client_shadow)
                             #print("client shadow updated from the server")
-                            error_return = items_send_post(__get_content(app.config['CLIENT_ID']), recursive_count)
+                            error_return = items_send_post(__getdb_content(app.config['CLIENT_ID'], "FIXME"), recursive_count)
                         return error_return
                     else:
-                        __set_content(app.config['CLIENT_ID'], client_text)
-                        __set_shadow(app.config['CLIENT_ID'], client_text)
+                        __setdb_content(app.config['CLIENT_ID'], client_text)
+                        __setdb_shadow(app.config['CLIENT_ID'], client_text)
                         if (r_json['status'] != "OK"
                             and r_json['error_type'] == "NoUpdate"):
                             # no changes so nothing else to do
@@ -297,8 +296,8 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
                         elif (r_json['status'] != "OK"
                             and r_json['error_type'] == "FuzzyServerPatchFailed"):
                             if 'server_text' in r_json:
-                                __set_content(app.config['CLIENT_ID'], r_json['server_text'])
-                                __set_shadow(app.config['CLIENT_ID'], r_json['server_text'])
+                                __setdb_content(app.config['CLIENT_ID'], r_json['server_text'])
+                                __setdb_shadow(app.config['CLIENT_ID'], r_json['server_text'])
                                 flash("Fuzzy patch failed. Data loss", 'error')
                                 return redirect(url_for('__main'), code=302)
                             else:
@@ -349,7 +348,7 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
                                     # len(set(list)) should be 1 if all elements are the same
                                     if len(set(shadow_results)) == 1 and shadow_results[0]:
                                         # step 5
-                                        __set_shadow(
+                                        __setdb_shadow(
                                             app.config['CLIENT_ID'],
                                             client_shadow_patch_results[0]
                                         )
@@ -363,7 +362,7 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
 
                                         if any(text_results):
                                             # step 7
-                                            __set_content(app.config['CLIENT_ID'], client_text_patch_results[0])
+                                            __setdb_content(app.config['CLIENT_ID'], client_text_patch_results[0])
                                             #
                                             # Here finishes the full sync.
                                             #
@@ -395,11 +394,11 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
 def __manage_send_sync_error_return(r_json, recursive_count):
     new_client_shadow = None
 
-    client_text = __get_content(app.config['CLIENT_ID'])
+    client_text = __getdb_content(app.config['CLIENT_ID'], "FIXME")
     if not client_text:
         raise Exception('There should be a client_text by now...')
 
-    client_shadow = __get_shadow(app.config['CLIENT_ID'])
+    client_shadow = __getdb_shadow(app.config['CLIENT_ID'])
     if not client_shadow:
         client_shadow = ""
 
@@ -458,7 +457,8 @@ def __items_send_post(client_shadow_cksum, client_patches):
                'client_patches': client_patches,
               }
 
-    return __requests_post(app.config['API_URL'], payload)
+    url_for_send = app.config['API_URL'] + "/users/" + app.config['CLIENT_ID'] + "/items"
+    return __requests_post(url_for_send, payload)
 
 
 def __send_shadow_payload(item_id, item_shadow):
@@ -469,12 +469,16 @@ def __send_shadow_payload(item_id, item_shadow):
               }
 
     # FIXME SANITIZE THIS
-    url_for_shadow = app.config['API_URL'] + "/" + item_id + "/shadow"
+    url_for_shadow = app.config['API_URL'] + "/users/" + app.config['CLIENT_ID'] + "/items/" + item_id + "/shadow"
     return __requests_post(url_for_shadow, payload)
 
 
-def items_send_get(item_id):
-    url_for_get = app.config['API_URL'] + "/" + item_id  # FIXME SANITIZE THIS
+def items_send_get(node_id, item_id=None):
+    url_for_get = ""
+    if item_id:
+        url_for_get = app.config['API_URL'] + "/users/" + app.config['USER_ID'] + "/nodes/" + node_id + "/items/" + item_id  # FIXME SANITIZE THIS
+    else:
+        url_for_get = app.config['API_URL'] + "/users/" + app.config['USER_ID'] + "/nodes/" + node_id + "/items"  # FIXME SANITIZE THIS
     return requests.get(
       url_for_get,
       headers={'Content-Type': 'application/json'}
@@ -483,7 +487,7 @@ def items_send_get(item_id):
 
 # "server" stuff
 
-def items_receive_post(request):
+def items_receive_post(user_id, request):
     #import pdb; pdb.set_trace()
     print("send_sync")
     req = request.json
@@ -508,11 +512,11 @@ def items_receive_post(request):
         # first check the server shadow cheksum
         # if server_shadows[client_id] is empty ask for it
 
-        client_id = req['client_id']
+        client_id = user_id
         client_shadow_cksum = req['client_shadow_cksum']
 
-        server_text = __get_server_text("this_should_be_the_item_id")
-        server_shadow = __get_shadow(client_id)
+        server_text = __getdb_server_text(user_id, "this_should_be_the_item_id")
+        server_shadow = __getdb_shadow(client_id)
         if server_shadow is None:
             if server_text:
                 print("ServerShadowChecksumFailed")
@@ -523,7 +527,7 @@ def items_receive_post(request):
                     'error_message': 'Shadows got desynced. Sending back the full server shadow',
                     'server_shadow': server_text,
                     }
-                __set_shadow(client_id, server_text)
+                __setdb_shadow(client_id, server_text)
             else:
                 print("NoServerShadow")
                 res = err_response('NoServerShadow',
@@ -568,8 +572,8 @@ def items_receive_post(request):
                 # len(set(list)) should be 1 if all elements are the same
                 if len(set(shadow_results)) == 1 and shadow_results[0]:
                     # step 5
-                    __set_shadow(client_id, server_shadow_patch_results[0])
-                    server_text = __get_server_text("this_should_be_the_item_id")
+                    __setdb_shadow(client_id, server_shadow_patch_results[0])
+                    server_text = __getdb_server_text(user_id, "this_should_be_the_item_id")
 
 
                     server_text_patch_results = None
@@ -579,7 +583,7 @@ def items_receive_post(request):
 
                     if any(text_results):
                         # step 7
-                        __set_server_text(server_text_patch_results[0])
+                        __setdb_server_text(server_text_patch_results[0])
 
                         #
                         # Here starts second half of sync.
@@ -597,8 +601,8 @@ def items_receive_post(request):
                         # Client Text is diffed against Shadow. This returns a list of edits which
                         # have been performed on Client Text
 
-                        server_shadow = __get_shadow(client_id)
-                        server_text = __get_server_text("this_should_be_the_item_id")
+                        server_shadow = __getdb_shadow(client_id)
+                        server_text = __getdb_server_text(user_id, "this_should_be_the_item_id")
                         edits = None
                         if not server_shadow:
                             edits = diff_obj.diff_main("", server_text)
@@ -629,7 +633,7 @@ def items_receive_post(request):
                             print("server_shadow_cksum {}".format(server_shadow_cksum))
                             #print(server_shadow)
 
-                            __set_shadow(client_id, server_text)
+                            __setdb_shadow(client_id, server_text)
 
                             res = {
                                 'status': 'OK',
@@ -672,7 +676,7 @@ def items_receive_post(request):
 
 
 
-def receive_shadow(item_id, request):
+def receive_shadow(user_id, item_id, request):
     #import pdb; pdb.set_trace()
     print("receive_shadow")
     req = request.json
@@ -681,11 +685,11 @@ def receive_shadow(item_id, request):
         res = err_response('UnknowErrorSendShadow',
         'Unknown error in receive_shadow')
 
-        __set_shadow(req['client_id'], req['client_shadow'])
+        __setdb_shadow(req['client_id'], req['client_shadow'])
 
         # check if there is server content, as this can be the 1st sync
-        if __get_server_text(item_id) == "":
-            __set_server_text(req['client_shadow'])
+        if not __getdb_server_text(user_id, item_id):
+            __setdb_server_text(req['client_shadow'])
 
         res = {
             'status': 'OK',
@@ -717,43 +721,49 @@ def err_response(error_type, error_message):
         }
 
 
-def __set_server_text(text):
-    __set_content(app.config['CLIENT_ID'], text)
+def __setdb_server_text(text):
+    __setdb_content(app.config['NODE_ID'], text)
     #with closing(shelve.open(temp_server_file_name)) as d:
     #    d['server_text'] = text
 
 
-def __get_server_text(item_id):
+def __getdb_server_text(user_id, item_id):
     # FIXME change to use item_id
-    content = __get_content(app.config['CLIENT_ID'])
-    if content is None:
-        content = ""
-    return content
+    return __getdb_content(user_id, app.config['NODE_ID'], item_id)
 
 
-def items_receive_get(item_id):
-    #import pdb; pdb.set_trace()
-    server_text = __get_server_text(item_id)
+def items_receive_get(user_id, node_id, item_id=None):
+    if not item_id:
+        items = __getdb_all_user_content(user_id, node_id)
+        res = {
+            'status': 'OK',
+            'items': items,
+            }
+        print("response:")
+        print(res)
+        return jsonify(**res)
+    else:
+        item = __getdb_server_text(user_id, item_id)
 
-    res = {
-        'status': 'OK',
-        'server_text': server_text,
-        }
-    print("response:")
-    print(res)
-    return jsonify(**res)
+        res = {
+            'status': 'OK',
+            'item': item,
+            }
+        print("response:")
+        print(res)
+        return jsonify(**res)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     args = parser.parse_args()
-    client_port = app.config['CLIENT_PORT']
+    client_port = app.config['NODE_PORT']
     if args.port and int(args.port) > 0:
         client_port = int(args.port)
 
-    app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], client_port)
+    app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], app.config['NODE_ID'])
     connect_db()
-    init_db()
+    #init_db()
     #print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
     app.run(host='0.0.0.0', port=client_port)
