@@ -46,6 +46,7 @@ def close_db(g, error):
 
 # FIXME: delete g and db_path from params...
 def get_content_or_shadow(g, db_path, item_id, node_id, user_id, content=True):
+    print("------>" + item_id + " - " + node_id)
     content_or_shadow = 'shadow'
     if content:
         content_or_shadow = 'content'
@@ -60,7 +61,6 @@ def get_content_or_shadow(g, db_path, item_id, node_id, user_id, content=True):
     cur = db.execute(select_query, (item_id, node_id, ))
     try:
         result = cur.fetchone()[0]
-        # print("--->" + result + "<----")
         return result
     except TypeError:
         # print("__get_{} returned None".format(content_or_shadow))
@@ -125,7 +125,7 @@ def get_all_user_content(g, db_path, user_id, node_id):
     result = []
     db = get_db(g, db_path)
     select_query = """
-                   SELECT content, item_id
+                   SELECT item_id
                    FROM items
                    WHERE user_id = ? and node_id = ?
                    """
@@ -136,7 +136,7 @@ def get_all_user_content(g, db_path, user_id, node_id):
     result = []
     try:
         for row in cur.fetchall():
-            result.append([row["content"], row["item_id"]])
+            result.append(row["item_id"])
         # print("--->" + result + "<----")
         return result
     except TypeError:

@@ -153,6 +153,7 @@ def show_datastore_form():
 
 
 def show_main_form():
+    content = []
     try:
         r = items_send_get(app.config['NODE_ID'])
     except requests.exceptions.ConnectionError:
@@ -173,14 +174,37 @@ def show_main_form():
                     return "ERROR: uncontrolled error in the server"
                 else:
                     items = r_json['items']
+                    for item_id in items:
+                        try:
+                            r = items_send_get(app.config['NODE_ID'], item_id)
+                        except requests.exceptions.ConnectionError:
+                            flash("Server is unreachable", 'error')
+                            #return redirect(url_for('__main'), code=302)
+                        else:
+                            try:
+                                r_json = r.json()
+                            except ValueError as e:
+                                # print("ValueError in show_main_form: {0}".format(e.message))
+                                flash("Server response error, no JSON", 'error')
+                                #return redirect(url_for('__main'), code=302)
+                            else:
+                                print(r_json)
+                                if 'status' in r_json:
+                                    if (r_json['status'] != "OK"
+                                        or 'item' not in r_json
+                                        ):
+                                        return "ERROR: uncontrolled error in the server"
+                                    else:
+                                        item = r_json['item']
+                                        if item:
+                                            content.append([item, item_id])
             else:
                 return "ERROR: failure contacting the server"
-    #__setdb_content(app.config['NODE_ID'], items)
 
     return render_template('client.html',
             user_id=app.config['USER_ID'],
             node_id=app.config['NODE_ID'],
-            content=items)
+            content=content)
 
 
 def _ui_press_sync(req_form):
@@ -515,7 +539,7 @@ def items_receive_post(user_id, request):
         client_id = user_id
         client_shadow_cksum = req['client_shadow_cksum']
 
-        server_text = __getdb_server_text(user_id, "this_should_be_the_item_id")
+        server_text = __getdb_item_content(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
         server_shadow = __getdb_shadow(client_id)
         if server_shadow is None:
             if server_text:
@@ -573,7 +597,7 @@ def items_receive_post(user_id, request):
                 if len(set(shadow_results)) == 1 and shadow_results[0]:
                     # step 5
                     __setdb_shadow(client_id, server_shadow_patch_results[0])
-                    server_text = __getdb_server_text(user_id, "this_should_be_the_item_id")
+                    server_text = __getdb_item_content(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
 
 
                     server_text_patch_results = None
@@ -602,7 +626,7 @@ def items_receive_post(user_id, request):
                         # have been performed on Client Text
 
                         server_shadow = __getdb_shadow(client_id)
-                        server_text = __getdb_server_text(user_id, "this_should_be_the_item_id")
+                        server_text = __getdb_item_content(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
                         edits = None
                         if not server_shadow:
                             edits = diff_obj.diff_main("", server_text)
@@ -688,7 +712,7 @@ def receive_shadow(user_id, item_id, request):
         __setdb_shadow(req['client_id'], req['client_shadow'])
 
         # check if there is server content, as this can be the 1st sync
-        if not __getdb_server_text(user_id, item_id):
+        if not __getdb_item_content(user_id, "this_should_be_the_nod_id", item_id):
             __setdb_server_text(req['client_shadow'])
 
         res = {
@@ -727,9 +751,9 @@ def __setdb_server_text(text):
     #    d['server_text'] = text
 
 
-def __getdb_server_text(user_id, item_id):
+def __getdb_item_content(user_id, node_id, item_id):
     # FIXME change to use item_id
-    return __getdb_content(user_id, app.config['NODE_ID'], item_id)
+    return __getdb_content(user_id, node_id, item_id)
 
 
 def items_receive_get(user_id, node_id, item_id=None):
@@ -743,7 +767,7 @@ def items_receive_get(user_id, node_id, item_id=None):
         print(res)
         return jsonify(**res)
     else:
-        item = __getdb_server_text(user_id, item_id)
+        item = __getdb_item_content(user_id, node_id, item_id)
 
         res = {
             'status': 'OK',
