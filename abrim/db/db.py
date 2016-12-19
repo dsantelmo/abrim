@@ -39,7 +39,7 @@ def init_db(app, g, db_path, schema_path):
 
 def close_db(g, error):
     """Closes the database again at the end of the request."""
-    #print("closing...")
+    # print("closing...")
     if hasattr(g, 'sqlite_db'):
         g.sqlite_db.close()
 
@@ -56,17 +56,17 @@ def get_content_or_shadow(g, db_path, text_id, user_id, content=True):
                    WHERE text_id = ?
                    """.format(content_or_shadow)
     # FIXME logging...
-    print("{0} -- {1}".format(select_query,text_id,))
+    # print("{0} -- {1}".format(select_query,text_id,))
     cur = db.execute(select_query, (text_id,))
     try:
         result = cur.fetchone()[0]
         # print("--->" + result + "<----")
         return result
     except TypeError:
-        #print("__get_{} returned None".format(content_or_shadow))
+        # print("__get_{} returned None".format(content_or_shadow))
         return None
     except:
-        #print("__get_{} FAILED!!".format(content_or_shadow))
+        # print("__get_{} FAILED!!".format(content_or_shadow))
         raise
 
 # FIXME: delete g and db_path from params...
@@ -90,14 +90,14 @@ def set_content_or_shadow(g, db_path, text_id, user_id, new_value, content=True)
                        WHERE text_id = ? AND user_id = ?
                        """.format(content_or_shadow)
         # FIXME logging...
-        print("{0} -- {1} -- {2} -- {3}".format(insert_query, text_id, user_id, new_value,))
+        # print("{0} -- {1} -- {2} -- {3}".format(insert_query, text_id, user_id, new_value,))
         db.execute(insert_query, (text_id, user_id, new_value,))
-        print("{0} -- {1} -- {2} -- {3}".format(update_query, new_value, text_id, user_id,))
+        # print("{0} -- {1} -- {2} -- {3}".format(update_query, new_value, text_id, user_id,))
         db.execute(update_query, (new_value, text_id, user_id))
         db.commit()
         return True
     except:
-        #print("__set_{} FAILED!!".format(content_or_shadow))
+        # print("__set_{} FAILED!!".format(content_or_shadow))
         raise
 
 def get_all_tables(g, db_path):
@@ -119,3 +119,27 @@ def get_table_contents(g, db_path, table_names):
         table_contents.append(cur.fetchall())
         contents.append(table_contents)
     return contents
+
+
+def get_all_user_content(g, db_path, user_id):
+    result = []
+    db = get_db(g, db_path)
+    select_query = """
+                   SELECT content, text_id
+                   FROM texts
+                   WHERE user_id = ?
+                   """
+    # FIXME logging...
+    # print("{0} -- {1}".format(select_query,text_id,))
+    cur = db.execute(select_query, (user_id,))
+    try:
+        result = cur.fetchall()
+        # print("--->" + result + "<----")
+        return result
+    except TypeError:
+        # print("__get_{} returned None".format(content_or_shadow))
+        return []
+    except:
+        # print("__get_{} FAILED!!".format(content_or_shadow))
+        raise
+    return result

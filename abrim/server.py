@@ -87,7 +87,7 @@ def _get_sync(item_id):
     else:
         abort(404)
 
-
+# API
 @app.route('/items/<string:item_id>/shadow', methods=['POST'])
 def _send_shadow(item_id):
     if request.method != 'POST':
@@ -114,6 +114,10 @@ def init_db():
 
 def __get_content(user_id):
     return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.CONTENT)
+
+
+def __get_all_user_content(user_id):
+    return db.get_all_user_content(g, app.config['DB_PATH'], user_id)
 
 
 def __get_shadow(user_id):
@@ -156,7 +160,6 @@ def show_main_form():
             flash("Server is unreachable", 'error')
             #return redirect(url_for('__main'), code=302)
         else:
-
             try:
                 r_json = r.json()
             except ValueError as e:
@@ -175,13 +178,10 @@ def show_main_form():
                     return "ERROR: failure contacting the server"
         __set_content(app.config['CLIENT_ID'], client_text)
 
-    client_shadow = __get_shadow(app.config['CLIENT_ID'])
-    if not client_shadow:
-        client_shadow= ""
+    content = __get_all_user_content(app.config['CLIENT_ID'])
     return render_template('client.html',
             CLIENT_ID=app.config['CLIENT_ID'],
-            client_text=client_text,
-            client_shadow=client_shadow)
+            content=content)
 
 
 def _ui_press_sync(req_form):
@@ -475,7 +475,6 @@ def __send_shadow_payload(item_id, item_shadow):
 
 def items_send_get(item_id):
     url_for_get = app.config['API_URL'] + "/" + item_id  # FIXME SANITIZE THIS
-
     return requests.get(
       url_for_get,
       headers={'Content-Type': 'application/json'}

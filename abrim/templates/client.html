@@ -12,7 +12,11 @@
               </p>
             </header>
             <section>
+                {% if content %}
+                {% for client_text, item_id in content %}
                 <form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
+                    <p> {{ item_id|safe }}
+                    </p>
                     <p>
                         <textarea name="client_text" placeholder="Some text here...">{{ client_text|safe }}</textarea>
                     </p>
@@ -21,12 +25,9 @@
                         <input class="sync_button" name="send_text" type="submit" value="Sync!">
                     </p>
                 </form>
+                {% endfor %}
+                {% endif %}
             </section>
-            <!--<section>
-                <form autocomplete="off">
-                    <textarea name="client_shadow" disabled placeholder="Shadow text...">{{ client_shadow|safe }}</textarea>
-                </form>
-            </section>-->
         </article>
     </main>
     <nav>recent nav</nav>
