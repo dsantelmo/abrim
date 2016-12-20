@@ -70,7 +70,7 @@ def get_content_or_shadow(g, db_path, item_id, node_id, user_id, content=True):
         raise
 
 # FIXME: delete g and db_path from params...
-def set_content_or_shadow(g, db_path, item_id, user_id, new_value, content=True):
+def set_content_or_shadow(g, db_path, item_id, node_id, user_id, new_value, content=True):
     content_or_shadow = 'shadow'
     if content:
         content_or_shadow = 'content'
@@ -81,24 +81,42 @@ def set_content_or_shadow(g, db_path, item_id, user_id, new_value, content=True)
         db = get_db(g, db_path)
         insert_query = """
                        INSERT OR IGNORE INTO items
-                       (item_id, user_id, {})
-                       VALUES (?, ?, ?)
+                       (item_id, node_id, user_id, {})
+                       VALUES (?, ?, ?, ?)
                        """.format(content_or_shadow)
         update_query = """
                        UPDATE items
                        SET {} = ?
-                       WHERE item_id = ? AND user_id = ?
+                       WHERE item_id = ? AND node_id = ? AND user_id = ?
                        """.format(content_or_shadow)
         # FIXME logging...
         # print("{0} -- {1} -- {2} -- {3}".format(insert_query, text_id, user_id, new_value,))
-        db.execute(insert_query, (item_id, user_id, new_value,))
+        db.execute(insert_query, (item_id, node_id, user_id, new_value,))
         # print("{0} -- {1} -- {2} -- {3}".format(update_query, new_value, text_id, user_id,))
-        db.execute(update_query, (new_value, item_id, user_id))
+        db.execute(update_query, (new_value, item_id, node_id, user_id))
         db.commit()
         return True
     except:
         # print("__set_{} FAILED!!".format(content_or_shadow))
         raise
+
+
+def create_item(g, db_path, node_id, user_id, content):
+    try:
+        db = get_db(g, db_path)
+        insert_query = """
+                       INSERT OR IGNORE INTO items
+                       (node_id, user_id, content)
+                       VALUES (?, ?, ?, ?)
+                       """
+        cur = db.execute(insert_query, (node_id, user_id, content,))
+        item_id = cur.lastrowid
+        db.commit()
+        return item_id
+    except:
+        # print("__set_{} FAILED!!".format(content_or_shadow))
+        raise
+
 
 def get_all_tables(g, db_path):
     db = get_db(g, db_path)

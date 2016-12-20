@@ -25,11 +25,6 @@ app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
 
-# FIXME client side config
-app.config['USER_ID'] = "the_user"
-app.config['NODE_ID'] = "node5001"
-
-
 # Config from files and env vars:
 config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
@@ -72,7 +67,7 @@ def __ui_press_sync():
 @app.route('/users/<string:user_id>/nodes/<string:node_id>/items', methods=['POST', 'GET'])
 def _send_sync(user_id, node_id):
     if request.method == 'POST':
-        return items_receive_post(user_id, node_id, request)  # FIXME check response correctness here
+        return items_receive_post(user_id, node_id, request)  # FIXME check response correctness here?
     elif request.method == 'GET':
         return items_receive_get(user_id, node_id)
     else:
@@ -80,12 +75,14 @@ def _send_sync(user_id, node_id):
 
 
 # API
-@app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET'])
+@app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'PUT'])
 def _get_sync(user_id, node_id, item_id):
     if request.method == 'POST':
         abort(404)
+    if request.method == 'PUT':
+        return items_receive_put_by_id(user_id, node_id, item_id, request)  # FIXME check response correctness here?
     elif request.method == 'GET':
-        return items_receive_get(user_id, node_id, item_id)
+        return items_receive_get_by_id(user_id, node_id, item_id)
     else:
         abort(404)
 
@@ -114,24 +111,27 @@ def init_db():
     db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
 
 
+def __db_get_user_node_items(user_id, node_id):
+    return db.get_all_user_content(g, app.config['DB_PATH'], user_id, node_id)
+
 def __getdb_content(user_id, node_id, item_id):
     return db.get_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, db.CONTENT)
 
 
-def __getdb_all_user_content(user_id, node_id):
-    return db.get_all_user_content(g, app.config['DB_PATH'], user_id, node_id)
+def __getdb_shadow(user_id, node_id, item_id):
+    return db.get_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, db.SHADOW)
 
 
-def __getdb_shadow(user_id):
-    return db.get_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, db.SHADOW)
+def __setdb_content(user_id, node_id, item_id, value):
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, value, db.CONTENT)
 
 
-def __setdb_content(user_id, value):
-    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, db.CONTENT)
+def __setdb_shadow(user_id, node_id, item_id, value):
+    return db.set_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, value, db.SHADOW)
 
 
-def __setdb_shadow(user_id, value):
-    return db.set_content_or_shadow(g, app.config['DB_PATH'], user_id, user_id, value, db.SHADOW)
+def __createdb_item(user_id, node_id, content):
+    return db.create_item(g, app.config['DB_PATH'], node_id, user_id, content)
 
 
 def show_datastore_form():
@@ -506,15 +506,51 @@ def items_send_get(node_id, item_id=None):
       headers={'Content-Type': 'application/json'}
       )
 
+# FIXME create a generic checker for json attributes and error responses
+def items_receive_post(user_id, node_id, request):
+    req = request.json
+    res = err_response('UnknownError', 'Non controlled error in server')
+    if req and 'content' in req:
+        item_id = __createdb_item(user_id, node_id, req['content'])
+        res = {'item_id': item_id, 'content': req['content'], 'shadow': None}
+    else:
+        if not req:
+            res = err_response('NoPayload',
+            'No payload found in the request')
+        elif not 'content' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No content found in the request')
+        else:
+            abort(500)
+    return jsonify(**res)
+
+
+def items_receive_put_by_id(user_id, node_id, item_id, request):
+    req = request.json
+    res = err_response('UnknownError', 'Non controlled error in server')
+    if req and 'content' in req:
+        print("DO SYNC ans generate shadow")
+        res = {'status': "ok"}
+    else:
+        if not req:
+            res = err_response('NoPayload',
+            'No payload found in the request')
+        elif not 'content' in req:
+            res = err_response('PayloadMissingAttribute',
+            'No content found in the request')
+        else:
+            abort(500)
+    return jsonify(**res)
+
+
 
 # "server" stuff
 
-def items_receive_post(user_id, request):
+def items_receive_sync(user_id, node_id, request):
     #import pdb; pdb.set_trace()
-    print("send_sync")
     req = request.json
     res = err_response('UnknownError', 'Non controlled error in server')
-    if req and 'client_id' in req and 'client_shadow_cksum' in req and 'client_patches' in req:
+    if req  in req and 'client_shadow_cksum' in req and 'client_patches' in req:
 
         # FIXME: create atomicity
         #
@@ -537,7 +573,7 @@ def items_receive_post(user_id, request):
         client_id = user_id
         client_shadow_cksum = req['client_shadow_cksum']
 
-        server_text = __getdb_item_content(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
+        server_text = __db_get_user_node_item_by_id(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
         server_shadow = __getdb_shadow(client_id)
         if server_shadow is None:
             if server_text:
@@ -595,7 +631,7 @@ def items_receive_post(user_id, request):
                 if len(set(shadow_results)) == 1 and shadow_results[0]:
                     # step 5
                     __setdb_shadow(client_id, server_shadow_patch_results[0])
-                    server_text = __getdb_item_content(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
+                    server_text = __db_get_user_node_item_by_id(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
 
 
                     server_text_patch_results = None
@@ -624,7 +660,7 @@ def items_receive_post(user_id, request):
                         # have been performed on Client Text
 
                         server_shadow = __getdb_shadow(client_id)
-                        server_text = __getdb_item_content(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
+                        server_text = __db_get_user_node_item_by_id(user_id, "this_should_be_the_nod_id", "this_should_be_the_item_id")
                         edits = None
                         if not server_shadow:
                             edits = diff_obj.diff_main("", server_text)
@@ -710,7 +746,7 @@ def receive_shadow(user_id, item_id, request):
         __setdb_shadow(req['client_id'], req['client_shadow'])
 
         # check if there is server content, as this can be the 1st sync
-        if not __getdb_item_content(user_id, "this_should_be_the_nod_id", item_id):
+        if not __db_get_user_node_item_by_id(user_id, "this_should_be_the_nod_id", item_id):
             __setdb_server_text(req['client_shadow'])
 
         res = {
@@ -749,14 +785,17 @@ def __setdb_server_text(text):
     #    d['server_text'] = text
 
 
-def __getdb_item_content(user_id, node_id, item_id):
+def __db_get_user_node_item_by_id(user_id, node_id, item_id):
     # FIXME change to use item_id
-    return __getdb_content(user_id, node_id, item_id)
+    content = __getdb_content(user_id, node_id, item_id)
+    shadow = __getdb_shadow(user_id, node_id, item_id)
+    return {"item_id": item_id, "content": content, "shadow": shadow}
 
 
 def items_receive_get(user_id, node_id, item_id=None):
     if not item_id:
-        items = __getdb_all_user_content(user_id, node_id)
+        # GET the list
+        items = __db_get_user_node_items(user_id, node_id)
         res = {
             'status': 'OK',
             'items': items,
@@ -765,7 +804,8 @@ def items_receive_get(user_id, node_id, item_id=None):
         print(res)
         return jsonify(**res)
     else:
-        item = __getdb_item_content(user_id, node_id, item_id)
+        # GET one item by ID
+        item = __db_get_user_node_item_by_id(user_id, node_id, item_id)
 
         res = {
             'status': 'OK',
@@ -776,6 +816,10 @@ def items_receive_get(user_id, node_id, item_id=None):
         return jsonify(**res)
 
 
+def items_receive_get_by_id(user_id, node_id, item_id):
+    return items_receive_get(user_id, node_id, item_id)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
@@ -784,12 +828,15 @@ if __name__ == "__main__":
         client_port = int(args.port)
         app.config['API_URL'] = "http://127.0.0.1:" + str( int(args.port)+1 )
         app.config['NODE_PORT'] = client_port
+        # FIXME client side config
+        app.config['USER_ID'] = "the_user"
+        app.config['NODE_ID'] = "node" + args.port
     else:
         print("use -p to specify a port")
         abort(500)
 
     app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], app.config['NODE_ID'])
     connect_db()
-    #init_db()
+    init_db()
     #print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
     app.run(host='0.0.0.0', port=client_port)
