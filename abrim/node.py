@@ -393,7 +393,7 @@ def items_send_get(node_id, item_id=None):
 def items_receive_post_by_id(user_id, node_id, item_id, request):
     """Receives a new item, saves it locally and then it tries to sync it (that can fail)"""
     req = request.json
-    res = err_response('UnknownError', 'Non controlled error in server')
+    res = err_response('UnknownError', 'Uncontrolled error in server')
     if req and 'content' in req:
 
         #
@@ -402,18 +402,19 @@ def items_receive_post_by_id(user_id, node_id, item_id, request):
         if __createdb_item(user_id, node_id, item_id, req['content']):
             res = {'item_id': item_id, 'content': req['content'], 'shadow': None}
         else:
-            res = err_response('ItemExists', 'An item with that ID already exists')
+            print("An item with that ID already exists")
+            abort(409)  # Conflict
         # item ready, now we try to sync it
         #
         #
 
     else:
         if not req:
-            res = err_response('NoPayload',
-            'No payload found in the request')
+            print("No payload found in the request")
+            abort(415)  # Unsupported Media Type
         elif not 'content' in req:
-            res = err_response('PayloadMissingAttribute',
-            'No content found in the request')
+            print("No content found in the request")
+            abort(422)  # Unprocessable Entity
         else:
             abort(500)
     return jsonify(**res)
@@ -421,17 +422,17 @@ def items_receive_post_by_id(user_id, node_id, item_id, request):
 
 def items_receive_put_by_id(user_id, node_id, item_id, request):
     req = request.json
-    res = err_response('UnknownError', 'Non controlled error in server')
+    res = err_response('UnknownError', 'Uncontrolled error in server')
     if req and 'content' in req:
         print("DO SYNC ans generate shadow")
         res = {'status': "ok"}
     else:
         if not req:
-            res = err_response('NoPayload',
-            'No payload found in the request')
+            print("No payload found in the request")
+            abort(415)  # Unsupported Media Type
         elif not 'content' in req:
-            res = err_response('PayloadMissingAttribute',
-            'No content found in the request')
+            print("No content found in the request")
+            abort(422)  # Unprocessable Entity
         else:
             abort(500)
     return jsonify(**res)
@@ -443,7 +444,7 @@ def items_receive_put_by_id(user_id, node_id, item_id, request):
 def items_receive_sync(user_id, node_id, request):
     #import pdb; pdb.set_trace()
     req = request.json
-    res = err_response('UnknownError', 'Non controlled error in server')
+    res = err_response('UnknownError', 'Uncontrolled error in server')
     if req  in req and 'client_shadow_cksum' in req and 'client_patches' in req:
 
         # FIXME: create atomicity
@@ -603,22 +604,22 @@ def items_receive_sync(user_id, node_id, request):
                             'server_text' : server_text
                             }
                 else:
-                    # I should try to patch again
+                    # FIXME: should I try to patch again?
                     res = err_response('ServerPatchFailed',
                     'Match-Patch failed in server')
     else:
         if not req:
-            res = err_response('NoPayload',
-            'No payload found in the request')
+            print("No payload found in the request")
+            abort(415)  # Unsupported Media Type
         elif not 'client_id' in req:
-            res = err_response('PayloadMissingAttribute',
-            'No client_id found in the request')
+            print("No client_id found in the request")
+            abort(422)  # Unprocessable Entity
         elif not 'client_shadow_cksum' in req:
-            res = err_response('PayloadMissingAttribute',
-            'No client_shadow_cksum found in the request')
+            print("No client_shadow_cksum found in the request")
+            abort(422)  # Unprocessable Entity
         elif not 'client_patches' in req:
-            res = err_response('PayloadMissingAttribute',
-            'No client_patches found in the request')
+            print("No client_patches found in the request")
+            abort(422)  # Unprocessable Entity
         else:
             abort(500)
     print("response:")
@@ -646,14 +647,14 @@ def receive_shadow(user_id, item_id, request):
             }
     else:
         if not req:
-            res = err_response('NoPayload',
-            'No payload found in the request')
+            print("No payload found in the request")
+            abort(415)  # Unsupported Media Type
         elif not 'client_id' in req:
-            res = err_response('PayloadMissingAttribute',
-            'No client_id found in the request')
+            print("No client_id found in the request")
+            abort(422)  # Unprocessable Entity
         elif not 'client_shadow' in req:
-            res = err_response('PayloadMissingAttribute',
-            'No client_shadow found in the request')
+            print(client_shadow)
+            abort(422)  # Unprocessable Entity
         else:
             print("receive_shadow 500")
             abort(500)
@@ -663,6 +664,8 @@ def receive_shadow(user_id, item_id, request):
 
 
 def err_response(error_type, error_message):
+    print(error_type + " - " + error_message)
+    #abort(500)
     return {
         'status': 'ERROR',
         'error_type': error_type,
@@ -680,7 +683,10 @@ def __db_get_user_node_item_by_id(user_id, node_id, item_id):
     # FIXME change to use item_id
     content = __getdb_content(user_id, node_id, item_id)
     shadow = __getdb_shadow(user_id, node_id, item_id)
-    return {"item_id": item_id, "content": content, "shadow": shadow}
+    if not content:
+        abort(404)
+    else:
+        return {"item_id": item_id, "content": content, "shadow": shadow}
 
 
 def items_receive_get(user_id, node_id, item_id=None):
