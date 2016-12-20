@@ -1,12 +1,14 @@
-DROP TABLE IF EXISTS users;
-CREATE TABLE users (
+--DROP TABLE IF EXISTS users;
+
+--DROP TABLE IF EXISTS items;
+
+CREATE TABLE IF NOT EXISTS users (
   user_id   TEXT PRIMARY KEY,
   nickname  TEXT    NOT NULL,
   password  TEXT    NOT NULL
 );
 
-DROP TABLE IF EXISTS items;
-CREATE TABLE items (
+CREATE TABLE IF NOT EXISTS items (
   item_id       TEXT PRIMARY KEY,
   content       TEXT,
   shadow        TEXT,
