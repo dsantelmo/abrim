@@ -37,7 +37,7 @@ def init_db(app, g, db_path, schema_path):
             db.cursor().executescript(f.read())
         db.commit()
 
-def close_db(g, error):
+def close_db(g):
     """Closes the database again at the end of the request."""
     # print("closing...")
     if hasattr(g, 'sqlite_db'):
@@ -46,7 +46,7 @@ def close_db(g, error):
 
 # FIXME: delete g and db_path from params...
 def get_content_or_shadow(g, db_path, item_id, node_id, user_id, content=True):
-    # print("------>" + item_id + " - " + node_id)
+    print("------>" + item_id + " - " + node_id)
     content_or_shadow = 'shadow'
     if content:
         content_or_shadow = 'content'
@@ -101,9 +101,9 @@ def set_content_or_shadow(g, db_path, item_id, node_id, user_id, new_value, cont
         raise
 
 
-def create_item(g, db_path, node_id, user_id, item_id, content):
+def create_item(g, app, item_id, node_id, user_id, content):
     try:
-        db = get_db(g, db_path)
+        db = get_db(g, app.config['DB_PATH'])
         insert_query = """
                        INSERT --OR IGNORE
                        INTO items
@@ -121,15 +121,15 @@ def create_item(g, db_path, node_id, user_id, item_id, content):
         raise
 
 
-def get_all_tables(g, db_path):
-    db = get_db(g, db_path)
+def get_all_tables(g, app):
+    db = get_db(g, app.config['DB_PATH'])
     cur = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name<>'sqlite_sequence';")
     # FIXME SANITIZE THIS! SQL injections...
     return [table_name[0] for table_name in cur.fetchall()]
 
 
-def get_table_contents(g, db_path, table_names):
-    db = get_db(g, db_path)
+def get_table_contents(g, app, table_names):
+    db = get_db(g, app.config['DB_PATH'])
     contents = []
     for table_name in table_names:
         cur = db.execute("SELECT * FROM {}".format(table_name))
@@ -167,3 +167,28 @@ def get_all_user_content(g, db_path, user_id, node_id):
         # print("__get_{} FAILED!!".format(content_or_shadow))
         raise
     return result
+
+
+def get_user_node_items(g, app, user_id, node_id):
+    return get_all_user_content(g, app.config['DB_PATH'], user_id, node_id)
+
+def get_content(g, app, user_id, node_id, item_id):
+    return get_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, CONTENT)
+
+
+def get_shadow(g, app, user_id, node_id, item_id):
+    return get_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, SHADOW)
+
+
+def set_content(g, app, user_id, node_id, item_id, value):
+    return set_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, value, CONTENT)
+
+
+def set_shadow(g, app, user_id, node_id, item_id, value):
+    return set_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, value, SHADOW)
+
+
+def set_server_text(g, app, text):
+    set_content(g, app, app.config['NODE_ID'], text)
+    #with closing(shelve.open(temp_server_file_name)) as d:
+    #    d['server_text'] = text
