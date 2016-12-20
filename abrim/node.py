@@ -19,7 +19,6 @@ app = Flask(__name__)
 # Default config:
 app.config['APP_NAME'] = "Sync"
 app.config['APP_AUTHOR'] = "Abrim"
-# app.config['BCRYPT_ROUNDS'] = 15
 app.config['DIFF_TIMEOUT'] = 0.1
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
@@ -30,40 +29,6 @@ config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
 
-# UI
-@app.route('/', methods=['GET', 'POST'])
-def __root():
-    return redirect(url_for('__main'), code=307) #307 for POST redir
-
-
-# UI
-@app.route('/datastore')
-def __datastore():
-    if request.method != 'GET':
-        abort(404)
-    else:
-        return show_datastore_form()
-
-
-# UI
-@app.route('/main/', methods=['GET', 'POST'])
-def __main():
-    if request.method == 'POST':
-        pass
-    else:
-        return show_main_form()
-
-
-# UI
-@app.route('/ui_press_sync', methods=['GET', 'POST'])
-def __ui_press_sync():
-    if request.method != 'POST':
-        abort(404)
-    else:
-        return _ui_press_sync(request.form)
-
-
-# API
 @app.route('/users/<string:user_id>/nodes/<string:node_id>/items', methods=['POST', 'GET'])
 def _send_sync(user_id, node_id):
     if request.method == 'POST':
@@ -74,7 +39,6 @@ def _send_sync(user_id, node_id):
         abort(404)
 
 
-# API
 @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'PUT'])
 def _get_sync(user_id, node_id, item_id):
     if request.method == 'POST':
@@ -86,7 +50,6 @@ def _get_sync(user_id, node_id, item_id):
     else:
         abort(404)
 
-# API
 @app.route('/users/<string:user_id>/items/<string:item_id>/shadow', methods=['POST'])
 def _send_shadow(user_id, item_id):
     if request.method != 'POST':
@@ -132,85 +95,6 @@ def __setdb_shadow(user_id, node_id, item_id, value):
 
 def __createdb_item(user_id, node_id, content):
     return db.create_item(g, app.config['DB_PATH'], node_id, user_id, content)
-
-
-def show_datastore_form():
-    table_names = db.get_all_tables(g, app.config['DB_PATH'])
-    content= db.get_table_contents(g, app.config['DB_PATH'], table_names)
-    #print(content)
-    #with closing(__open_datastore()) as d:
-    #    temp_string = "<h1>Datastore</h1><h3>" + app.config['DB_PATH'] + "</h3>"
-    #    return __print_iter_contents(d, 6, temp_string)
-    return render_template('datastore.html', user_id=app.config['USER_ID'], node_id=app.config['NODE_ID'], content=content)
-
-
-# from passlib.hash import bcrypt
-# hash = bcrypt.encrypt(usersPassword, rounds=app.config['BCRYPT_ROUNDS'])
-# # Validating a hash
-# if bcrypt.verify(usersPassword, hash):
-
-
-def show_main_form():
-    content = []
-    try:
-        r = items_send_get(app.config['NODE_ID'])
-    except requests.exceptions.ConnectionError:
-        flash("Server is unreachable", 'error')
-        #return redirect(url_for('__main'), code=302)
-    else:
-        try:
-            r_json = r.json()
-        except ValueError as e:
-            # print("ValueError in show_main_form: {0}".format(e.message))
-            flash("Server response error, no JSON", 'error')
-            #return redirect(url_for('__main'), code=302)
-        else:
-            if 'status' in r_json:
-                if (r_json['status'] != "OK"
-                    or 'items' not in r_json
-                    ):
-                    return "ERROR: uncontrolled error in the server"
-                else:
-                    items = r_json['items']
-                    for item_id in items:
-                        try:
-                            r = items_send_get(app.config['NODE_ID'], item_id)
-                        except requests.exceptions.ConnectionError:
-                            flash("Server is unreachable", 'error')
-                            #return redirect(url_for('__main'), code=302)
-                        else:
-                            try:
-                                r_json = r.json()
-                            except ValueError as e:
-                                # print("ValueError in show_main_form: {0}".format(e.message))
-                                flash("Server response error, no JSON", 'error')
-                                #return redirect(url_for('__main'), code=302)
-                            else:
-                                print(r_json)
-                                if 'status' in r_json:
-                                    if (r_json['status'] != "OK"
-                                        or 'item' not in r_json
-                                        ):
-                                        return "ERROR: uncontrolled error in the server"
-                                    else:
-                                        item = r_json['item']
-                                        if item:
-                                            content.append([item, item_id])
-            else:
-                return "ERROR: failure contacting the server"
-
-    return render_template('client.html',
-            user_id=app.config['USER_ID'],
-            node_id=app.config['NODE_ID'],
-            content=content)
-
-
-def _ui_press_sync(req_form):
-    if req_form and 'send_text' in req_form:
-        return items_send_post(request.form['client_text'], 0)
-    else:
-        flash("Command not recognized", 'error')
-        return redirect(url_for('__main'), code=302)
 
 
 def items_send_post(client_text, recursive_count, previously_shadow_updated_from_client=False):
