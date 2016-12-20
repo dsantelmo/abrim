@@ -6,6 +6,7 @@ import sys
 import hashlib
 import json
 import argparse
+import logging
 from flask import Flask, g, request, redirect, url_for, abort, render_template, flash, jsonify
 import diff_match_patch
 import requests
@@ -14,6 +15,11 @@ from abrim.utils import config_files
 from abrim.utils.common import generate_random_id
 from abrim.db import db
 
+LOGGING_LEVELS = {'critical': logging.CRITICAL,
+                  'error': logging.ERROR,
+                  'warning': logging.WARNING,
+                  'info': logging.INFO,
+                  'debug': logging.DEBUG}
 
 app = Flask(__name__)
 # Default config:
@@ -669,6 +675,8 @@ def get_user_node_item_by_id(g, app, user_id, node_id, item_id):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
+    parser.add_argument("-l", "--logginglevel", help="Logging level")
+    parser.add_argument("-f", "--loggingfile", help="Logging file name")
     args = parser.parse_args()
     if args.port and int(args.port) > 0:
         client_port = int(args.port)
@@ -680,7 +688,20 @@ if __name__ == "__main__":
     else:
         print("use -p to specify a port")
         abort(500)
-
+    if args.logginglevel:
+        # http://stackoverflow.com/questions/1623039/python-debugging-tips
+        logging_level = LOGGING_LEVELS.get(args.logginglevel, logging.NOTSET)
+        # FIXME http://docs.python-guide.org/en/latest/writing/logging/
+        # It is strongly advised that you do not add any handlers other
+        # than NullHandler to your library’s loggers.
+        logging.basicConfig(level=logging_level, filename=args.loggingfile,
+                      format='%(asctime)s %(levelname)s: %(message)s',
+                      datefmt='%Y-%m-%d %H:%M:%S')
+        logging.StreamHandler(sys.stdout)
+    logger = logging.getLogger()
+    logger.debug("======================")
+    logger.debug("Starting DEBUG logging")
+    logger.debug("======================")
     app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], app.config['NODE_ID'])
     db.connect_db(app.config['DB_PATH'])
     db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
