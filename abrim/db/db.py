@@ -101,18 +101,21 @@ def set_content_or_shadow(g, db_path, item_id, node_id, user_id, new_value, cont
         raise
 
 
-def create_item(g, db_path, node_id, user_id, content):
+def create_item(g, db_path, node_id, user_id, item_id, content):
     try:
         db = get_db(g, db_path)
         insert_query = """
-                       INSERT OR IGNORE INTO items
-                       (node_id, user_id, content)
+                       INSERT --OR IGNORE
+                       INTO items
+                       (item_id, node_id, user_id, content)
                        VALUES (?, ?, ?, ?)
                        """
-        cur = db.execute(insert_query, (node_id, user_id, content,))
-        item_id = cur.lastrowid
+        cur = db.execute(insert_query, (item_id, node_id, user_id, content,))
+        #item_id = cur.lastrowid
         db.commit()
-        return item_id
+        return True
+    except sqlite3.IntegrityError:
+        return False
     except:
         # print("__set_{} FAILED!!".format(content_or_shadow))
         raise

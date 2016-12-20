@@ -1,6 +1,6 @@
---DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS users;
 
---DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS items;
 
 CREATE TABLE IF NOT EXISTS users (
   user_id   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS items (
-  item_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id       TEXT PRIMARY KEY ,
   content       TEXT,
   shadow        TEXT,
   user_id       TEXT NOT NULL,

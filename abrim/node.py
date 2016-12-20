@@ -29,21 +29,19 @@ config_files.load_app_config(app)
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
 
-@app.route('/users/<string:user_id>/nodes/<string:node_id>/items', methods=['POST', 'GET'])
+@app.route('/users/<string:user_id>/nodes/<string:node_id>/items', methods=[ 'GET'])
 def _send_sync(user_id, node_id):
-    if request.method == 'POST':
-        return items_receive_post(user_id, node_id, request)  # FIXME check response correctness here?
-    elif request.method == 'GET':
+    if request.method == 'GET':
         return items_receive_get(user_id, node_id)
     else:
         abort(404)
 
 
-@app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'PUT'])
+@app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
 def _get_sync(user_id, node_id, item_id):
     if request.method == 'POST':
-        abort(404)
-    if request.method == 'PUT':
+        return items_receive_post_by_id(user_id, node_id, item_id, request)  # FIXME check response correctness here?
+    elif request.method == 'PUT':
         return items_receive_put_by_id(user_id, node_id, item_id, request)  # FIXME check response correctness here?
     elif request.method == 'GET':
         return items_receive_get_by_id(user_id, node_id, item_id)
@@ -93,8 +91,8 @@ def __setdb_shadow(user_id, node_id, item_id, value):
     return db.set_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, value, db.SHADOW)
 
 
-def __createdb_item(user_id, node_id, content):
-    return db.create_item(g, app.config['DB_PATH'], node_id, user_id, content)
+def __createdb_item(user_id, node_id, item_id, content):
+    return db.create_item(g, app.config['DB_PATH'], node_id, user_id, item_id, content)
 
 
 def items_send_post(client_text, recursive_count, previously_shadow_updated_from_client=False):
@@ -390,13 +388,25 @@ def items_send_get(node_id, item_id=None):
       headers={'Content-Type': 'application/json'}
       )
 
+
 # FIXME create a generic checker for json attributes and error responses
-def items_receive_post(user_id, node_id, request):
+def items_receive_post_by_id(user_id, node_id, item_id, request):
+    """Receives a new item, saves it locally and then it tries to sync it (that can fail)"""
     req = request.json
     res = err_response('UnknownError', 'Non controlled error in server')
     if req and 'content' in req:
-        item_id = __createdb_item(user_id, node_id, req['content'])
-        res = {'item_id': item_id, 'content': req['content'], 'shadow': None}
+
+        #
+        # move to external lib
+        #
+        if __createdb_item(user_id, node_id, item_id, req['content']):
+            res = {'item_id': item_id, 'content': req['content'], 'shadow': None}
+        else:
+            res = err_response('ItemExists', 'An item with that ID already exists')
+        # item ready, now we try to sync it
+        #
+        #
+
     else:
         if not req:
             res = err_response('NoPayload',
@@ -427,9 +437,9 @@ def items_receive_put_by_id(user_id, node_id, item_id, request):
     return jsonify(**res)
 
 
-
+#
 # "server" stuff
-
+#
 def items_receive_sync(user_id, node_id, request):
     #import pdb; pdb.set_trace()
     req = request.json
@@ -616,8 +626,6 @@ def items_receive_sync(user_id, node_id, request):
     return jsonify(**res)
 
 
-
-
 def receive_shadow(user_id, item_id, request):
     #import pdb; pdb.set_trace()
     print("receive_shadow")
@@ -652,7 +660,6 @@ def receive_shadow(user_id, item_id, request):
     print("response:")
     print(res)
     return jsonify(**res)
-
 
 
 def err_response(error_type, error_message):
