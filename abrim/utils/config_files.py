@@ -2,10 +2,12 @@
 import sys
 import os
 import appdirs
+import logging
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim.utils.common import secure_filename
 from abrim.utils import exit_codes
 
+log = logging.getLogger()
 
 def _get_config_paths(app_name, app_author, default_config_filename='default', default_config_extension='.cfg'):
     default_config_filename = secure_filename(default_config_filename + default_config_extension)
@@ -19,10 +21,10 @@ def _get_config_paths(app_name, app_author, default_config_filename='default', d
     if not os.path.exists(default_config_dir):
         os.makedirs(default_config_dir)
     try:
-        # FIXME: define logging -> print("Opening config at: {0}".format(default_config_path,))
+        log.debug("Opening config at: {0}".format(default_config_path,))
         open(default_config_path, 'a').close()
     except FileNotFoundError:
-        print("IOError while opening config file at: {0}".format(default_config_path,))
+        log.warning("IOError while opening config file at: {0}".format(default_config_path,))
         sys.exit(exit_codes.EX_OSFILE)
 
 
@@ -34,10 +36,10 @@ def _get_config_paths(app_name, app_author, default_config_filename='default', d
     if not os.path.exists(user_config_dir):
         os.makedirs(user_config_dir)
     try:
-        # FIXME: define logging -> print("Opening config at: {0}".format(user_config_path,))
+        log.debug("Opening config at: {0}".format(user_config_path,))
         open(user_config_path, 'a').close()
     except FileNotFoundError:
-        print("IOError while opening config file at: {0}".format(user_config_path,))
+        log.warning("IOError while opening config file at: {0}".format(user_config_path,))
         sys.exit(exit_codes.EX_OSFILE)
 
     return [default_config_path, user_config_path,]
@@ -48,26 +50,28 @@ def _load_from_config_files(app, config_paths):
         try:
             app.config.from_pyfile(config_path)
         except IOError:
-            print("IOError while opening config file at: {0}".format(config_path,))
+            log.warning("IOError while opening config file at: {0}".format(config_path,))
             sys.exit(exit_codes.EX_OSFILE)
         except IndentationError:
-            print("IndentationError while opening config file at: {0}".format(config_path,))
+            log.warning("IndentationError while opening config file at: {0}".format(config_path,))
             sys.exit(exit_codes.EX_DATAERR)
 
 
 def _show_secret_key_warning(config_paths):
     if config_paths[0]:
-        print("""===============================================================================
+        print_warning = """
+===============================================================================
 WARNING! No SECRET_KEY has been set in config files.
   Sessions will be lost every time this server is restarted
-  Edit at least one of the config files:""")
-        print("""  * {}""".format(config_paths[0]))
+  Edit at least one of the config files:"""
+        print_warning = print_warning + """  * {}""".format(config_paths[0])
         for config_path in config_paths[1:]:
-            print("""  or:
-  * {}""".format(config_path))
-        print("""  Add a line with SECRET_KEY = ' and a long random key:
+            print_warning = print_warning + """  or:
+  * {}""".format(config_path)
+        print_warning = print_warning + """  Add a line with SECRET_KEY = ' and a long random key:
 SECRET_KEY = '""" + r"""?\xbf,\xb4\x8d...')
-===============================================================================""")
+==============================================================================="""
+        log.warning(print_warning)
 
 
 def load_app_config(app):
@@ -80,5 +84,5 @@ def load_app_config(app):
     config_paths = _get_config_paths(app.config['APP_NAME'], app.config['APP_AUTHOR'])
     _load_from_config_files(app, config_paths)
 
-    if app.secret_key == default_secret_key:
-        _show_secret_key_warning(config_paths)
+    # if app.secret_key == default_secret_key:
+    #     _show_secret_key_warning(config_paths)

@@ -15,11 +15,23 @@ from abrim.utils import config_files
 from abrim.utils.common import generate_random_id
 from abrim.db import db
 
+
+# http://stackoverflow.com/questions/1623039/python-debugging-tips
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
                   'error': logging.ERROR,
                   'warning': logging.WARNING,
                   'info': logging.INFO,
                   'debug': logging.DEBUG}
+# FIXME http://docs.python-guide.org/en/latest/writing/logging/
+# It is strongly advised that you do not add any handlers other
+# than NullHandler to your library's loggers.
+logging.basicConfig(level=logging.DEBUG,
+              format='%(asctime)s __ %(module)s __ %(levelname)s: %(message)s',
+              datefmt='%Y-%m-%d %H:%M:%S',
+              disable_existing_loggers=False)
+logging.StreamHandler(sys.stdout)
+log = logging.getLogger(__name__)
+
 
 app = Flask(__name__)
 # Default config:
@@ -60,6 +72,51 @@ def _send_shadow(user_id, item_id):
         abort(404)
     else:
         return receive_shadow(item_id, request)
+
+
+# FIXME create a generic checker for json attributes and error responses
+def items_receive_post_by_id(user_id, node_id, item_id, request):
+    """Receives a new item, saves it locally and then it tries to sync it (that can fail)"""
+    req = request.json
+    if req and 'content' in req:
+        res = None
+        #
+        # move to external lib
+        #
+        if db.create_item(g, app, item_id, node_id, user_id, req['content']):
+            res = {'item_id': item_id, 'content': req['content'], 'shadow': None}
+        else:
+            log.warning("HTTP 409 - Conflict: An item with that ID already exists")
+            abort(409)
+        # item ready, now we try to sync it
+        #
+        #
+        if res:
+            return jsonify(**res)
+        else:
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            abort(500)
+    else:
+        if not req:
+            log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
+            abort(415)
+        elif not 'content' in req:
+            log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
+            abort(422)
+        else:
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            abort(500)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -259,7 +316,8 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
             flash("Server is unreachable", 'error')
             return redirect(url_for('__main'), code=302)
 
-    #print("if we have got to here we have some coverage problems...")
+    # if we have got to here we have some coverage problems...
+    log.critical("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
     abort(500)
 
 
@@ -310,7 +368,6 @@ def __manage_send_sync_error_return(r_json, recursive_count):
             if  'error_message' in r_json:
                 error_return = error_return + "<br />" + r_json['error_message']
                 error_return = error_return + "<br />" + "FULL MESSAGE:<br />" + json.dumps(r_json)
-
     return error_return, new_client_shadow
 
 
@@ -357,37 +414,6 @@ def items_send_get(node_id, item_id=None):
       )
 
 
-# FIXME create a generic checker for json attributes and error responses
-def items_receive_post_by_id(user_id, node_id, item_id, request):
-    """Receives a new item, saves it locally and then it tries to sync it (that can fail)"""
-    req = request.json
-    res = err_response('UnknownError', 'Uncontrolled error in server')
-    if req and 'content' in req:
-
-        #
-        # move to external lib
-        #
-        if db.create_item(g, app, item_id, node_id, user_id, req['content']):
-            res = {'item_id': item_id, 'content': req['content'], 'shadow': None}
-        else:
-            print("An item with that ID already exists")
-            abort(409)  # Conflict
-        # item ready, now we try to sync it
-        #
-        #
-
-    else:
-        if not req:
-            print("No payload found in the request")
-            abort(415)  # Unsupported Media Type
-        elif not 'content' in req:
-            print("No content found in the request")
-            abort(422)  # Unprocessable Entity
-        else:
-            abort(500)
-    return jsonify(**res)
-
-
 def items_receive_put_by_id(user_id, node_id, item_id, request):
     req = request.json
     res = err_response('UnknownError', 'Uncontrolled error in server')
@@ -396,12 +422,13 @@ def items_receive_put_by_id(user_id, node_id, item_id, request):
         res = {'status': "ok"}
     else:
         if not req:
-            print("No payload found in the request")
-            abort(415)  # Unsupported Media Type
+            log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
+            abort(415)
         elif not 'content' in req:
-            print("No content found in the request")
-            abort(422)  # Unprocessable Entity
+            log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
+            abort(422)
         else:
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
             abort(500)
     return jsonify(**res)
 
@@ -577,12 +604,13 @@ def items_receive_sync(user_id, node_id, request):
                     'Match-Patch failed in server')
     else:
         if not req:
-            print("No payload found in the request")
-            abort(415)  # Unsupported Media Type
+            log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
+            abort(415)
         elif not 'client_id' in req or not 'client_shadow_cksum' in req or not 'client_patches' in req:
-            print("No client_id found in the request")
-            abort(422)  # Unprocessable Entity
+            log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
+            abort(422)
         else:
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
             abort(500)
     print("response:")
     print(res)
@@ -609,13 +637,13 @@ def receive_shadow(user_id, item_id, request):
             }
     else:
         if not req:
-            print("No payload found in the request")
-            abort(415)  # Unsupported Media Type
+            log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
+            abort(415)
         elif not 'client_id' in req or not 'client_shadow' in req:
-            print("No client_id found in the request")
-            abort(422)  # Unprocessable Entity
+            log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
+            abort(422)
         else:
-            print("receive_shadow 500")
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
             abort(500)
     print("response:")
     print(res)
@@ -624,7 +652,6 @@ def receive_shadow(user_id, item_id, request):
 
 def err_response(error_type, error_message):
     print(error_type + " - " + error_message)
-    #abort(500)
     return {
         'status': 'ERROR',
         'error_type': error_type,
@@ -673,10 +700,11 @@ def get_user_node_item_by_id(g, app, user_id, node_id, item_id):
 
 
 if __name__ == "__main__":
+    log.info("Hajime!")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     parser.add_argument("-l", "--logginglevel", help="Logging level")
-    parser.add_argument("-f", "--loggingfile", help="Logging file name")
     args = parser.parse_args()
     if args.port and int(args.port) > 0:
         client_port = int(args.port)
@@ -689,22 +717,13 @@ if __name__ == "__main__":
         print("use -p to specify a port")
         abort(500)
     if args.logginglevel:
-        # http://stackoverflow.com/questions/1623039/python-debugging-tips
         logging_level = LOGGING_LEVELS.get(args.logginglevel, logging.NOTSET)
-        # FIXME http://docs.python-guide.org/en/latest/writing/logging/
-        # It is strongly advised that you do not add any handlers other
-        # than NullHandler to your library’s loggers.
-        logging.basicConfig(level=logging_level, filename=args.loggingfile,
-                      format='%(asctime)s %(levelname)s: %(message)s',
-                      datefmt='%Y-%m-%d %H:%M:%S')
-        logging.StreamHandler(sys.stdout)
-    logger = logging.getLogger()
-    logger.debug("======================")
-    logger.debug("Starting DEBUG logging")
-    logger.debug("======================")
+        log.setLevel(logging_level)
+    log.debug("DEBUG logging enabled")
     app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], app.config['NODE_ID'])
     db.connect_db(app.config['DB_PATH'])
     db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
     #print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
+    #app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     app.run(host='0.0.0.0', port=client_port)
     db.close_db(g)

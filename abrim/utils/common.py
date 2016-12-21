@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import random
 import string
+import sys
 
 def secure_filename(filename):
     filename.lower()
