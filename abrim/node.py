@@ -703,6 +703,7 @@ def get_user_node_item_by_id(g, app, user_id, node_id, item_id):
 
 
 if __name__ == "__main__":
+    #import pdb; pdb.set_trace()
     log.info("Hajime!")
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")

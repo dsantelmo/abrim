@@ -55,6 +55,7 @@ def get_content_or_shadow(g, db_path, item_id, node_id, user_id, content=True):
         content_or_shadow = 'content'
     else:
         log.debug("get_content_or_shadow -> shadow:" + item_id + " - " + node_id)
+
     db = get_db(g, db_path)
     select_query = """
 SELECT {}
@@ -168,9 +169,24 @@ WHERE user_id = ? and node_id = ?
     cur = db.execute(select_query, where_items)
     result = []
     try:
-        for row in cur.fetchall():
-            result.append({"item_id": row["item_id"], "content": row["content"], "shadow": row["shadow"]})
-        log.debug("get_all_user_content - results: " + result)
+        rows = cur.fetchall()
+        if rows:
+            for row in rows:
+                try:
+                    result_item_id = row[0]
+                except IndexError:
+                    result_item_id = None
+                try:
+                    result_content = row[1]
+                except IndexError:
+                    result_content = None
+                try:
+                    result_shadow = row[2]
+                except IndexError:
+                    result_shadow = None
+                result_row = { 'item_id': result_item_id, 'content': result_content, 'shadow': result_shadow}
+                result.append(result_row)
+            log.debug("get_all_user_content - results: " + str(result))
         return result
     except TypeError:
         log.debug("get_all_user_content returned None")
