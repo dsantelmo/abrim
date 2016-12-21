@@ -52,6 +52,7 @@ def _send_sync(user_id, node_id):
     if request.method == 'GET':
         return items_receive_get(g, app, user_id, node_id)
     else:
+        log.debug("HTTP 404 - " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
         abort(404)
 
 
@@ -64,11 +65,13 @@ def _get_sync(user_id, node_id, item_id):
     elif request.method == 'GET':
         return items_receive_get_by_id(user_id, node_id, item_id)
     else:
+        log.debug("HTTP 404 - " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
         abort(404)
 
 @app.route('/users/<string:user_id>/items/<string:item_id>/shadow', methods=['POST'])
 def _send_shadow(user_id, item_id):
     if request.method != 'POST':
+        log.debug("HTTP 404 - " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
         abort(404)
     else:
         return receive_shadow(item_id, request)
@@ -94,7 +97,7 @@ def items_receive_post_by_id(user_id, node_id, item_id, request):
         if res:
             return jsonify(**res)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
             abort(500)
     else:
         if not req:
@@ -104,7 +107,7 @@ def items_receive_post_by_id(user_id, node_id, item_id, request):
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
             abort(500)
 
 
@@ -317,7 +320,7 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
             return redirect(url_for('__main'), code=302)
 
     # if we have got to here we have some coverage problems...
-    log.critical("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+    log.critical("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
     abort(500)
 
 
@@ -428,7 +431,7 @@ def items_receive_put_by_id(user_id, node_id, item_id, request):
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
             abort(500)
     return jsonify(**res)
 
@@ -610,7 +613,7 @@ def items_receive_sync(user_id, node_id, request):
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
             abort(500)
     print("response:")
     print(res)
@@ -643,7 +646,7 @@ def receive_shadow(user_id, item_id, request):
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + "//" + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
             abort(500)
     print("response:")
     print(res)
@@ -661,7 +664,8 @@ def err_response(error_type, error_message):
 
 def items_receive_get(g, app, user_id, node_id, item_id=None):
     if not item_id:
-        # GET the list
+        log.debug("items_receive_get: GET the list")
+        #
         items = db.get_user_node_items(g, app, user_id, node_id)
         res = {
             'status': 'OK',
@@ -671,9 +675,8 @@ def items_receive_get(g, app, user_id, node_id, item_id=None):
         print(res)
         return jsonify(**res)
     else:
-        # GET one item by ID
+        log.debug("items_receive_get: GET one item by ID - " + item_id)
         item = get_user_node_item_by_id(g, app, user_id, node_id, item_id)
-
         res = {
             'status': 'OK',
             'item': item,
@@ -689,11 +692,11 @@ def items_receive_get_by_id(user_id, node_id, item_id):
 
 def get_user_node_item_by_id(g, app, user_id, node_id, item_id):
     # FIXME change to use item_id
-    print("get_content -> " + user_id +  node_id + item_id)
+    log.debug("get_user_node_item_by_id -> " + user_id + " - " + node_id + " - " + item_id)
     content = db.get_content(g, app, user_id, node_id, item_id)
     shadow = db.get_shadow(g, app, user_id, node_id, item_id)
     if not content:
-        print("item not found")
+        log.debug("HTTP 404 - " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
         abort(404)
     else:
         return {"item_id": item_id, "content": content, "shadow": shadow}
@@ -701,7 +704,6 @@ def get_user_node_item_by_id(g, app, user_id, node_id, item_id):
 
 if __name__ == "__main__":
     log.info("Hajime!")
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     parser.add_argument("-l", "--logginglevel", help="Logging level")

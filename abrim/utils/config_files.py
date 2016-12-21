@@ -2,11 +2,11 @@
 import sys
 import os
 import appdirs
-import logging
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim.utils.common import secure_filename
 from abrim.utils import exit_codes
 
+import logging
 log = logging.getLogger()
 
 def _get_config_paths(app_name, app_author, default_config_filename='default', default_config_extension='.cfg'):
