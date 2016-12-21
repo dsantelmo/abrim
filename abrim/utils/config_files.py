@@ -10,6 +10,7 @@ import logging
 log = logging.getLogger()
 
 def _get_config_paths(app_name, app_author, default_config_filename='default', default_config_extension='.cfg'):
+    # FIXME this shouldn't create empty config files
     default_config_filename = secure_filename(default_config_filename + default_config_extension)
     user_config_filename = secure_filename(app_name + default_config_extension)
 
@@ -21,11 +22,14 @@ def _get_config_paths(app_name, app_author, default_config_filename='default', d
     if not os.path.exists(default_config_dir):
         os.makedirs(default_config_dir)
     try:
-        log.debug("Opening config at: {0}".format(default_config_path,))
-        open(default_config_path, 'a').close()
+        if os.path.isfile(default_config_path):
+            log.debug("Opening config at: {0}".format(default_config_path,))
+            open(default_config_path, 'a').close()
+        else:
+            default_config_path = None
     except FileNotFoundError:
-        log.warning("IOError while opening config file at: {0}".format(default_config_path,))
-        sys.exit(exit_codes.EX_OSFILE)
+        log.warning("FileNotFoundError while opening config file at: {0}".format(default_config_path,))
+        #sys.exit(exit_codes.EX_OSFILE)
 
 
     user_config_dir = appdirs.user_config_dir(app_name, app_author)
@@ -36,11 +40,14 @@ def _get_config_paths(app_name, app_author, default_config_filename='default', d
     if not os.path.exists(user_config_dir):
         os.makedirs(user_config_dir)
     try:
-        log.debug("Opening config at: {0}".format(user_config_path,))
-        open(user_config_path, 'a').close()
+        if os.path.isfile(user_config_path):
+            log.debug("Opening config at: {0}".format(user_config_path,))
+            open(user_config_path, 'a').close()
+        else:
+            user_config_path = None
     except FileNotFoundError:
-        log.warning("IOError while opening config file at: {0}".format(user_config_path,))
-        sys.exit(exit_codes.EX_OSFILE)
+        log.warning("FileNotFoundError while opening config file at: {0}".format(user_config_path,))
+        #sys.exit(exit_codes.EX_OSFILE)
 
     return [default_config_path, user_config_path,]
 
@@ -82,7 +89,8 @@ def load_app_config(app):
     # load config from different sources:
     #app.config.from_object(__name__)
     config_paths = _get_config_paths(app.config['APP_NAME'], app.config['APP_AUTHOR'])
-    _load_from_config_files(app, config_paths)
+    if config_paths[0] and config_paths[1]:  # FIXME fix this as it should work with only one
+        _load_from_config_files(app, config_paths)
 
     # if app.secret_key == default_secret_key:
     #     _show_secret_key_warning(config_paths)

@@ -63,7 +63,7 @@ FROM items
 WHERE item_id = ? and node_id = ?
 """.format(content_or_shadow)
     where_items = (item_id, node_id, )
-    log.debug("get_content_or_shadow, SELECT: {0} -- {1}".format(select_query,where_items,))
+    log.debug("get_content_or_shadow, SELECT: {0} -- {1}".format(select_query.replace('\n', ' '),where_items,))
     cur = db.execute(select_query, where_items)
     try:
         result = cur.fetchone()[0]
@@ -98,11 +98,11 @@ WHERE item_id = ? AND node_id = ? AND user_id = ?
 """.format(content_or_shadow)
 
         where_items = (item_id, node_id, user_id, new_value,)
-        log.debug("set_content_or_shadow, INSERT: {0} -- {1}".format(insert_query,where_items,))
+        log.debug("set_content_or_shadow, INSERT: {0} -- {1}".format(insert_query.replace('\n', ' '),where_items,))
         db.execute(insert_query, where_items)
 
         where_items = (new_value, item_id, node_id, user_id,)
-        log.debug("set_content_or_shadow, UPDATE: {0} -- {1}".format(update_query,where_items,))
+        log.debug("set_content_or_shadow, UPDATE: {0} -- {1}".format(update_query.replace('\n', ' '),where_items,))
         db.execute(update_query, where_items)
         db.commit()
         return True
@@ -122,7 +122,7 @@ VALUES (?, ?, ?, ?)
 """
 
         where_items = (item_id, node_id, user_id, content,)
-        log.debug("create_item, INSERT: {0} -- {1}".format(insert_query,where_items,))
+        log.debug("create_item, INSERT: {0} -- {1}".format(insert_query.replace('\n', ' '),where_items,))
         cur = db.execute(insert_query, where_items)
         #item_id = cur.lastrowid
         db.commit()
@@ -165,7 +165,7 @@ FROM items
 WHERE user_id = ? and node_id = ?
 """
     where_items = (user_id, node_id, )
-    log.debug("get_all_user_content, SELECT: {0} -- {1}".format(select_query,where_items,))
+    log.debug("get_all_user_content, SELECT: {0} -- {1}".format(select_query.replace('\n', ' '),where_items,))
     cur = db.execute(select_query, where_items)
     result = []
     try:
@@ -186,7 +186,7 @@ WHERE user_id = ? and node_id = ?
                     result_shadow = None
                 result_row = { 'item_id': result_item_id, 'content': result_content, 'shadow': result_shadow}
                 result.append(result_row)
-            log.debug("get_all_user_content - results: " + str(result))
+                log.debug("get_all_user_content - results: " + str(result_row))
         return result
     except TypeError:
         log.debug("get_all_user_content returned None")

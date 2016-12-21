@@ -26,7 +26,7 @@ LOGGING_LEVELS = {'critical': logging.CRITICAL,
 # It is strongly advised that you do not add any handlers other
 # than NullHandler to your library's loggers.
 logging.basicConfig(level=logging.DEBUG,
-              format='%(asctime)s __ %(module)s __ %(levelname)s: %(message)s',
+              format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
               datefmt='%Y-%m-%d %H:%M:%S',
               disable_existing_loggers=False)
 logging.StreamHandler(sys.stdout)
@@ -52,7 +52,7 @@ def _send_sync(user_id, node_id):
     if request.method == 'GET':
         return items_receive_get(g, app, user_id, node_id)
     else:
-        log.debug("HTTP 404 - " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+        log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
         abort(404)
 
 
@@ -65,13 +65,13 @@ def _get_sync(user_id, node_id, item_id):
     elif request.method == 'GET':
         return items_receive_get_by_id(user_id, node_id, item_id)
     else:
-        log.debug("HTTP 404 - " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+        log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
         abort(404)
 
 @app.route('/users/<string:user_id>/items/<string:item_id>/shadow', methods=['POST'])
 def _send_shadow(user_id, item_id):
     if request.method != 'POST':
-        log.debug("HTTP 404 - " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+        log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
         abort(404)
     else:
         return receive_shadow(item_id, request)
@@ -95,9 +95,10 @@ def items_receive_post_by_id(user_id, node_id, item_id, request):
         #
         #
         if res:
+            log.debug("items_receive_post_by_id - response: " + str(res))
             return jsonify(**res)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
             abort(500)
     else:
         if not req:
@@ -107,20 +108,8 @@ def items_receive_post_by_id(user_id, node_id, item_id, request):
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
             abort(500)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def items_send_post(client_text, recursive_count, previously_shadow_updated_from_client=False):
@@ -320,7 +309,7 @@ def items_send_post(client_text, recursive_count, previously_shadow_updated_from
             return redirect(url_for('__main'), code=302)
 
     # if we have got to here we have some coverage problems...
-    log.critical("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+    log.critical("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
     abort(500)
 
 
@@ -419,10 +408,11 @@ def items_send_get(node_id, item_id=None):
 
 def items_receive_put_by_id(user_id, node_id, item_id, request):
     req = request.json
-    res = err_response('UnknownError', 'Uncontrolled error in server')
     if req and 'content' in req:
-        print("DO SYNC ans generate shadow")
+        print("DO SYNC and generate shadow")
         res = {'status': "ok"}
+        log.debug("items_receive_put_by_id - response: " + str(res))
+        return jsonify(**res)
     else:
         if not req:
             log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
@@ -431,15 +421,15 @@ def items_receive_put_by_id(user_id, node_id, item_id, request):
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
             abort(500)
-    return jsonify(**res)
 
 
 #
 # "server" stuff
 #
 def items_receive_sync(user_id, node_id, request):
+    # FIXME this func is way to long
     #import pdb; pdb.set_trace()
     req = request.json
     res = err_response('UnknownError', 'Uncontrolled error in server')
@@ -613,10 +603,9 @@ def items_receive_sync(user_id, node_id, request):
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
             abort(500)
-    print("response:")
-    print(res)
+    log.debug("items_receive_sync - response: " + str(res))
     return jsonify(**res)
 
 
@@ -646,10 +635,9 @@ def receive_shadow(user_id, item_id, request):
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
         else:
-            log.error("HTTP 500 " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
+            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
             abort(500)
-    print("response:")
-    print(res)
+    log.debug("receive_shadow - response: " + str(res))
     return jsonify(**res)
 
 
@@ -671,18 +659,20 @@ def items_receive_get(g, app, user_id, node_id, item_id=None):
             'status': 'OK',
             'items': items,
             }
-        print("response:")
-        print(res)
+        log.debug("items_receive_get - response: " + str(res))
         return jsonify(**res)
     else:
         log.debug("items_receive_get: GET one item by ID - " + item_id)
         item = get_user_node_item_by_id(g, app, user_id, node_id, item_id)
+        if item is None:
+            log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
+            abort(404)
+        else:
+            log.debug("items_receive_get - response: " + str(res))
         res = {
             'status': 'OK',
             'item': item,
             }
-        print("response:")
-        print(res)
         return jsonify(**res)
 
 
@@ -696,8 +686,8 @@ def get_user_node_item_by_id(g, app, user_id, node_id, item_id):
     content = db.get_content(g, app, user_id, node_id, item_id)
     shadow = db.get_shadow(g, app, user_id, node_id, item_id)
     if not content:
-        log.debug("HTTP 404 - " + sys._getframe(  ).f_code.co_name + " :: " + sys._getframe(  ).f_code.co_filename + ":" + str(sys._getframe(  ).f_lineno))
-        abort(404)
+        log.debug("get_user_node_item_by_id - not found: " + item_id)
+        return None
     else:
         return {"item_id": item_id, "content": content, "shadow": shadow}
 
