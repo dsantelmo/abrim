@@ -77,26 +77,57 @@ def _send_shadow(user_id, item_id):
         return receive_shadow(item_id, request)
 
 
+def items_receive_get(g, app, user_id, node_id, item_id=None):
+    if not item_id:
+        log.debug("items_receive_get: GET the list")
+        #
+        items = db.get_user_node_items(g, app, user_id, node_id)
+        res = {
+            'status': 'OK',
+            'items': items,
+            }
+        log.debug("items_receive_get - response: " + str(res))
+        return jsonify(**res)
+    else:
+        log.debug("items_receive_get: GET one item by ID - " + item_id)
+        item = get_user_node_item_by_id(g, app, user_id, node_id, item_id)
+        if item is None:
+            log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
+            abort(404)
+        res = {
+            'status': 'OK',
+            'item': item,
+            }
+        log.debug("items_receive_get - response: " + str(res))
+        return jsonify(**res)
+
+
+def items_receive_get_by_id(user_id, node_id, item_id):
+    return items_receive_get(g, app, user_id, node_id, item_id)
+
+
 # FIXME create a generic checker for json attributes and error responses
 def items_receive_post_by_id(user_id, node_id, item_id, request):
     """Receives a new item, saves it locally and then it tries to sync it (that can fail)"""
     req = request.json
     if req and 'content' in req:
-        res = None
+        response_ok = False
         #
         # move to external lib
         #
         if db.create_item(g, app, item_id, node_id, user_id, req['content']):
-            res = {'item_id': item_id, 'content': req['content'], 'shadow': None}
+            response_ok = True
         else:
             log.warning("HTTP 409 - Conflict: An item with that ID already exists")
             abort(409)
-        # item ready, now we try to sync it
         #
         #
-        if res:
-            log.debug("items_receive_post_by_id - response: " + str(res))
-            return jsonify(**res)
+        # item ready, now we try to sync it and generate a shadow
+        #
+        #
+        if response_ok:
+            log.debug("items_receive_post_by_id - response: 201")
+            return '', 201
         else:
             log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
             abort(500)
@@ -111,6 +142,47 @@ def items_receive_post_by_id(user_id, node_id, item_id, request):
             log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
             abort(500)
 
+
+def items_receive_put_by_id(user_id, node_id, item_id, request):
+    """Receives a new item or an update to an item, saves it locally and then it tries to sync it (that can fail)"""
+    req = request.json
+    if req and 'content' in req:
+        response_ok = False
+        #
+        # move to external lib
+        #
+        response_code = 201  # HTTP 201: Created
+        new_content = db.get_content(g, app, user_id, node_id, item_id)
+        if new_content is not None:
+            response_code = 204  # HTTP No Content - Item already exists... FIXME: race condition between get and set? maybe create an atomic operation
+        if db.set_content(g, app, user_id, node_id, item_id, req['content']):
+            response_ok = True
+        #
+        # item ready, now we try to sync it and generate a shadow
+        #
+        #
+        if response_ok:
+            log.debug("items_receive_put_by_id - response: " + str(response_code))
+            return '', response_code
+        else:
+            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
+            abort(500)
+    else:
+        if not req:
+            log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
+            abort(415)
+        elif not 'content' in req:
+            log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
+            abort(422)
+        else:
+            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
+            abort(500)
+
+
+
+#
+# Sync stuff
+#
 
 def items_send_post(client_text, recursive_count, previously_shadow_updated_from_client=False):
     """send a new client text to the server part"""
@@ -406,27 +478,8 @@ def items_send_get(node_id, item_id=None):
       )
 
 
-def items_receive_put_by_id(user_id, node_id, item_id, request):
-    req = request.json
-    if req and 'content' in req:
-        print("DO SYNC and generate shadow")
-        res = {'status': "ok"}
-        log.debug("items_receive_put_by_id - response: " + str(res))
-        return jsonify(**res)
-    else:
-        if not req:
-            log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
-            abort(415)
-        elif not 'content' in req:
-            log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
-            abort(422)
-        else:
-            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
-            abort(500)
-
-
 #
-# "server" stuff
+# Sync "server" stuff
 #
 def items_receive_sync(user_id, node_id, request):
     # FIXME this func is way to long
@@ -648,35 +701,6 @@ def err_response(error_type, error_message):
         'error_type': error_type,
         'error_message': error_message,
         }
-
-
-def items_receive_get(g, app, user_id, node_id, item_id=None):
-    if not item_id:
-        log.debug("items_receive_get: GET the list")
-        #
-        items = db.get_user_node_items(g, app, user_id, node_id)
-        res = {
-            'status': 'OK',
-            'items': items,
-            }
-        log.debug("items_receive_get - response: " + str(res))
-        return jsonify(**res)
-    else:
-        log.debug("items_receive_get: GET one item by ID - " + item_id)
-        item = get_user_node_item_by_id(g, app, user_id, node_id, item_id)
-        if item is None:
-            log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
-            abort(404)
-        res = {
-            'status': 'OK',
-            'item': item,
-            }
-        log.debug("items_receive_get - response: " + str(res))
-        return jsonify(**res)
-
-
-def items_receive_get_by_id(user_id, node_id, item_id):
-    return items_receive_get(g, app, user_id, node_id, item_id)
 
 
 def get_user_node_item_by_id(g, app, user_id, node_id, item_id):
