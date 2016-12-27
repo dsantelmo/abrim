@@ -667,12 +667,11 @@ def items_receive_get(g, app, user_id, node_id, item_id=None):
         if item is None:
             log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
             abort(404)
-        else:
-            log.debug("items_receive_get - response: " + str(res))
         res = {
             'status': 'OK',
             'item': item,
             }
+        log.debug("items_receive_get - response: " + str(res))
         return jsonify(**res)
 
 
