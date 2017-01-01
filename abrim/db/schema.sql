@@ -1,15 +1,18 @@
 DROP TABLE IF EXISTS users;
-CREATE TABLE users (
-  user_id   TEXT PRIMARY KEY,
+
+DROP TABLE IF EXISTS items;
+
+CREATE TABLE IF NOT EXISTS users (
+  user_id   INTEGER PRIMARY KEY AUTOINCREMENT,
   nickname  TEXT    NOT NULL,
   password  TEXT    NOT NULL
 );
 
-DROP TABLE IF EXISTS texts;
-CREATE TABLE texts (
-  text_id       TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS items (
+  item_id       TEXT PRIMARY KEY ,
   content       TEXT,
   shadow        TEXT,
-  user_id       TEXT NOT NULL--,
+  user_id       TEXT NOT NULL,
+  node_id       TEXT NOT NULL--,
   --FOREIGN KEY(user_id) REFERENCES users(user_id)
 );
