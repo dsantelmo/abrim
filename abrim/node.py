@@ -27,8 +27,8 @@ LOGGING_LEVELS = {'critical': logging.CRITICAL,
 # than NullHandler to your library's loggers.
 logging.basicConfig(level=logging.DEBUG,
               format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
-              datefmt='%Y-%m-%d %H:%M:%S',
-              disable_existing_loggers=False)
+              datefmt='%Y-%m-%d %H:%M:%S')  # ,
+              # disable_existing_loggers=False)
 logging.StreamHandler(sys.stdout)
 log = logging.getLogger(__name__)
 
