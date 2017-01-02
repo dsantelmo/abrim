@@ -716,7 +716,6 @@ def get_user_node_item_by_id(user_id, node_id, item_id):
 def _init():
     #import pdb; pdb.set_trace()
     log.info("Hajime!")
-    print(sys.argv)
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     parser.add_argument("-l", "--logginglevel", help="Logging level")
