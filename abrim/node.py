@@ -715,7 +715,7 @@ def get_user_node_item_by_id(g, app, user_id, node_id, item_id):
         return {"item_id": item_id, "content": content, "shadow": shadow}
 
 
-if __name__ == "__main__":
+def __init():
     #import pdb; pdb.set_trace()
     log.info("Hajime!")
     parser = argparse.ArgumentParser()
@@ -737,9 +737,17 @@ if __name__ == "__main__":
         log.setLevel(logging_level)
     log.debug("DEBUG logging enabled")
     app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], app.config['NODE_ID'])
-    db.connect_db(app.config['DB_PATH'])
     db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
-    #print("My ID is {}. Starting up server...".format(app.config['CLIENT_ID']))
+    print("db iniciada")
+    return client_port
+
+
+def __end():
+    db.close_db(g)
+
+
+if __name__ == "__main__":
+    client_port = __init()
     #app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     app.run(host='0.0.0.0', port=client_port)
-    db.close_db(g)
+    __end()

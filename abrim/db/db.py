@@ -17,7 +17,7 @@ def get_db_path(string_to_format, client_port):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
 
 
-def connect_db(db_path):
+def __connect_db(db_path):
     """Connects to the specific database."""
     rv = sqlite3.connect(db_path)
     rv.row_factory = sqlite3.Row
@@ -29,7 +29,7 @@ def get_db(g, db_path):
     current application context.
     """
     if not hasattr(g, 'sqlite_db'):
-        g.sqlite_db = connect_db(db_path)
+        g.sqlite_db = __connect_db(db_path)
     return g.sqlite_db
 
 
