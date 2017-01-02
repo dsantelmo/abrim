@@ -2,6 +2,7 @@
 import sys
 import os
 import sqlite3
+from flask import g
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim.utils.common import secure_filename
 
@@ -17,6 +18,13 @@ def get_db_path(string_to_format, client_port):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
 
 
+def prepare_db_path(db_path):
+    """Saves the DB path to g.db_path.
+    """
+    if not hasattr(g, 'db_path'):
+        g.db_path = db_path
+
+
 def __connect_db(db_path):
     """Connects to the specific database."""
     rv = sqlite3.connect(db_path)
@@ -24,39 +32,38 @@ def __connect_db(db_path):
     return rv
 
 
-def get_db(g, db_path):
+def __get_db():
     """Opens a new database connection if there is none yet for the
     current application context.
     """
     if not hasattr(g, 'sqlite_db'):
-        g.sqlite_db = __connect_db(db_path)
+        g.sqlite_db = __connect_db(g.db_path)
     return g.sqlite_db
 
 
-def init_db(app, g, db_path, schema_path):
+def init_db(app):
     with app.app_context():
-        db = get_db(g, db_path)
-        with app.open_resource(schema_path, mode='r') as f:
+        db = __connect_db(app.config['DB_PATH'])
+        with app.open_resource(app.config['DB_SCHEMA_PATH'], mode='r') as f:
             db.cursor().executescript(f.read())
         db.commit()
 
-def close_db(g):
+
+def close_db():
     """Closes the database again at the end of the request."""
     log.debug("closing DB")
     if hasattr(g, 'sqlite_db'):
         g.sqlite_db.close()
 
 
-# FIXME: delete g and db_path from params...
-def get_content_or_shadow(g, db_path, item_id, node_id, user_id, content=True):
+def get_content_or_shadow(item_id, node_id, user_id, content=True):
     content_or_shadow = 'shadow'
     if content:
         log.debug("get_content_or_shadow -> content:" + item_id + " - " + node_id)
         content_or_shadow = 'content'
     else:
         log.debug("get_content_or_shadow -> shadow:" + item_id + " - " + node_id)
-
-    db = get_db(g, db_path)
+    db = __get_db()
     select_query = """
 SELECT {}
 FROM items
@@ -75,8 +82,8 @@ WHERE item_id = ? and node_id = ?
         log.error("get_content_or_shadow FAILED!!")
         raise
 
-# FIXME: delete g and db_path from params...
-def set_content_or_shadow(g, db_path, item_id, node_id, user_id, new_value, content=True):
+
+def set_content_or_shadow(item_id, node_id, user_id, new_value, content=True):
     content_or_shadow = 'shadow'
     if content:
         content_or_shadow = 'content'
@@ -84,7 +91,7 @@ def set_content_or_shadow(g, db_path, item_id, node_id, user_id, new_value, cont
     if new_value is None:
         new_value = ""
     try:
-        db = get_db(g, db_path)
+        db = __get_db()
         insert_query = """
 INSERT OR IGNORE INTO items
 (item_id, node_id, user_id, {})
@@ -111,9 +118,9 @@ WHERE item_id = ? AND node_id = ? AND user_id = ?
         raise
 
 
-def create_item(g, app, item_id, node_id, user_id, content):
+def create_item(item_id, node_id, user_id, content):
     try:
-        db = get_db(g, app.config['DB_PATH'])
+        db = __get_db()
         insert_query = """
 INSERT --OR IGNORE
 INTO items
@@ -135,15 +142,15 @@ VALUES (?, ?, ?, ?)
         raise
 
 
-def get_all_tables(g, app):
-    db = get_db(g, app.config['DB_PATH'])
+def get_all_tables():
+    db = __get_db()
     cur = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name<>'sqlite_sequence';")
     # FIXME SANITIZE THIS! SQL injections...
     return [table_name[0] for table_name in cur.fetchall()]
 
 
-def get_table_contents(g, app, table_names):
-    db = get_db(g, app.config['DB_PATH'])
+def get_table_contents(table_names):
+    db = __get_db()
     contents = []
     for table_name in table_names:
         cur = db.execute("SELECT * FROM {}".format(table_name))
@@ -156,9 +163,9 @@ def get_table_contents(g, app, table_names):
     return contents
 
 
-def get_all_user_content(g, db_path, user_id, node_id):
+def get_all_user_content(user_id, node_id):
     result = []
-    db = get_db(g, db_path)
+    db = __get_db()
     select_query = """
 SELECT item_id, content, shadow
 FROM items
@@ -197,26 +204,26 @@ WHERE user_id = ? and node_id = ?
     return result
 
 
-def get_user_node_items(g, app, user_id, node_id):
-    return get_all_user_content(g, app.config['DB_PATH'], user_id, node_id)
+def get_user_node_items(user_id, node_id):
+    return get_all_user_content(user_id, node_id)
 
-def get_content(g, app, user_id, node_id, item_id):
-    return get_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, CONTENT)
-
-
-def get_shadow(g, app, user_id, node_id, item_id):
-    return get_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, SHADOW)
+def get_content(user_id, node_id, item_id):
+    return get_content_or_shadow(item_id, node_id, user_id, CONTENT)
 
 
-def set_content(g, app, user_id, node_id, item_id, value):
-    return set_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, value, CONTENT)
+def get_shadow(user_id, node_id, item_id):
+    return get_content_or_shadow(item_id, node_id, user_id, SHADOW)
 
 
-def set_shadow(g, app, user_id, node_id, item_id, value):
-    return set_content_or_shadow(g, app.config['DB_PATH'], item_id, node_id, user_id, value, SHADOW)
+def set_content(user_id, node_id, item_id, value):
+    return set_content_or_shadow(item_id, node_id, user_id, value, CONTENT)
 
 
-def set_server_text(g, app, text):
-    set_content(g, app, app.config['NODE_ID'], text)
+def set_shadow(user_id, node_id, item_id, value):
+    return set_content_or_shadow(item_id, node_id, user_id, value, SHADOW)
+
+
+def set_server_text(text):
+    set_content(text)
     #with closing(shelve.open(temp_server_file_name)) as d:
     #    d['server_text'] = text
