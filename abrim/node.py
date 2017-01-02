@@ -721,6 +721,7 @@ def __init():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     parser.add_argument("-l", "--logginglevel", help="Logging level")
+    parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
     args = parser.parse_args()
     if args.port and int(args.port) > 0:
         client_port = int(args.port)
@@ -737,7 +738,8 @@ def __init():
         log.setLevel(logging_level)
     log.debug("DEBUG logging enabled")
     app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], app.config['NODE_ID'])
-    db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
+    if args.initdb:
+        db.init_db(app, g, app.config['DB_PATH'], app.config['DB_SCHEMA_PATH'])
     print("db iniciada")
     return client_port
 
