@@ -510,7 +510,7 @@ def items_receive_sync(user_id, node_id, request):
         server_shadow = db.get_shadow(client_id)
         if server_shadow is None:
             if server_text:
-                print("ServerShadowChecksumFailed")
+                # print("ServerShadowChecksumFailed")
                  # FIXME: Change ServerShadowChecksumFailed to its own type
                 res = {
                     'status': 'ERROR',
@@ -520,7 +520,7 @@ def items_receive_sync(user_id, node_id, request):
                     }
                 db.set_shadow(client_id, server_text)
             else:
-                print("NoServerShadow")
+                # print("NoServerShadow")
                 res = err_response('NoServerShadow',
                 'No shadow found in the server. Send it again')
             #print("NoServerShadow")
@@ -531,12 +531,12 @@ def items_receive_sync(user_id, node_id, request):
                 server_shadow_cksum = 0
             else:
                 server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
-            print("server_shadow_cksum {}".format(server_shadow_cksum))
+            # print("server_shadow_cksum {}".format(server_shadow_cksum))
             #print(server_shadow)
 
             if client_shadow_cksum != server_shadow_cksum:
                 #FIXME what happenson first sync?
-                print("ServerShadowChecksumFailed")
+                #print("ServerShadowChecksumFailed")
                 res = {
                     'status': 'ERROR',
                     'error_type': 'ServerShadowChecksumFailed',
@@ -580,7 +580,7 @@ def items_receive_sync(user_id, node_id, request):
                         # Here starts second half of sync.
                         #
 
-                        print("""#
+                        # print("""#
 # Here starts second half of sync.
 #""")
 
@@ -618,10 +618,11 @@ def items_receive_sync(user_id, node_id, request):
                             # a snapshot of the text should have been taken.
                             server_shadow_cksum = 0
                             if not server_shadow:
-                                print("server_shadow: None")
+                                #print("server_shadow: None")
+                                pass
                             else:
                                 server_shadow_cksum = hashlib.md5(server_shadow.encode('utf-8')).hexdigest()
-                            print("server_shadow_cksum {}".format(server_shadow_cksum))
+                            #print("server_shadow_cksum {}".format(server_shadow_cksum))
                             #print(server_shadow)
 
                             db.set_shadow(client_id, server_text)
@@ -634,7 +635,7 @@ def items_receive_sync(user_id, node_id, request):
                                 }
                     else:
                         # should I try to patch again?
-                        print("FuzzyServerPatchFailed")
+                        #print("FuzzyServerPatchFailed")
                         res = {
                             'status': 'ERROR',
                             'error_type': 'FuzzyServerPatchFailed',
@@ -661,7 +662,7 @@ def items_receive_sync(user_id, node_id, request):
 
 def receive_shadow(user_id, item_id, request):
     #import pdb; pdb.set_trace()
-    print("receive_shadow")
+    #print("receive_shadow")
     req = request.json
     res = None
     if req and 'client_id' in req and 'client_shadow' in req:
@@ -692,7 +693,7 @@ def receive_shadow(user_id, item_id, request):
 
 
 def err_response(error_type, error_message):
-    print(error_type + " - " + error_message)
+    log.debug(error_type + " - " + error_message)
     return {
         'status': 'ERROR',
         'error_type': error_type,
@@ -712,9 +713,10 @@ def get_user_node_item_by_id(user_id, node_id, item_id):
         return {"item_id": item_id, "content": content, "shadow": shadow}
 
 
-def __init():
+def _init():
     #import pdb; pdb.set_trace()
     log.info("Hajime!")
+    print(sys.argv)
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     parser.add_argument("-l", "--logginglevel", help="Logging level")
@@ -756,7 +758,7 @@ def teardown_request(exception):
 
 
 if __name__ == "__main__":
-    client_port = __init()
+    client_port = _init()
     #app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     app.run(host='0.0.0.0', port=client_port)
     __end()
