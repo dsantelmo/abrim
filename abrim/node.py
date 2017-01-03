@@ -713,31 +713,38 @@ def get_user_node_item_by_id(user_id, node_id, item_id):
         return {"item_id": item_id, "content": content, "shadow": shadow}
 
 
-def _init():
-    #import pdb; pdb.set_trace()
-    log.info("Hajime!")
+def _parse_args_helper():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     parser.add_argument("-l", "--logginglevel", help="Logging level")
     parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
     args = parser.parse_args()
-    if args.port and int(args.port) > 0:
-        client_port = int(args.port)
-        app.config['API_URL'] = "http://127.0.0.1:" + str( int(args.port)+1 )
+    if not args.port or int(args.port) <= 0:
+        return None, None, None
+    return args.port, args.logginglevel, args.initdb
+
+
+def _init():
+    #import pdb; pdb.set_trace()
+    log.info("Hajime!")
+    args_port, args_logginglevel, args_initdb = _parse_args_helper()
+    if args_port and int(args_port) > 0:
+        client_port = int(args_port)
+        app.config['API_URL'] = "http://127.0.0.1:" + str( int(args_port)+1 )
         app.config['NODE_PORT'] = client_port
         # FIXME client side config
         app.config['USER_ID'] = "the_user"
-        app.config['NODE_ID'] = "node" + args.port
+        app.config['NODE_ID'] = "node" + args_port
     else:
         print("use -p to specify a port")
         abort(500)
-    if args.logginglevel:
-        logging_level = LOGGING_LEVELS.get(args.logginglevel, logging.NOTSET)
+    if args_logginglevel:
+        logging_level = LOGGING_LEVELS.get(args_logginglevel, logging.NOTSET)
         log.setLevel(logging_level)
     log.debug("DEBUG logging enabled")
     app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], app.config['NODE_ID'])
     # before_request()
-    if args.initdb:
+    if args_initdb:
         db.init_db(app)
     return client_port
 
