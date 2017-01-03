@@ -40,7 +40,7 @@ app.config['APP_AUTHOR'] = "Abrim"
 app.config['DIFF_TIMEOUT'] = 0.1
 app.config['MAX_RECURSIVE_COUNT'] = 3
 app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
-app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
+app.config['DB_SCHEMA_PATH'] = os.path.join('db', 'schema.sql')
 
 # Config from files and env vars:
 # config_files.load_app_config(app)  # breaks in travis
