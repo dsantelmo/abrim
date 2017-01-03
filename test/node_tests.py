@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import unittest
 import argparse
 import mock
@@ -27,7 +28,7 @@ class NodeTestCase(unittest.TestCase):
                 os.unlink(node.app.config['DB_PATH'])
             except OSError as error:
                 pass
-        else:
+        else: # pragma: no cover
             raise
 
     def _standard_init(self):
@@ -83,10 +84,11 @@ class NodeTestCase(unittest.TestCase):
             self._standard_init()
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items')
             response = node._send_sync('1','1')
+            respose_data = re.sub('[\s+]', '', response.data.decode("utf-8") )
             self.assertEqual(response.headers.get('Content-Type'), 'application/json')
             self.assertEqual(response.status, "200 OK")
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.data, b'{\n  "items": [], \n  "status": "OK"\n}\n')
+            self.assertEqual(respose_data, '{"items":[],"status":"OK"}')
             self.assertEqual(response.mimetype, 'application/json')
 
     def test_send_sync_post(self):
@@ -121,6 +123,43 @@ class NodeTestCase(unittest.TestCase):
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
             self.assertRaises(werkzeug.exceptions.UnprocessableEntity, node._get_sync, '1', '1', '1')
 
+    def test_get_sync_post_with_payload_then_get(self):
+        jsonified_data = '{"content": "content_text"}'
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1',
+                method='POST',
+                content_type='application/json',
+                data=jsonified_data) as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertEqual(('', 201), node._get_sync('1', '1', '1'))
+            with node.app.test_request_context('/users/1/nodes/1/items/1', method='GET') as test_req2:
+                self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+                response = node._get_sync('1', '1', '1')
+                respose_data = re.sub('[\s+]', '', response.data.decode("utf-8") )
+                self.assertEqual(response.headers.get('Content-Type'), 'application/json')
+                self.assertEqual(response.status, "200 OK")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(respose_data, '{"item":{"content":"content_text","item_id":"1","shadow":null},"status":"OK"}')
+                self.assertEqual(response.mimetype, 'application/json')
+
+    def test_get_sync_post_double_post(self):
+        jsonified_data = '{"content": "content_text"}'
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1',
+                method='POST',
+                content_type='application/json',
+                data=jsonified_data) as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertEqual(('', 201), node._get_sync('1', '1', '1'))
+            with node.app.test_request_context('/users/1/nodes/1/items/1',
+                    method='POST',
+                    content_type='application/json',
+                    data=jsonified_data) as test_req2:
+                self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+                self.assertRaises(werkzeug.exceptions.Conflict, node._get_sync, '1', '1', '1')
+
     def test_get_sync_put_empty(self):
         # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
         with node.app.test_request_context('/users/1/nodes/1/items/1', method='PUT') as test_req:
@@ -139,6 +178,43 @@ class NodeTestCase(unittest.TestCase):
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
             self.assertRaises(werkzeug.exceptions.UnprocessableEntity, node._get_sync, '1', '1', '1')
 
+    def test_get_sync_put_with_payload_then_get(self):
+        jsonified_data = '{"content": "content_text"}'
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1',
+                method='PUT',
+                content_type='application/json',
+                data=jsonified_data) as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertEqual(('', 201), node._get_sync('1', '1', '1'))
+            with node.app.test_request_context('/users/1/nodes/1/items/1', method='GET') as test_req2:
+                self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+                response = node._get_sync('1', '1', '1')
+                respose_data = re.sub('[\s+]', '', response.data.decode("utf-8") )
+                self.assertEqual(response.headers.get('Content-Type'), 'application/json')
+                self.assertEqual(response.status, "200 OK")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(respose_data, '{"item":{"content":"content_text","item_id":"1","shadow":null},"status":"OK"}')
+                self.assertEqual(response.mimetype, 'application/json')
+
+    def test_get_sync_put_double_put(self):
+        jsonified_data = '{"content": "content_text"}'
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1',
+                method='PUT',
+                content_type='application/json',
+                data=jsonified_data) as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertEqual(('', 201), node._get_sync('1', '1', '1'))
+            with node.app.test_request_context('/users/1/nodes/1/items/1',
+                    method='PUT',
+                    content_type='application/json',
+                    data=jsonified_data) as test_req2:
+                self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+                self.assertEqual(('', 204), node._get_sync('1', '1', '1'))
+
     def test_get_sync_get(self):
         # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
         with node.app.test_request_context('/users/1/nodes/1/items/1', method='GET') as test_req:
@@ -146,10 +222,18 @@ class NodeTestCase(unittest.TestCase):
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
             self.assertRaises(werkzeug.exceptions.NotFound, node._get_sync, '1', '1', '1')
 
+###    def test_send_shadow_get(self):
+###        # @app.route('/users/<string:user_id>/items/<string:item_id>/shadow', methods=['POST'])
+###        with node.app.test_request_context('/users/1/nodes/1/items/1/shadow', method='GET') as test_req:
+###            self._standard_init()
+###            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1/shadow')
+###            self.assertRaises(werkzeug.exceptions.NotFound, node._send_shadow, '1', '1', '1')
+
+
 
 def _main():
     unittest.main()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     _main()
