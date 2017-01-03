@@ -6,3 +6,5 @@
 abrim.cfg
 geckodriver.log
 .idea
+.coverage
+htmlcov
