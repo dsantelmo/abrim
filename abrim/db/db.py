@@ -14,7 +14,10 @@ SHADOW=False
 
 
 def get_db_path(string_to_format, client_port):
-    db_filename = secure_filename(string_to_format.format(client_port))
+    try:
+        db_filename = secure_filename(string_to_format.format(client_port))
+    except ValueError:
+        db_filename = secure_filename(string_to_format.format('1'))
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
 
 

@@ -729,9 +729,6 @@ def _init():
         logging_level = LOGGING_LEVELS.get(args_logginglevel, logging.NOTSET)
         log.setLevel(logging_level)
     log.debug("DEBUG logging enabled")
-
-    if 'NODE_ID' not in app.config:
-        app.config['NODE_ID'] = 5001
     app.config['DB_PATH'] = db.get_db_path(app.config['DB_FILENAME_FORMAT'], app.config['NODE_ID'])
     # before_request()
     if args_initdb:
