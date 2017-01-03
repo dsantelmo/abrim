@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python test/node_tests.py
+python test/node_tests.py -b

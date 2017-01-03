@@ -2,6 +2,7 @@ import sys
 import os
 import re
 import unittest
+import logging
 import argparse
 import mock
 import flask
@@ -15,6 +16,7 @@ class NodeTestCase(unittest.TestCase):
     port_to_test = None
 
     def setUp(self):
+        logging.disable(logging.CRITICAL)
         sys.argv = [__name__]
         self.port_to_test = 5001
 
@@ -30,6 +32,7 @@ class NodeTestCase(unittest.TestCase):
                 pass
         else: # pragma: no cover
             raise
+        logging.disable(logging.NOTSET)
 
     def _standard_init(self):
         sys.argv.append('-i')
