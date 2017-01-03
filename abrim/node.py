@@ -43,7 +43,7 @@ app.config['DB_FILENAME_FORMAT'] = 'abrimsync-{}.sqlite'
 app.config['DB_SCHEMA_PATH'] = 'db\\schema.sql'
 
 # Config from files and env vars:
-config_files.load_app_config(app)
+# config_files.load_app_config(app)  # breaks in travis
 app.config.from_envvar('ABRIMSYNC_SETTINGS', silent=True)
 
 
