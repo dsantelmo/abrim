@@ -4,7 +4,7 @@ import unittest
 import argparse
 import mock
 import flask
-from werkzeug.exceptions import InternalServerError, NotFound
+import werkzeug.exceptions
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim import node
 
@@ -27,13 +27,21 @@ class NodeTestCase(unittest.TestCase):
                 os.unlink(node.app.config['DB_PATH'])
             except OSError as error:
                 pass
+        else:
+            raise
 
+    def _standard_init(self):
+        sys.argv.append('-i')
+        sys.argv.append('-p')
+        sys.argv.append(str(self.port_to_test))
+        node._init()
+        node.app.preprocess_request()
     #
     # init methods
     #
     def test_init_and_parse_without_argv(self):
         self.assertEqual((None, None, None), node._parse_args_helper())
-        self.assertRaises(InternalServerError, node._init)
+        self.assertRaises(werkzeug.exceptions.InternalServerError, node._init)
 
     def test_init_and_parse_with_argv_without_i(self):
         sys.argv.append('-p')
@@ -72,11 +80,7 @@ class NodeTestCase(unittest.TestCase):
     def test_send_sync_get(self):
         # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items', methods=[ 'GET'])
         with node.app.test_request_context('/users/1/nodes/1/items', method='GET') as test_req:
-            node.app.preprocess_request()
-            sys.argv.append('-i')
-            sys.argv.append('-p')
-            sys.argv.append(str(self.port_to_test))
-            node._init()
+            self._standard_init()
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items')
             response = node._send_sync('1','1')
             self.assertEqual(response.headers.get('Content-Type'), 'application/json')
@@ -88,13 +92,60 @@ class NodeTestCase(unittest.TestCase):
     def test_send_sync_post(self):
         # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items', methods=[ 'GET'])
         with node.app.test_request_context('/users/1/nodes/1/items', method='POST') as test_req:
-            node.app.preprocess_request()
-            sys.argv.append('-i')
-            sys.argv.append('-p')
-            sys.argv.append(str(self.port_to_test))
-            node._init()
+            self._standard_init()
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items')
-            self.assertRaises(NotFound, node._send_sync, '1', '1')
+            self.assertRaises(werkzeug.exceptions.NotFound, node._send_sync, '1', '1')
+
+    def test_get_sync_patch_empty(self):
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1', method='PATCH') as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertRaises(werkzeug.exceptions.NotFound, node._get_sync, '1', '1', '1')
+
+    def test_get_sync_post_empty(self):
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1', method='POST') as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertRaises(werkzeug.exceptions.UnsupportedMediaType, node._get_sync, '1', '1', '1')
+
+    def test_get_sync_post_wrong_payload(self):
+        jsonified_data = '{"this_should_fail": "with_HTTP_422_UnprocessableEntity"}'
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1',
+                method='POST',
+                content_type='application/json',
+                data=jsonified_data) as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertRaises(werkzeug.exceptions.UnprocessableEntity, node._get_sync, '1', '1', '1')
+
+    def test_get_sync_put_empty(self):
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1', method='PUT') as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertRaises(werkzeug.exceptions.UnsupportedMediaType, node._get_sync, '1', '1', '1')
+
+    def test_get_sync_put_wrong_payload(self):
+        jsonified_data = '{"this_should_fail": "with_HTTP_422_UnprocessableEntity"}'
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1',
+                method='PUT',
+                content_type='application/json',
+                data=jsonified_data) as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertRaises(werkzeug.exceptions.UnprocessableEntity, node._get_sync, '1', '1', '1')
+
+    def test_get_sync_get(self):
+        # @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST', 'PUT'])
+        with node.app.test_request_context('/users/1/nodes/1/items/1', method='GET') as test_req:
+            self._standard_init()
+            self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
+            self.assertRaises(werkzeug.exceptions.NotFound, node._get_sync, '1', '1', '1')
+
 
 def _main():
     unittest.main()

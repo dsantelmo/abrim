@@ -135,12 +135,9 @@ def items_receive_post_by_id(user_id, node_id, item_id, request):
         if not req:
             log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
             abort(415)
-        elif not 'content' in req:
+        else:
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
-        else:
-            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
-            abort(500)
 
 
 def items_receive_put_by_id(user_id, node_id, item_id, request):
@@ -171,13 +168,9 @@ def items_receive_put_by_id(user_id, node_id, item_id, request):
         if not req:
             log.warning("HTTP 415 - Unsupported Media Type: No payload found in the request")
             abort(415)
-        elif not 'content' in req:
+        else:
             log.warning("HTTP 422 - Unprocessable Entity: No content found in the request")
             abort(422)
-        else:
-            log.error("HTTP 500 " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
-            abort(500)
-
 
 
 #
