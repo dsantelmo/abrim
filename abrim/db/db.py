@@ -17,7 +17,9 @@ def get_db_path(string_to_format, client_port):
     try:
         db_filename = secure_filename(string_to_format.format(client_port))
     except ValueError:
-        db_filename = secure_filename(string_to_format.format('1'))
+        string_to_format = 'abrimsync-{}.sqlite'
+        client_port = '1'
+        db_filename = secure_filename(string_to_format.format(client_port))
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), db_filename)
 
 
