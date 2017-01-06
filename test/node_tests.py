@@ -143,7 +143,7 @@ class NodeTestCase(unittest.TestCase):
                 self.assertEqual(response.headers.get('Content-Type'), 'application/json')
                 self.assertEqual(response.status, "200 OK")
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(respose_data, '{"item":{"content":"content_text","item_id":"1","shadow":null},"status":"OK"}')
+                self.assertEqual(respose_data, u'{"item":{"content":"content_text","item_id":"1","shadow":{"client_ver":0,"server_ver":0,"shadow":"content_text","shadow_id":1}},"status":"OK"}')
                 self.assertEqual(response.mimetype, 'application/json')
 
     def test_get_sync_post_double_post(self):

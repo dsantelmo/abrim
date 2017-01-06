@@ -9,8 +9,11 @@ from abrim.utils.common import secure_filename
 import logging
 log = logging.getLogger()
 
-CONTENT=True
-SHADOW=False
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
 
 
 def get_db_path(string_to_format, client_port):
@@ -31,7 +34,7 @@ def prepare_db_path(db_path):
 def __connect_db(db_path):
     """Connects to the specific database."""
     rv = sqlite3.connect(db_path)
-    rv.row_factory = sqlite3.Row
+    rv.row_factory = dict_factory
     return rv
 
 
@@ -57,33 +60,6 @@ def close_db():
     log.debug("closing DB")
     if hasattr(g, 'sqlite_db'):
         g.sqlite_db.close()
-
-
-def get_content_or_shadow(item_id, node_id, user_id, content=True):
-    content_or_shadow = 'shadow'
-    if content:
-        log.debug("get_content_or_shadow -> content:" + item_id + " - " + node_id)
-        content_or_shadow = 'content'
-    else:
-        log.debug("get_content_or_shadow -> shadow:" + item_id + " - " + node_id)
-    db = __get_db()
-    select_query = """
-SELECT {}
-FROM items
-WHERE item_id = ? and node_id = ?
-""".format(content_or_shadow)
-    where_items = (item_id, node_id, )
-    log.debug("get_content_or_shadow, SELECT: {0} -- {1}".format(select_query.replace('\n', ' '),where_items,))
-    cur = db.execute(select_query, where_items)
-    try:
-        result = cur.fetchone()[0]
-        return result
-    except TypeError:
-        log.debug("get_content_or_shadow returned None")
-        return None
-    except:
-        log.error("get_content_or_shadow FAILED!!")
-        raise
 
 
 def set_content_or_shadow(item_id, node_id, user_id, new_value, content=True):
@@ -170,7 +146,7 @@ def get_all_user_content(user_id, node_id):
     result = []
     db = __get_db()
     select_query = """
-SELECT item_id, content, shadow
+SELECT item_id, content
 FROM items
 WHERE user_id = ? and node_id = ?
 """
@@ -211,19 +187,71 @@ def get_user_node_items(user_id, node_id):
     return get_all_user_content(user_id, node_id)
 
 def get_content(user_id, node_id, item_id):
-    return get_content_or_shadow(item_id, node_id, user_id, CONTENT)
+    log.debug("get_content " + user_id + " - " + item_id + " - " + node_id)
+    db = __get_db()
+    select_query = """
+SELECT content
+FROM items
+WHERE user_id = ? and item_id = ? and node_id = ?
+"""
+    where_items = (user_id, item_id, node_id, )
+    log.debug("get_content, SELECT: {0} -- {1}".format(select_query.replace('\n', ' '),where_items,))
+    cur = db.execute(select_query, where_items)
+    try:
+        result = cur.fetchone()['content']
+        return result
+    except TypeError:
+        log.debug("get_content returned None")
+        return None
+    except:
+        log.error("get_content FAILED!!")
+        raise
 
 
 def get_shadow(user_id, node_id, item_id):
-    return get_content_or_shadow(item_id, node_id, user_id, SHADOW)
+    log.debug("get_shadow " + user_id + " - " + item_id + " - " + node_id)
+    db = __get_db()
+    select_query = """
+SELECT shadow_id, shadow, client_ver, server_ver
+FROM shadows
+WHERE user_id = ? and item_id = ? and node_id = ?
+"""
+    where_items = (user_id, item_id, node_id, )
+    log.debug("get_shadow, SELECT: {0} -- {1}".format(select_query.replace('\n', ' '),where_items,))
+    cur = db.execute(select_query, where_items)
+    try:
+        results = cur.fetchone()
+        return results
+    except TypeError:
+        log.debug("get_shadow returned None")
+        return None
+    except:
+        log.error("get_shadow FAILED!!")
+        raise
 
 
 def set_content(user_id, node_id, item_id, value):
-    return set_content_or_shadow(item_id, node_id, user_id, value, CONTENT)
+    return set_content_or_shadow(item_id, node_id, user_id, value, True)
 
 
-def set_shadow(user_id, node_id, item_id, value):
-    return set_content_or_shadow(item_id, node_id, user_id, value, SHADOW)
+def create_shadow(user_id, node_id, item_id, value):
+    try:
+        db = __get_db()
+        insert_query = """
+INSERT INTO shadows
+(shadow, client_ver, server_ver, item_id, user_id, node_id)
+VALUES (?, 0, 0, ?, ?, ?)
+"""
+        where_items = (value, item_id, user_id, node_id,)
+        log.debug("set_shadow, INSERT: {0} -- {1}".format(insert_query.replace('\n', ' '),where_items,))
+        cur = db.cursor()
+        cur.execute(insert_query, where_items)
+        shadow_id = cur.lastrowid
+        db.commit()
+        return shadow_id
+    except:
+        log.error("set_shadow FAILED!!")
+        raise
 
 
 def set_server_text(text):
