@@ -3,14 +3,10 @@
 from contextlib import closing
 import os
 import sys
-import hashlib
-import json
 import argparse
 import logging
 from flask import Flask, g, request, redirect, url_for, abort, render_template, flash, jsonify
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from abrim.utils import config_files
-from abrim.utils.common import generate_random_id
 from abrim.db import db
 from abrim.sync import client_sync
 
