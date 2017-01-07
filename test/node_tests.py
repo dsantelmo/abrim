@@ -19,7 +19,7 @@ class NodeTestCase(unittest.TestCase):
         self.port_to_test = 5001
 
         file_format = node.app.config['DB_FILENAME_FORMAT']
-        if not "_test" in file_format:
+        if "_test" not in file_format:
             node.app.config['DB_FILENAME_FORMAT'] += "_test"
 
     def tearDown(self):
