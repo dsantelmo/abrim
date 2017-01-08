@@ -102,9 +102,9 @@ def items_receive_get_by_id(user_id, node_id, item_id):
 
 
 # FIXME create a generic checker for json attributes and error responses
-def items_receive_post_by_id(user_id, node_id, item_id, request):
+def items_receive_post_by_id(user_id, node_id, item_id, req_input):
     """Receives a new item, saves it locally and then it tries to sync it (that can fail)"""
-    req = request.json
+    req = req_input.json
     if req and 'content' in req:
         #
         # move to external lib

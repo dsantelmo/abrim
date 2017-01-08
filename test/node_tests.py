@@ -86,11 +86,11 @@ class NodeTestCase(unittest.TestCase):
             self._standard_init()
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items')
             response = node._send_sync('1','1')
-            respose_data = re.sub('[\s+]', '', response.data.decode("utf-8") )
+            response_data = re.sub('[\s+]', '', response.data.decode("utf-8") )
             self.assertEqual(response.headers.get('Content-Type'), 'application/json')
             self.assertEqual(response.status, "200 OK")
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(respose_data, '{"items":[],"status":"OK"}')
+            self.assertEqual(response_data, '{"items":[],"status":"OK"}')
             self.assertEqual(response.mimetype, 'application/json')
 
     def test_send_sync_post(self):
@@ -142,11 +142,11 @@ class NodeTestCase(unittest.TestCase):
             with node.app.test_request_context('/users/1/nodes/1/items/1', method='GET'):
                 self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
                 response = node._get_sync('1', '1', '1')
-                respose_data = re.sub('[\s+]', '', response.data.decode("utf-8") )
+                response_data = re.sub('[\s+]', '', response.data.decode("utf-8") )
                 self.assertEqual(response.headers.get('Content-Type'), 'application/json')
                 self.assertEqual(response.status, "200 OK")
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(respose_data, u'{"item":{"content":"content_text","item_id":"1","shadow":{"client_ver":0,"server_ver":0,"shadow":"content_text","shadow_id":1}},"status":"OK"}')
+                self.assertEqual(response_data, u'{"item":{"content":"content_text","item_id":"1","shadow":{"client_ver":0,"server_ver":0,"shadow":"content_text","shadow_id":1}},"status":"OK"}')
                 self.assertEqual(response.mimetype, 'application/json')
 
     def test_get_sync_post_double_post(self):
@@ -155,7 +155,7 @@ class NodeTestCase(unittest.TestCase):
         # methods=['GET', 'POST', 'PUT'])
         with node.app.test_request_context('/users/1/nodes/1/items/1',
                                            method='POST',
-                                           content_type='application/j+son',
+                                           content_type='application/json',
                                            data=jsonified_data):
             self._standard_init()
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items/1')
