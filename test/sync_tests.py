@@ -22,6 +22,10 @@ class SyncTestCase(unittest.TestCase):
         self.assertEqual("(0, 'text ')(-1, 'shadow')(1, 'text')",
                          sync.step_2_create_edits([(0, 'text '), (-1, 'shadow'), (1, 'text')]))
 
+#    def test_get_or_create_shadow(self):
+#        self.assertEqual((1, "", 0, 0,),
+#                         sync._get_or_create_shadow('1', '1', '1', ""))
+
 
 def _main():
     unittest.main()
