@@ -24,9 +24,11 @@ def step_1_create_diff(item_text, item_shadow, diff_timeout):
 
 def step_2_create_edits(diff):
     diff_obj = diff_match_patch.diff_match_patch()
-    patches = diff_obj.patch_make(diff)
-    text_patches = diff_obj.patch_toText(diff)
+    diff2 = diff_obj.patch_make(diff)
+    text_patches = diff_obj.patch_toText(diff2)
+    print(text_patches)
     return text_patches
+
 
 def _get_or_create_shadow(user_id, node_id, item_id, client_text):
     results = db.get_shadow(user_id, node_id, item_id)
@@ -35,11 +37,16 @@ def _get_or_create_shadow(user_id, node_id, item_id, client_text):
         results = (shadow_id, client_text, 0, 0)
     return results
 
+
+def _enqueue_and_sync(user_id, node_id, item_id, text_patches, client_ver, server_ver):
+    db.save_edit(user_id, node_id, item_id, text_patches, client_ver, server_ver)
+
+
 def client_sync(user_id, node_id, item_id, client_text, diff_timeout):
     shadow_id, shadow, client_ver, server_ver = _get_or_create_shadow(user_id, node_id, item_id, client_text)
     diff = step_1_create_diff(client_text, shadow, diff_timeout)
     text_patches = step_2_create_edits(diff)
-
+    _enqueue_and_sync(user_id, node_id, item_id, text_patches, client_ver, server_ver)
 
 
 

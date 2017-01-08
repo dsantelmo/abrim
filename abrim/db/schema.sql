@@ -33,5 +33,8 @@ CREATE TABLE IF NOT EXISTS edits (
   edit_id       INTEGER PRIMARY KEY,
   edit          TEXT    NOT NULL,
   client_ver    INTEGER NOT NULL,
-  server_ver    INTEGER NOT NULL
+  server_ver    INTEGER NOT NULL,
+  item_id       TEXT    NOT NULL,
+  user_id       TEXT    NOT NULL,
+  node_id       TEXT    NOT NULL
 );

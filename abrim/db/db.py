@@ -256,5 +256,23 @@ VALUES (?, 0, 0, ?, ?, ?)
 
 def set_server_text(text):
     set_content(text)
-    #with closing(shelve.open(temp_server_file_name)) as d:
-    #    d['server_text'] = text
+
+
+def save_edit(user_id, node_id, item_id, text_patches, client_ver, server_ver):
+    try:
+        db = __get_db()
+        insert_query = """
+    INSERT INTO edits
+    (edit, client_ver, server_ver, item_id, user_id, node_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """
+        where_items = (text_patches, client_ver, server_ver, item_id, user_id, node_id,)
+        log.debug("save_edit, INSERT: {0} -- {1}".format(insert_query.replace('\n', ' '), where_items, ))
+        cur = db.cursor()
+        cur.execute(insert_query, where_items)
+        edit_id = cur.lastrowid
+        db.commit()
+        return edit_id
+    except:
+        log.error("save_edit FAILED!!")
+        raise
