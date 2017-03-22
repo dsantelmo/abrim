@@ -1,5 +1,32 @@
 import uuid
 
+class DatastoreProvider(object):
+    path = None
+  
+    def __init__(self, path=None, ram=None):
+        if path:
+            raise Exception
+        elif ram:
+            raise Exception
+        else:
+            raise Exception
+
+    @classmethod
+    def from_path(cls, path):
+        return cls(path, None)
+       
+    @classmethod
+    def from_ram(cls):
+        return cls(None, True)
+
+
+class ItemDatastore(object):
+    datastore_provider = None
+   
+    def __init__(self, datastore_provider):
+        pass
+
+
 class Item(object):
     id = None
     text = None
@@ -9,19 +36,16 @@ class Item(object):
         return uuid.uuid4()
   
     def __check_id_exists(self, id):
-        return True
+        raise Exception
   
     def __init__(self, id=None):
         if id:
             if isinstance(id, uuid.UUID):
-                print("init desde id")
                 self.id = id
             else:
                 raise Exception
         else:
-            print("init sin id")
             self.id = self.__create_uuid()
-        print(self.id.hex)
         if self.__check_id_exists(id):
             raise Exception
 

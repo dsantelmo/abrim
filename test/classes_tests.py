@@ -2,14 +2,12 @@ import sys
 import os
 import unittest
 import logging
+import uuid
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from abrim import Item
+from abrim import DatastoreProvider, ItemDatastore, Item
 
 
-class ClassesTestCase(unittest.TestCase):
-
-    port_to_test = None
-
+class DatastoreProviderTestCase(unittest.TestCase):
     def setUp(self):
         logging.disable(logging.CRITICAL)
 
@@ -19,12 +17,52 @@ class ClassesTestCase(unittest.TestCase):
     def _standard_init(self):
         pass
 
-    def test_class_item_constructor(self):
+    def test_class_DatastoreProvider_constructor(self):
+        datastore_provider = DatastoreProvider()
+        self.assertTrue(isinstance(datastore_provider, DatastoreProvider))
+
+    def test_class_DatastoreProvider_constructor_from_path(self):
+        datastore_provider = DatastoreProvider.from_path("path")
+        self.assertTrue(isinstance(datastore_provider, DatastoreProvider))
+
+    def test_class_DatastoreProvider_constructor_from_ram(self):
+        datastore_provider = DatastoreProvider.from_ram()
+        self.assertTrue(isinstance(datastore_provider, DatastoreProvider))
+
+
+class ItemDatastoreTestCase(unittest.TestCase):
+    def setUp(self):
+        logging.disable(logging.CRITICAL)
+
+    def tearDown(self):
+        logging.disable(logging.NOTSET)
+
+    def _standard_init(self):
+        pass
+
+    def test_class_ItemDatastore_constructor(self):
+        item_datastore = ItemDatastore()
+        self.assertTrue(isinstance(item_datastore, ItemDatastore))
+
+
+class ItemTestCase(unittest.TestCase):
+    def setUp(self):
+        logging.disable(logging.CRITICAL)
+
+    def tearDown(self):
+        logging.disable(logging.NOTSET)
+
+    def _standard_init(self):
+        pass
+
+    def test_class_Item_constructor(self):
         item = Item()
+        self.assertTrue(isinstance(item, Item))
         self.assertTrue(isinstance(item.id, uuid.UUID))
 
-    def test_class_item_constructor_from_existing_id(self):
+    def test_class_Item_constructor_from_existing_id(self):
         item = Item.from_existing_id(uuid.uuid4())
+        self.assertTrue(isinstance(item, Item))
         self.assertTrue(isinstance(item.id, uuid.UUID))
 
 
