@@ -116,6 +116,7 @@ class SqliteDatasore(object):
             self.path = path
         self.connect()
         self.init()
+        self.close()
 
     def connect(self):
         # support for UUID type in SQLite
@@ -131,13 +132,14 @@ class SqliteDatasore(object):
           title         TEXT    ,--NOT NULL,
           text          TEXT    --NOT NULL
         );""")
-        self.conn.commit()
+        self.close()
 
     def clear(self):
         c = self.conn.cursor()
         c.execute("""DROP TABLE IF EXISTS items;""")
         self.conn.commit()
         self.init()
+        self.close()
 
     def close(self):
         self.conn.commit()
@@ -148,14 +150,14 @@ class SqliteDatasore(object):
             c.execute("INSERT INTO items (uuid, title, text) VALUES (?, ?, ?);", (item_uuid.hex, title, text,))
         except sqlite3.IntegrityError:
             raise Exception
-        self.conn.commit()
+        self.close()
 
 
 class Item(object):
     datastore = None
     id = None
-    text = None
-    shadow = None
+    _text = None
+    __shadow = None
 
     def __create_uuid(self):
         return uuid.uuid4()
@@ -180,16 +182,27 @@ class Item(object):
             raise Exception
         else:
             datastore.insert(self.id)
-
+        datastore.close()
 
     @classmethod
     def from_existing_id(cls, id):
         return cls(id)
+
+    @classmethod
+    def set_text(cls, text):
+        cls._text = text
+
+    @classmethod
+    def get_text(cls):
+        return cls._text
 
 if __name__ == "__main__":
     print("RUNNING AS MAIN!")  # FIXME
     datastore = SqliteDatasore()
     datastore.clear()
     item = Item(datastore)
-    datastore.close()
     print(item.id)
+    item.set_text("test 1")
+    print(item.get_text())
+    item.set_text("test 2")
+    print(item.get_text())
