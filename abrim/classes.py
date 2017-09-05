@@ -144,7 +144,7 @@ class SqliteDatasore(object):
     def close(self):
         self.conn.commit()
 
-    def insert(self, item_uuid, title=None, text=None):
+    def insert_item(self, item_uuid, title=None, text=None):
         try:
             c = self.conn.cursor()
             c.execute("INSERT INTO items (uuid, title, text) VALUES (?, ?, ?);", (item_uuid.hex, title, text,))
@@ -153,11 +153,28 @@ class SqliteDatasore(object):
         self.close()
 
 
+class ClientText(object):
+    id = None
+    item_id = None
+    _text = None
+
+    def __create_uuid(self):
+        return uuid.uuid4()
+
+    def __init__(self, datastore, text):
+        if not datastore:
+            raise Exception
+
+        self.id = self.__create_uuid()
+        self._text = text
+
+
 class Item(object):
     datastore = None
     id = None
-    _text = None
+    _texts = []
     __shadow = None
+    __datastore = None
 
     def __create_uuid(self):
         return uuid.uuid4()
@@ -169,7 +186,8 @@ class Item(object):
     def __init__(self, datastore, id=None):
         if not datastore:
             raise Exception
-
+        else:
+            self.__datastore = datastore
         if id:
             if isinstance(id, uuid.UUID):
                 self.id = id
@@ -181,8 +199,13 @@ class Item(object):
         if self.__check_id_exists(id):
             raise Exception
         else:
-            datastore.insert(self.id)
-        datastore.close()
+            self.__datastore.insert_item(self.id)
+        self.__datastore.close()
+        self.__init_datastore(self.__datastore)
+
+    @classmethod
+    def __init_datastore(cls, datastore):
+        cls.__datastore = datastore
 
     @classmethod
     def from_existing_id(cls, id):
@@ -190,11 +213,12 @@ class Item(object):
 
     @classmethod
     def set_text(cls, text):
-        cls._text = text
+        new_text = ClientText(cls.__datastore, text)
+        cls._texts.append(new_text)
 
     @classmethod
     def get_text(cls):
-        return cls._text
+        return cls._texts[-1]._text
 
 if __name__ == "__main__":
     print("RUNNING AS MAIN!")  # FIXME
