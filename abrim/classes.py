@@ -1,5 +1,6 @@
 import uuid
-import sqlite3
+#import sqlite3
+from google.cloud import firestore
 
 
 
@@ -100,74 +101,71 @@ class Component(object):
 def _uuid_coverter(uuid_bytes):
     return uuid.UUID(bytes_le=uuid_bytes)
 
+
 # support for UUID type in SQLite
 def _uuid_adapter(uuid_obj):
     return buffer(uuid_obj.bytes_le)
 
+
 # FIXME: fix this crap
-class SqliteDatasore(object):
-    path = None
-    conn = None
+class FirestoreDatasore(object):
+    db = None
   
-    def __init__(self, path="delete_me.sqlite"):
-        if not path:
-            raise Exception
-        else:
-            self.path = path
+    def __init__(self):
         self.connect()
         self.init()
         self.close()
 
     def connect(self):
-        # support for UUID type in SQLite
-        #sqlite3.register_converter('UUID', _uuid_coverter)
-        #sqlite3.register_adapter(uuid.UUID, _uuid_adapter)
-        #self.conn = sqlite3.connect(self.path, detect_types=sqlite3.PARSE_DECLTYPES)
-        self.conn = sqlite3.connect(self.path)
+        self.db = firestore.Client()
 
     def init(self):
-        c = self.conn.cursor()
-        c.execute("""CREATE TABLE IF NOT EXISTS items (
-          uuid          TEXT    PRIMARY KEY,
-          title         TEXT    ,--NOT NULL,
-          text          TEXT    --NOT NULL
-        );""")
-        self.close()
+        pass
 
     def clear(self):
-        c = self.conn.cursor()
-        c.execute("""DROP TABLE IF EXISTS items;""")
-        self.conn.commit()
-        self.init()
-        self.close()
+        self.__delete_collection(self.db.collection('items'), 10)
+        pass
 
     def close(self):
-        self.conn.commit()
+        pass
 
     def insert_item(self, item_uuid, title=None, text=None):
         try:
-            c = self.conn.cursor()
-            c.execute("INSERT INTO items (uuid, title, text) VALUES (?, ?, ?);", (item_uuid.hex, title, text,))
-        except sqlite3.IntegrityError:
+            item_ref = self.db.collection('items').document(item_uuid.hex)
+            item_ref.set({
+                'title': title,
+                'text':  text,
+            })
+        except:
             raise Exception
         self.close()
 
-
-class ClientText(object):
-    id = None
-    item_id = None
-    _text = None
-
-    def __create_uuid(self):
-        return uuid.uuid4()
-
-    def __init__(self, datastore, text):
-        if not datastore:
+    def save_text(self, item_uuid, text):
+        if not item_uuid or not text:
             raise Exception
+        else:
+            item_ref = self.db.collection('items').document(item_uuid.hex)
+            item_ref.update({'text':  text, })
 
-        self.id = self.__create_uuid()
-        self._text = text
+    def read_text(self, item_uuid):
+        if not item_uuid:
+            raise Exception
+        else:
+            item_ref = self.db.collection('items').document(item_uuid.hex)
+            items_get = item_ref.get().get('text')
+            return items_get
 
+    def __delete_collection(self, coll_ref, batch_size):
+        docs = coll_ref.limit(10).get()
+        deleted = 0
+
+        for doc in docs:
+            print(u'Deleting doc {} => {}'.format(doc.id, doc.to_dict()))
+            doc.reference.delete()
+            deleted = deleted + 1
+
+        if deleted >= batch_size:
+            return self.__delete_collection(coll_ref, batch_size)
 
 class Item(object):
     datastore = None
@@ -183,11 +181,11 @@ class Item(object):
         return False
         # FIXME raise Exception
   
-    def __init__(self, datastore, id=None):
-        if not datastore:
+    def __init__(self, init_datastore, id=None):
+        if not init_datastore:
             raise Exception
         else:
-            self.__datastore = datastore
+            self.__datastore = init_datastore
         if id:
             if isinstance(id, uuid.UUID):
                 self.id = id
@@ -211,20 +209,21 @@ class Item(object):
     def from_existing_id(cls, id):
         return cls(id)
 
-    @classmethod
-    def set_text(cls, text):
-        new_text = ClientText(cls.__datastore, text)
-        cls._texts.append(new_text)
+    #@classmethod
+    #def set_text(cls, text):
+    def set_text(self, text):
+        self.__datastore.save_text(self.id, text)
 
-    @classmethod
-    def get_text(cls):
-        return cls._texts[-1]._text
+    #@classmethod
+    #def get_text(cls):
+    def get_text(self):
+        return self.__datastore.read_text(self.id)
 
 if __name__ == "__main__":
     print("RUNNING AS MAIN!")  # FIXME
-    datastore = SqliteDatasore()
-    datastore.clear()
-    item = Item(datastore)
+    my_datastore = FirestoreDatasore()
+    my_datastore.clear()
+    item = Item(my_datastore)
     print(item.id)
     item.set_text("test 1")
     print(item.get_text())
