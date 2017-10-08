@@ -1,6 +1,9 @@
 import uuid
 #import sqlite3
+import diff_match_patch
 from google.cloud import firestore
+import grpc
+import google
 
 
 
@@ -108,7 +111,7 @@ def _uuid_adapter(uuid_obj):
 
 
 # FIXME: fix this crap
-class FirestoreDatasore(object):
+class FirestoreDatastore(object):
     db = None
   
     def __init__(self):
@@ -133,8 +136,21 @@ class FirestoreDatasore(object):
         try:
             item_ref = self.db.collection('items').document(item_uuid.hex)
             item_ref.set({
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'last_update_date': firestore.SERVER_TIMESTAMP,
                 'title': title,
                 'text':  text,
+                'shadows': {
+                    'create_date': firestore.SERVER_TIMESTAMP,
+                    'text': None,
+                    'client_rev': None,
+                    'server_rev': None,
+                },
+                'edits': {
+                    'create_date': firestore.SERVER_TIMESTAMP,
+                    'client_rev': None,
+                    'server_rev': None,
+                },
             })
         except:
             raise Exception
@@ -145,7 +161,16 @@ class FirestoreDatasore(object):
             raise Exception
         else:
             item_ref = self.db.collection('items').document(item_uuid.hex)
-            item_ref.update({'text':  text, })
+            item_ref.update({
+                'last_update_date': firestore.SERVER_TIMESTAMP,
+                'text':  text,
+                'shadow': {
+                    'text': None,
+                    'client_rev': None,
+                    'server_rev': None,
+                },
+            }, firestore.CreateIfMissingOption(True))
+
 
     def read_text(self, item_uuid):
         if not item_uuid:
@@ -168,18 +193,13 @@ class FirestoreDatasore(object):
             return self.__delete_collection(coll_ref, batch_size)
 
 class Item(object):
-    datastore = None
     id = None
-    _texts = []
+    __text = None
     __shadow = None
     __datastore = None
 
     def __create_uuid(self):
         return uuid.uuid4()
-  
-    def __check_id_exists(self, id):
-        return False
-        # FIXME raise Exception
   
     def __init__(self, init_datastore, id=None):
         if not init_datastore:
@@ -194,10 +214,7 @@ class Item(object):
         else:
             self.id = self.__create_uuid()
 
-        if self.__check_id_exists(id):
-            raise Exception
-        else:
-            self.__datastore.insert_item(self.id)
+        self.__datastore.insert_item(self.id)
         self.__datastore.close()
         self.__init_datastore(self.__datastore)
 
@@ -211,7 +228,8 @@ class Item(object):
 
     #@classmethod
     #def set_text(cls, text):
-    def set_text(self, text):
+    def set_text(self, new_text):
+        self.__text = text
         self.__datastore.save_text(self.id, text)
 
     #@classmethod
@@ -219,13 +237,132 @@ class Item(object):
     def get_text(self):
         return self.__datastore.read_text(self.id)
 
+
 if __name__ == "__main__":
     print("RUNNING AS MAIN!")  # FIXME
-    my_datastore = FirestoreDatasore()
-    my_datastore.clear()
-    item = Item(my_datastore)
-    print(item.id)
-    item.set_text("test 1")
-    print(item.get_text())
-    item.set_text("test 2")
-    print(item.get_text())
+    # my_datastore = FirestoreDatastore()
+    # my_datastore.clear()
+    # item = Item(my_datastore)
+    # print(item.id)
+    # item.set_text("test 1")
+    # print(item.get_text())
+    # item.set_text("test 2")
+    # print(item.get_text())
+
+    # create node id if it doesn't exist
+    node_id = uuid.uuid4()
+
+    # create new item
+    item_text = "original text"
+    item_shadow = None
+    client_rev = 0
+
+    if not item_text:
+        raise Exception
+
+    # create ID
+    item_id = uuid.uuid4()
+
+    # create edits
+    diff = None
+    if item_shadow is None:
+        text_patches = None
+    else:
+        diff_obj = diff_match_patch.diff_match_patch()
+        diff_obj.Diff_Timeout = 1
+        diff = diff_obj.diff_main(item_shadow, item_text)
+        diff_obj.diff_cleanupSemantic(diff)  # FIXME: optional?
+        patch = diff_obj.patch_make(diff)
+        if patch:
+            text_patches = diff_obj.patch_toText(patch)
+        else:
+            text_patches = None
+
+    print(text_patches)
+
+    # prepare the update of shadow and client text revision
+    new_client_rev = client_rev + 1
+    new_item_shadow = item_text
+
+    # enqueue edits and save new item to datastore
+    db = firestore.Client()
+    item_ref = db.collection('nodes').document(node_id.hex).collection('items').document(item_id.hex)
+    try:
+        item_ref.set({
+            #'create_date': firestore.SERVER_TIMESTAMP,
+            'last_update_date': firestore.SERVER_TIMESTAMP,
+            'text': item_text,
+            'shadow_text': new_item_shadow,
+            'client_rev': new_client_rev,
+            'edits_queue': {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'client_rev': client_rev,
+                'patches': text_patches,
+            },
+        })
+    except (grpc._channel._Rendezvous,
+            google.auth.exceptions.TransportError,
+            google.gax.errors.GaxError,
+            ):
+        print("Connection error to Firestore")
+        raise Exception
+    print("edit enqueued")
+
+    # the edit is queued and the user closes the screen
+    # the server is currently offline so the edits stay enqueued
+    # the user reopens the screen so the data has to be loaded:
+
+    old_text = None
+    shadow_text = None
+    client_rev = None
+    if not item_id:
+        raise Exception
+    else:
+        item_ref = db.collection('nodes').document(node_id.hex).collection('items').document(item_id.hex)
+        try:
+            old_item = item_ref.get()
+            print('Document data: {}'.format(old_item.to_dict()))
+
+            # the user changes some text so a new edit has to be created and enqueued
+            if not old_item.exists:
+                raise Exception
+            else:
+                try:
+                    old_text = old_item.get("text")
+                    shadow_text = old_item.get("shadow_text")
+                    client_rev = old_item.get("client_rev")
+                except KeyError:
+                    raise Exception
+        except google.cloud.exceptions.NotFound:
+            print('No such document!')
+            raise Exception
+
+    print("recovered data ok")
+
+    # the user changes the text so a new set of edits has to be created and enqueued
+    new_text = "new text"
+
+    if not new_text:
+        raise Exception
+
+    # create edits
+    diff = None
+    if shadow_text is None:
+        text_patches = None
+    else:
+        diff_obj = diff_match_patch.diff_match_patch()
+        diff_obj.Diff_Timeout = 1
+        diff = diff_obj.diff_main(shadow_text, new_text)
+        diff_obj.diff_cleanupSemantic(diff)  # FIXME: optional?
+        patch = diff_obj.patch_make(diff)
+        if patch:
+            text_patches = diff_obj.patch_toText(patch)
+        else:
+            text_patches = None
+
+    print(text_patches)
+
+    # prepare the update of shadow and client text revision
+    new_client_rev = client_rev + 1
+    new_item_shadow = new_text
+    
