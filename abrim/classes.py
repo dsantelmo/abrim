@@ -1,3 +1,4 @@
+import sys
 import uuid
 #import sqlite3
 import diff_match_patch
@@ -238,6 +239,24 @@ class Item(object):
         return self.__datastore.read_text(self.id)
 
 
+def create_diff_edits(item_text2, item_shadow2):
+    diff = None
+    text_patches2 = None
+    if item_shadow2 is None:
+        text_patches2 = None
+    else:
+        diff_obj = diff_match_patch.diff_match_patch()
+        diff_obj.Diff_Timeout = 1
+        diff = diff_obj.diff_main(item_shadow2, item_text2)
+        diff_obj.diff_cleanupSemantic(diff)  # FIXME: optional?
+        patch = diff_obj.patch_make(diff)
+        if patch:
+            text_patches2 = diff_obj.patch_toText(patch)
+        else:
+            text_patches2 = None
+    return text_patches2
+
+
 if __name__ == "__main__":
     print("RUNNING AS MAIN!")  # FIXME
     # my_datastore = FirestoreDatastore()
@@ -249,120 +268,105 @@ if __name__ == "__main__":
     # item.set_text("test 2")
     # print(item.get_text())
 
+
+
     # create node id if it doesn't exist
-    node_id = uuid.uuid4()
+    # node_id = uuid.uuid4().hex
+    node_id = "node_1"
 
     # create new item
+    # item_id = uuid.uuid4().hex
+    item_id = "item_1"
     item_text = "original text"
-    item_shadow = None
-    client_rev = 0
+    print("node_id = " + node_id)
 
-    if not item_text:
-        raise Exception
-
-    # create ID
-    item_id = uuid.uuid4()
-
-    # create edits
-    diff = None
-    if item_shadow is None:
-        text_patches = None
-    else:
-        diff_obj = diff_match_patch.diff_match_patch()
-        diff_obj.Diff_Timeout = 1
-        diff = diff_obj.diff_main(item_shadow, item_text)
-        diff_obj.diff_cleanupSemantic(diff)  # FIXME: optional?
-        patch = diff_obj.patch_make(diff)
-        if patch:
-            text_patches = diff_obj.patch_toText(patch)
-        else:
-            text_patches = None
-
-    print(text_patches)
-
-    # prepare the update of shadow and client text revision
-    new_client_rev = client_rev + 1
-    new_item_shadow = item_text
-
-    # enqueue edits and save new item to datastore
     db = firestore.Client()
-    item_ref = db.collection('nodes').document(node_id.hex).collection('items').document(item_id.hex)
-    try:
-        item_ref.set({
-            #'create_date': firestore.SERVER_TIMESTAMP,
-            'last_update_date': firestore.SERVER_TIMESTAMP,
-            'text': item_text,
-            'shadow_text': new_item_shadow,
-            'client_rev': new_client_rev,
-            'edits_queue': {
+    node_ref = db.collection('nodes').document(node_id)
+    item_ref = node_ref.collection('items').document(item_id)
+
+    transaction = db.transaction()
+    @firestore.transactional
+    def create_in_transaction(transaction1, item_id, item_text):
+        try:
+            client_rev = 0
+            node_ref = db.collection('nodes').document(node_id)
+            item_ref = node_ref.collection('items').document(item_id)
+            transaction1.set(item_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
+                #'last_update_date': firestore.SERVER_TIMESTAMP,
+                'text': item_text,
                 'client_rev': client_rev,
-                'patches': text_patches,
-            },
-        })
-    except (grpc._channel._Rendezvous,
-            google.auth.exceptions.TransportError,
-            google.gax.errors.GaxError,
-            ):
-        print("Connection error to Firestore")
+            })
+            queue_ref = item_ref.collection('queue').document(str(client_rev))
+            transaction1.set(queue_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'action': 'create_item',
+                'status': 'recorded_in_queue'
+            })
+        except (grpc._channel._Rendezvous,
+                google.auth.exceptions.TransportError,
+                google.gax.errors.GaxError,
+                ):
+            print("Connection error to Firestore")
+            return False
+        print("edit enqueued")
+        return True
+
+    result = create_in_transaction(transaction, item_id, item_text)
+    if result:
+        print('transaction ended OK')
+    else:
+        print('ERROR saving new item')
         raise Exception
-    print("edit enqueued")
 
     # the edit is queued and the user closes the screen
     # the server is currently offline so the edits stay enqueued
     # the user reopens the screen so the data has to be loaded:
 
-    old_text = None
-    shadow_text = None
-    client_rev = None
-    if not item_id:
+    print("recovering item...")
+
+    node_id = "node_1"
+    item_id = "item_1"
+
+    db = firestore.Client()
+    node_ref = db.collection('nodes').document(node_id)
+    item_ref = node_ref.collection('items').document(item_id)
+
+    old_item = None
+    try:
+        old_item = item_ref.get()
+        print('Document data: {}'.format(old_item.to_dict()))
+    except google.cloud.exceptions.NotFound:
+        print('No such document!')
         raise Exception
-    else:
-        item_ref = db.collection('nodes').document(node_id.hex).collection('items').document(item_id.hex)
-        try:
-            old_item = item_ref.get()
-            print('Document data: {}'.format(old_item.to_dict()))
-
-            # the user changes some text so a new edit has to be created and enqueued
-            if not old_item.exists:
-                raise Exception
-            else:
-                try:
-                    old_text = old_item.get("text")
-                    shadow_text = old_item.get("shadow_text")
-                    client_rev = old_item.get("client_rev")
-                except KeyError:
-                    raise Exception
-        except google.cloud.exceptions.NotFound:
-            print('No such document!')
-            raise Exception
-
+    if not old_item:
+        raise Exception
     print("recovered data ok")
+
+    old_text = None
+    client_rev = None
+    try:
+        old_text = old_item.get('text')
+        client_rev = old_item.get('client_rev')
+    except KeyError:
+        print("ERROR recovering the item text")
+        sys.exit(0)
+
+    old_shadow = old_text
+    try:
+        old_shadow = old_item.get('shadow')
+    except KeyError:
+        pass
 
     # the user changes the text so a new set of edits has to be created and enqueued
     new_text = "new text"
 
-    if not new_text:
-        raise Exception
-
     # create edits
-    diff = None
-    if shadow_text is None:
-        text_patches = None
-    else:
-        diff_obj = diff_match_patch.diff_match_patch()
-        diff_obj.Diff_Timeout = 1
-        diff = diff_obj.diff_main(shadow_text, new_text)
-        diff_obj.diff_cleanupSemantic(diff)  # FIXME: optional?
-        patch = diff_obj.patch_make(diff)
-        if patch:
-            text_patches = diff_obj.patch_toText(patch)
-        else:
-            text_patches = None
-
+    text_patches = create_diff_edits(new_text, old_text)
     print(text_patches)
 
     # prepare the update of shadow and client text revision
     new_client_rev = client_rev + 1
     new_item_shadow = new_text
-    
+
+    sys.exit(0)
