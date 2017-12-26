@@ -300,6 +300,7 @@ if __name__ == "__main__":
             queue_ref = item_ref.collection('queue').document(str(client_rev))
             transaction1.set(queue_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
+                'client_rev': client_rev,
                 'action': 'create_item',
                 'status': 'recorded_in_queue'
             })
@@ -362,11 +363,58 @@ if __name__ == "__main__":
     new_text = "new text"
 
     # create edits
-    text_patches = create_diff_edits(new_text, old_text)
-    print(text_patches)
+    text_patches = create_diff_edits(new_text, old_shadow)
+    #print(text_patches)
 
     # prepare the update of shadow and client text revision
-    new_client_rev = client_rev + 1
-    new_item_shadow = new_text
+
+
+
+    db = firestore.Client()
+
+    transaction = db.transaction()
+    @firestore.transactional
+    def update_in_transaction(transaction1, node_id1, item_id1, client_rev1, new_text1, text_patches1):
+        try:
+            new_client_rev = client_rev1 + 1
+            new_item_shadow = new_text1
+            node_ref = db.collection('nodes').document(node_id1)
+            item_ref1 = node_ref.collection('items').document(item_id1)
+            transaction1.update(item_ref1, {
+                'last_update_date': firestore.SERVER_TIMESTAMP,
+                'text': new_text1,
+                'shadow': new_item_shadow,
+                'client_rev': new_client_rev,
+            })
+            queue_ref = item_ref.collection('queue').document(str(new_client_rev))
+            transaction1.set(queue_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'client_rev': new_client_rev,
+                'action': 'edit_item',
+                'status': 'recorded_in_queue',
+                'text_patches': text_patches1
+            })
+        except (grpc._channel._Rendezvous,
+                google.auth.exceptions.TransportError,
+                google.gax.errors.GaxError,
+                ):
+            print("Connection error to Firestore")
+            return False
+        print("edit enqueued")
+        return True
+
+    result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
+    if result:
+        print('transaction 2 ended OK')
+    else:
+        print('ERROR updating item')
+        raise Exception
+
+
+
+
+
+
+
 
     sys.exit(0)
