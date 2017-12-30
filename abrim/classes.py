@@ -285,6 +285,7 @@ if __name__ == "__main__":
     item_ref = node_ref.collection('items').document(item_id)
 
     transaction = db.transaction()
+
     @firestore.transactional
     def create_in_transaction(transaction1, item_id, item_text):
         try:
@@ -297,12 +298,11 @@ if __name__ == "__main__":
                 'text': item_text,
                 'client_rev': client_rev,
             })
-            queue_ref = item_ref.collection('queue').document(str(client_rev))
+            queue_ref = item_ref.collection('queue_1_to_process').document(str(client_rev))
             transaction1.set(queue_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
                 'client_rev': client_rev,
-                'action': 'create_item',
-                'status': 'recorded_in_queue'
+                'action': 'create_item'
             })
         except (grpc._channel._Rendezvous,
                 google.auth.exceptions.TransportError,
@@ -368,11 +368,10 @@ if __name__ == "__main__":
 
     # prepare the update of shadow and client text revision
 
-
-
     db = firestore.Client()
 
     transaction = db.transaction()
+
     @firestore.transactional
     def update_in_transaction(transaction1, node_id1, item_id1, client_rev1, new_text1, text_patches1):
         try:
@@ -386,12 +385,11 @@ if __name__ == "__main__":
                 'shadow': new_item_shadow,
                 'client_rev': new_client_rev,
             })
-            queue_ref = item_ref.collection('queue').document(str(new_client_rev))
+            queue_ref = item_ref.collection('queue_1_to_process').document(str(new_client_rev))
             transaction1.set(queue_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
                 'client_rev': new_client_rev,
                 'action': 'edit_item',
-                'status': 'recorded_in_queue',
                 'text_patches': text_patches1
             })
         except (grpc._channel._Rendezvous,
@@ -410,11 +408,110 @@ if __name__ == "__main__":
         print('ERROR updating item')
         raise Exception
 
+    # once again the edit is queued and the user closes the screen
+    # the server is currently offline so the edits stay enqueued
+    # the user reopens the screen so the data has to be loaded
 
+    print("recovering item again...")
 
+    node_id = "node_1"
+    item_id = "item_1"
 
+    db = firestore.Client()
+    node_ref = db.collection('nodes').document(node_id)
+    item_ref = node_ref.collection('items').document(item_id)
 
+    old_item = None
+    try:
+        old_item = item_ref.get()
+        print('Document data: {}'.format(old_item.to_dict()))
+    except google.cloud.exceptions.NotFound:
+        print('No such document!')
+        raise Exception
+    if not old_item:
+        raise Exception
+    print("recovered data ok")
 
+    old_text = None
+    client_rev = None
+    try:
+        old_text = old_item.get('text')
+        client_rev = old_item.get('client_rev')
+    except KeyError:
+        print("ERROR recovering the item text")
+        sys.exit(0)
 
+    old_shadow = old_text
+    try:
+        old_shadow = old_item.get('shadow')
+    except KeyError:
+        pass
+
+    # the user changes the text so a new set of edits has to be created and enqueued
+    new_text = "really new text"
+
+    # create edits
+    text_patches = create_diff_edits(new_text, old_shadow)
+    # print(text_patches)
+
+    # prepare the update of shadow and client text revision
+
+    db = firestore.Client()
+
+    transaction = db.transaction()
+
+    @firestore.transactional
+    def update_in_transaction(transaction1, node_id1, item_id1, client_rev1, new_text1, text_patches1):
+        try:
+            new_client_rev = client_rev1 + 1
+            new_item_shadow = new_text1
+            node_ref = db.collection('nodes').document(node_id1)
+            item_ref1 = node_ref.collection('items').document(item_id1)
+            transaction1.update(item_ref1, {
+                'last_update_date': firestore.SERVER_TIMESTAMP,
+                'text': new_text1,
+                'shadow': new_item_shadow,
+                'client_rev': new_client_rev,
+            })
+            queue_ref = item_ref.collection('queue_1_to_process').document(str(new_client_rev))
+            transaction1.set(queue_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'client_rev': new_client_rev,
+                'action': 'edit_item',
+                'text_patches': text_patches1
+            })
+        except (grpc._channel._Rendezvous,
+                google.auth.exceptions.TransportError,
+                google.gax.errors.GaxError,
+                ):
+            print("Connection error to Firestore")
+            return False
+        print("edit enqueued")
+        return True
+
+    result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
+    if result:
+        print('transaction 3 ended OK')
+    else:
+        print('ERROR updating item')
+        raise Exception
+
+    #
+    # end UI client part, start the queue part
+    #
+
+    # read the queues
+
+    node_id = "node_1"
+    item_id = "item_1"
+
+    db = firestore.Client()
+    node_ref = db.collection('nodes').document(node_id)
+    item_ref = node_ref.collection('items').document(item_id)
+    # queue = item_ref.collection('queue').where('status', '==', 'recorded_in_queue').order_by('client_rev').get()
+    queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
+
+    for queue_instance in queue:
+        print(u'{} => {}'.format(queue_instance.id, queue_instance.to_dict()))
 
     sys.exit(0)
