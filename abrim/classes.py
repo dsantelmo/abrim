@@ -257,19 +257,7 @@ def create_diff_edits(item_text2, item_shadow2):
     return text_patches2
 
 
-if __name__ == "__main__":
-    print("RUNNING AS MAIN!")  # FIXME
-    # my_datastore = FirestoreDatastore()
-    # my_datastore.clear()
-    # item = Item(my_datastore)
-    # print(item.id)
-    # item.set_text("test 1")
-    # print(item.get_text())
-    # item.set_text("test 2")
-    # print(item.get_text())
-
-
-
+def user_0_create():
     # create node id if it doesn't exist
     # node_id = uuid.uuid4().hex
     node_id = "node_1"
@@ -294,7 +282,7 @@ if __name__ == "__main__":
             item_ref = node_ref.collection('items').document(item_id)
             transaction1.set(item_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
-                #'last_update_date': firestore.SERVER_TIMESTAMP,
+                # 'last_update_date': firestore.SERVER_TIMESTAMP,
                 'text': item_text,
                 'client_rev': client_rev,
             })
@@ -320,6 +308,8 @@ if __name__ == "__main__":
         print('ERROR saving new item')
         raise Exception
 
+
+def user_1_update():
     # the edit is queued and the user closes the screen
     # the server is currently offline so the edits stay enqueued
     # the user reopens the screen so the data has to be loaded:
@@ -364,7 +354,7 @@ if __name__ == "__main__":
 
     # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
-    #print(text_patches)
+    # print(text_patches)
 
     # prepare the update of shadow and client text revision
 
@@ -408,6 +398,8 @@ if __name__ == "__main__":
         print('ERROR updating item')
         raise Exception
 
+
+def user_2_update():
     # once again the edit is queued and the user closes the screen
     # the server is currently offline so the edits stay enqueued
     # the user reopens the screen so the data has to be loaded
@@ -496,6 +488,22 @@ if __name__ == "__main__":
         print('ERROR updating item')
         raise Exception
 
+
+if __name__ == "__main__":
+    print("RUNNING AS MAIN!")  # FIXME
+    # my_datastore = FirestoreDatastore()
+    # my_datastore.clear()
+    # item = Item(my_datastore)
+    # print(item.id)
+    # item.set_text("test 1")
+    # print(item.get_text())
+    # item.set_text("test 2")
+    # print(item.get_text())
+
+    # user_0_create()
+    # user_1_update()
+    # user_2_update()
+
     #
     # end UI client part, start the queue part
     #
@@ -512,6 +520,44 @@ if __name__ == "__main__":
     queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
 
     for queue_instance in queue:
-        print(u'{} => {}'.format(queue_instance.id, queue_instance.to_dict()))
+        print("processing item {} queue {}".format(item_id, queue_instance.id,))
+        # print("contents {}".format(queue_instance.to_dict()))
+
+        break
+    else:
+        raise Exception
+
+    # transaction = db.transaction()
+    #
+    # @firestore.transactional
+    # def send_queue1(transaction1, node_id1, item_id1, client_rev1, new_text1, text_patches1):
+    #     try:
+    #         new_client_rev = client_rev1 + 1
+    #         new_item_shadow = new_text1
+    #         node_ref = db.collection('nodes').document(node_id1)
+    #         item_ref1 = node_ref.collection('items').document(item_id1)
+    #         transaction1.update(item_ref1, {
+    #             'last_update_date': firestore.SERVER_TIMESTAMP,
+    #             'text': new_text1,
+    #             'shadow': new_item_shadow,
+    #             'client_rev': new_client_rev,
+    #         })
+    #         queue_ref = item_ref.collection('queue_1_to_process').document(str(new_client_rev))
+    #         transaction1.set(queue_ref, {
+    #             'create_date': firestore.SERVER_TIMESTAMP,
+    #             'client_rev': new_client_rev,
+    #             'action': 'edit_item',
+    #             'text_patches': text_patches1
+    #         })
+    #     except (grpc._channel._Rendezvous,
+    #             google.auth.exceptions.TransportError,
+    #             google.gax.errors.GaxError,
+    #             ):
+    #         print("Connection error to Firestore")
+    #         return False
+    #     print("edit enqueued")
+    #     return True
+    #
+    # result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
 
     sys.exit(0)
