@@ -489,21 +489,7 @@ def user_2_update():
         raise Exception
 
 
-if __name__ == "__main__":
-    print("RUNNING AS MAIN!")  # FIXME
-    # my_datastore = FirestoreDatastore()
-    # my_datastore.clear()
-    # item = Item(my_datastore)
-    # print(item.id)
-    # item.set_text("test 1")
-    # print(item.get_text())
-    # item.set_text("test 2")
-    # print(item.get_text())
-
-    # user_0_create()
-    # user_1_update()
-    # user_2_update()
-
+def user_3_process_queue():
     #
     # end UI client part, start the queue part
     #
@@ -516,48 +502,61 @@ if __name__ == "__main__":
     db = firestore.Client()
     node_ref = db.collection('nodes').document(node_id)
     item_ref = node_ref.collection('items').document(item_id)
-    # queue = item_ref.collection('queue').where('status', '==', 'recorded_in_queue').order_by('client_rev').get()
-    queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
 
-    for queue_instance in queue:
-        print("processing item {} queue {}".format(item_id, queue_instance.id,))
-        # print("contents {}".format(queue_instance.to_dict()))
+    transaction = db.transaction()
 
-        break
+    @firestore.transactional
+    def send_queue1(transaction, item_ref):
+        try:
+            queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
+
+            for queue_snapshot in queue:
+                queue_1_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
+                print("processing item {} queue {}".format(item_id, queue_1_ref.id, ))
+
+                # NOW SENT THE QUEUE ITEM TO THE SERVER
+
+                queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
+                transaction.set(queue_2_ref, {
+                    'create_date': firestore.SERVER_TIMESTAMP,
+                    'client_rev': queue_1_ref.id,
+                    'action': 'processed_item',
+                })
+
+                transaction.delete(queue_1_ref)
+                break
+            else:
+                return False
+        except (grpc._channel._Rendezvous,
+                google.auth.exceptions.TransportError,
+                google.gax.errors.GaxError,
+                ):
+            print("Connection error to Firestore")
+            raise Exception
+        print("queue 1 sent!")
+        return True
+
+    result = send_queue1(transaction, item_ref)
+
+    if result:
+        print("one entry from queue 1 was correctly processed")
     else:
-        raise Exception
+        print("no entries in queue 1. Nothing done!")
 
-    # transaction = db.transaction()
-    #
-    # @firestore.transactional
-    # def send_queue1(transaction1, node_id1, item_id1, client_rev1, new_text1, text_patches1):
-    #     try:
-    #         new_client_rev = client_rev1 + 1
-    #         new_item_shadow = new_text1
-    #         node_ref = db.collection('nodes').document(node_id1)
-    #         item_ref1 = node_ref.collection('items').document(item_id1)
-    #         transaction1.update(item_ref1, {
-    #             'last_update_date': firestore.SERVER_TIMESTAMP,
-    #             'text': new_text1,
-    #             'shadow': new_item_shadow,
-    #             'client_rev': new_client_rev,
-    #         })
-    #         queue_ref = item_ref.collection('queue_1_to_process').document(str(new_client_rev))
-    #         transaction1.set(queue_ref, {
-    #             'create_date': firestore.SERVER_TIMESTAMP,
-    #             'client_rev': new_client_rev,
-    #             'action': 'edit_item',
-    #             'text_patches': text_patches1
-    #         })
-    #     except (grpc._channel._Rendezvous,
-    #             google.auth.exceptions.TransportError,
-    #             google.gax.errors.GaxError,
-    #             ):
-    #         print("Connection error to Firestore")
-    #         return False
-    #     print("edit enqueued")
-    #     return True
-    #
-    # result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
+if __name__ == "__main__":
+    # print("RUNNING AS MAIN!")
+    # my_datastore = FirestoreDatastore()
+    # my_datastore.clear()
+    # item = Item(my_datastore)
+    # print(item.id)
+    # item.set_text("test 1")
+    # print(item.get_text())
+    # item.set_text("test 2")
+    # print(item.get_text())
+
+    user_0_create()
+    user_1_update()
+    user_2_update()
+    user_3_process_queue()
 
     sys.exit(0)
