@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 
-from contextlib import closing
-import os
-import sys
 import argparse
 import logging
-from flask import Flask, g, request, redirect, url_for, abort, render_template, flash, jsonify
+import os
+import sys
+
+from flask import Flask, request, abort, jsonify
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim.db import db
-from abrim.sync import client_sync
+from abrim.old.sync import client_sync
 
 
 # http://stackoverflow.com/questions/1623039/python-debugging-tips

@@ -1,10 +1,12 @@
 #!/usr/bin/env python
-import sys
 import os
 import sqlite3
+import sys
+
 from flask import g
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from abrim.utils.common import secure_filename
+from abrim import secure_filename
 
 import logging
 log = logging.getLogger()

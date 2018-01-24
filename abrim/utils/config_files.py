@@ -1,10 +1,12 @@
 #!/usr/bin/env python
-import sys
 import os
+import sys
+
 import appdirs
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from abrim.utils.common import secure_filename
-from abrim.utils import exit_codes
+from abrim import secure_filename
+from abrim import exit_codes
 
 import logging
 log = logging.getLogger()

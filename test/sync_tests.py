@@ -1,9 +1,10 @@
-import sys
-import os
-import unittest
 import logging
+import os
+import sys
+import unittest
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from abrim import node, sync
+from abrim import sync, node
 
 
 class SyncTestCase(unittest.TestCase):

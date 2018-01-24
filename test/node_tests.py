@@ -1,10 +1,12 @@
-import sys
+import logging
 import os
 import re
+import sys
 import unittest
-import logging
+
 import flask
 import werkzeug.exceptions
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim import node
 
@@ -72,7 +74,7 @@ class NodeTestCase(unittest.TestCase):
         self.assertEqual((str(self.port_to_test), 'info', True), node._parse_args_helper())
 
         self.assertEqual(node._init(), self.port_to_test)
-        self.assertEqual(node.app.config['API_URL'], "http://127.0.0.1:" + str( int(self.port_to_test)+1 ))
+        self.assertEqual(node.app.config['API_URL'], "http://127.0.0.1:" + str(int(self.port_to_test) + 1))
         self.assertEqual(node.app.config['NODE_PORT'], self.port_to_test)
         self.assertEqual(node.app.config['USER_ID'], "the_user")
         self.assertEqual(node.app.config['NODE_ID'], "node" + str(self.port_to_test))
@@ -85,7 +87,7 @@ class NodeTestCase(unittest.TestCase):
         with node.app.test_request_context('/users/1/nodes/1/items', method='GET'):
             self._standard_init()
             self.assertEqual(flask.request.path, '/users/1/nodes/1/items')
-            response = node._send_sync('1','1')
+            response = node._send_sync('1', '1')
             response_data = re.sub('[\s+]', '', response.data.decode("utf-8") )
             self.assertEqual(response.headers.get('Content-Type'), 'application/json')
             self.assertEqual(response.status, "200 OK")
