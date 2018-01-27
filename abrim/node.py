@@ -254,66 +254,11 @@ def user_2_update():
         raise Exception
 
 
-def user_3_process_queue():
-    #
-    # end UI client part, start the queue part
-    #
-
-    # read the queues
-
-    node_id = "node_1"
-    item_id = "item_1"
-
-    db = firestore.Client()
-    node_ref = db.collection('nodes').document(node_id)
-    item_ref = node_ref.collection('items').document(item_id)
-
-    transaction = db.transaction()
-
-    @firestore.transactional
-    def send_queue1(transaction, item_ref):
-        try:
-            queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
-
-            for queue_snapshot in queue:
-                queue_1_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
-                print("processing item {} queue {}".format(item_id, queue_1_ref.id, ))
-
-                # NOW SENT THE QUEUE ITEM TO THE SERVER
-
-                queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
-                transaction.set(queue_2_ref, {
-                    'create_date': firestore.SERVER_TIMESTAMP,
-                    'client_rev': queue_1_ref.id,
-                    'action': 'processed_item',
-                })
-
-                transaction.delete(queue_1_ref)
-                break
-            else:
-                return False
-        except (grpc._channel._Rendezvous,
-                google.auth.exceptions.TransportError,
-                google.gax.errors.GaxError,
-                ):
-            print("Connection error to Firestore")
-            raise Exception
-        print("queue 1 sent!")
-        return True
-
-    result = send_queue1(transaction, item_ref)
-
-    if result:
-        print("one entry from queue 1 was correctly processed")
-    else:
-        print("no entries in queue 1. Nothing done!")
-
 if __name__ == "__main__":
     try:
         user_0_create()
         user_1_update()
         user_2_update()
-        user_3_process_queue()
 
     except google.auth.exceptions.DefaultCredentialsError:
         print(""" AUTH FAILED
