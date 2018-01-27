@@ -5,6 +5,8 @@ import sys
 from google.cloud import firestore
 import grpc
 import google
+import requests
+import json
 
 def test_proc(lock):
     for i in range(randint(1, 11)):
@@ -13,6 +15,29 @@ def test_proc(lock):
         sys.stdout.flush()
         lock.release()
         time.sleep(1) # do work instead
+
+
+def date_handler(obj):
+    return obj.isoformat() if hasattr(obj, 'isoformat') else obj
+
+
+def __requests_post(url, payload):
+    return requests.post(
+      url,
+      headers={'Content-Type': 'application/json'},
+      data=json.dumps(payload, default=date_handler)
+      )
+
+### def items_send_get(node_id, item_id=None):
+###     url_for_get = ""
+###     if item_id:
+###         url_for_get = app.config['API_URL'] + "/users/" + app.config['USER_ID'] + "/nodes/" + node_id + "/items/" + item_id  # FIXME SANITIZE THIS
+###     else:
+###         url_for_get = app.config['API_URL'] + "/users/" + app.config['USER_ID'] + "/nodes/" + node_id + "/items"  # FIXME SANITIZE THIS
+###     return requests.get(
+###       url_for_get,
+###       headers={'Content-Type': 'application/json'}
+###       )
 
 
 def user_3_process_queue(lock):
@@ -43,15 +68,37 @@ def user_3_process_queue(lock):
                 lock.release()
 
                 # NOW SENT THE QUEUE ITEM TO THE SERVER
+                queue_1_dict = queue_1_ref.get().to_dict()
+                url = "https://localhost:12345"
+                try:
+                    post_result = __requests_post(url, queue_1_dict)
 
-                queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
-                transaction.set(queue_2_ref, {
-                    'create_date': firestore.SERVER_TIMESTAMP,
-                    'client_rev': queue_1_ref.id,
-                    'action': 'processed_item',
-                })
+                    print(post_result)
 
-                transaction.delete(queue_1_ref)
+                    queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
+                    transaction.set(queue_2_ref, {
+                        'create_date': firestore.SERVER_TIMESTAMP,
+                        'client_rev': queue_1_ref.id,
+                        'action': 'processed_item',
+                    })
+
+                    transaction.delete(queue_1_ref)
+                except requests.exceptions.ConnectionError:
+                    print("ConnectionError!! Sleep 10 secs")
+                    time.sleep(10)
+                # print("{}".format(queue_1_dict),)
+                # try:
+                #     item_action = queue_1_dict['action']
+                #     item_client_rev = queue_1_dict['client_rev']
+                #     item_create_date = queue_1_dict['create_date']
+                #     text_patches = None
+                #     try:
+                #         text_patches = queue_1_dict['text_patches']
+                #     except AttributeError:
+                #         pass
+                # except AttributeError:
+                #     raise
+
                 break
             else:
                 lock.acquire()
