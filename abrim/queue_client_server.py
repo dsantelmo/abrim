@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import multiprocessing
 import time
 from random import randint
@@ -69,7 +71,7 @@ def user_3_process_queue(lock):
 
                 # NOW SENT THE QUEUE ITEM TO THE SERVER
                 queue_1_dict = queue_1_ref.get().to_dict()
-                url = "https://localhost:12345"
+                url = "https://localhost:5001"
                 try:
                     post_result = __requests_post(url, queue_1_dict)
 

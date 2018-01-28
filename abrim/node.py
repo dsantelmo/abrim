@@ -1,12 +1,13 @@
+#!/usr/bin/env python
+
 import sys
 import diff_match_patch
 from google.cloud import firestore
 import grpc
 import google
 
+
 def create_diff_edits(item_text2, item_shadow2):
-    diff = None
-    text_patches2 = None
     if item_shadow2 is None:
         text_patches2 = None
     else:
