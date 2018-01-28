@@ -27,7 +27,7 @@ def __requests_post(url, payload):
     return requests.post(
       url,
       headers={'Content-Type': 'application/json'},
-      data=json.dumps(payload, default=date_handler)
+      json=json.dumps(payload, default=date_handler)
       )
 
 ### def items_send_get(node_id, item_id=None):
@@ -71,11 +71,15 @@ def user_3_process_queue(lock):
 
                 # NOW SENT THE QUEUE ITEM TO THE SERVER
                 queue_1_dict = queue_1_ref.get().to_dict()
-                url = "https://localhost:5001"
+                url_base = "http://localhost:5001"
+                url_route = "users/user_1/nodes/{}/items/{}".format(node_id,item_id,)
+                url = "{}/{}".format(url_base,url_route,)
+                print(url)
                 try:
                     post_result = __requests_post(url, queue_1_dict)
 
-                    print(post_result)
+                    print(post_result.status_code)
+                    post_result.raise_for_status()
 
                     queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
                     transaction.set(queue_2_ref, {
@@ -126,7 +130,8 @@ def user_3_process_queue(lock):
     if result:
         print("one entry from queue 1 was correctly processed")
     else:
-        print("no entries in queue 1. Nothing done!")
+        print("no entries in queue 1. Nothing done! waiting 5 seconds")
+        time.sleep(5)
     lock.release()
 
 
@@ -138,12 +143,10 @@ if __name__ == '__main__':
         print(p_name + " starting up")
         p.start()
         # Wait for x seconds or until process finishes
-        p.join(20)
+        p.join(30)
         if p.is_alive():
             print(p_name + " timeouts")
             p.terminate()
             p.join()
         else:
             print(p_name + " finished ok")
-        # even if the process finishes right now wait a bit
-        time.sleep(1)

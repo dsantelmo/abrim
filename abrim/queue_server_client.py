@@ -24,10 +24,11 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-@app.route('/users/<string:user_id>/nodes/<string:node_id>/items', methods=[ 'GET'])
-def _send_sync(user_id, node_id):
-    if request.method == 'GET':
-        return items_receive_get(user_id, node_id)
+@app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['POST'])
+def _get_sync(user_id, node_id, item_id):
+    if request.method == 'POST':
+        log.debug("{} {} {} {}".format(user_id, node_id, item_id, request,))
+        return '', 201  # HTTP 201: Created
     else:
         log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
         abort(404)
