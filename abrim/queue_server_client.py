@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-import os
 import sys
 
 from flask import Flask, request, abort, jsonify
