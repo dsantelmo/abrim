@@ -5,6 +5,22 @@ import diff_match_patch
 from google.cloud import firestore
 import grpc
 import google
+import logging
+
+LOGGING_LEVELS = {'critical': logging.CRITICAL,
+                  'error': logging.ERROR,
+                  'warning': logging.WARNING,
+                  'info': logging.INFO,
+                  'debug': logging.DEBUG}
+# FIXME http://docs.python-guide.org/en/latest/writing/logging/
+# It is strongly advised that you do not add any handlers other
+# than NullHandler to your library's loggers.
+logging.basicConfig(level=logging.DEBUG,
+              format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
+              datefmt='%Y-%m-%d %H:%M:%S')  # ,
+              # disable_existing_loggers=False)
+logging.StreamHandler(sys.stdout)
+log = logging.getLogger(__name__)
 
 
 def create_diff_edits(item_text2, item_shadow2):
@@ -32,7 +48,7 @@ def user_0_create():
     # item_id = uuid.uuid4().hex
     item_id = "item_1"
     item_text = "original text"
-    print("node_id = " + node_id)
+    log.debug("node_id = " + node_id)
 
     db = firestore.Client()
     node_ref = db.collection('nodes').document(node_id)
@@ -62,16 +78,16 @@ def user_0_create():
                 google.auth.exceptions.TransportError,
                 google.gax.errors.GaxError,
                 ):
-            print("Connection error to Firestore")
+            log.error("Connection error to Firestore")
             return False
-        print("edit enqueued")
+        log.debug("edit enqueued")
         return True
 
     result = create_in_transaction(transaction, item_id, item_text)
     if result:
-        print('transaction ended OK')
+        log.debug('transaction ended OK')
     else:
-        print('ERROR saving new item')
+        log.error('ERROR saving new item')
         raise Exception
 
 
@@ -80,7 +96,7 @@ def user_1_update():
     # the server is currently offline so the edits stay enqueued
     # the user reopens the screen so the data has to be loaded:
 
-    print("recovering item...")
+    log.debug("recovering item...")
 
     node_id = "node_1"
     item_id = "item_1"
@@ -92,13 +108,13 @@ def user_1_update():
     old_item = None
     try:
         old_item = item_ref.get()
-        print('Document data: {}'.format(old_item.to_dict()))
+        log.debug('Document data: {}'.format(old_item.to_dict()))
     except google.cloud.exceptions.NotFound:
-        print('No such document!')
+        log.debug('No such document!')
         raise Exception
     if not old_item:
         raise Exception
-    print("recovered data ok")
+        log.info("recovered data ok")
 
     old_text = None
     client_rev = None
@@ -106,7 +122,7 @@ def user_1_update():
         old_text = old_item.get('text')
         client_rev = old_item.get('client_rev')
     except KeyError:
-        print("ERROR recovering the item text")
+        log.error("ERROR recovering the item text")
         sys.exit(0)
 
     old_shadow = old_text
@@ -120,7 +136,7 @@ def user_1_update():
 
     # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
-    # print(text_patches)
+    # log.debug(text_patches)
 
     # prepare the update of shadow and client text revision
 
@@ -152,16 +168,16 @@ def user_1_update():
                 google.auth.exceptions.TransportError,
                 google.gax.errors.GaxError,
                 ):
-            print("Connection error to Firestore")
+            log.error("Connection error to Firestore")
             return False
-        print("edit enqueued")
+        log.info("edit enqueued")
         return True
 
     result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
     if result:
-        print('transaction 2 ended OK')
+        log.debug('transaction 2 ended OK')
     else:
-        print('ERROR updating item')
+        log.error('ERROR updating item')
         raise Exception
 
 
@@ -170,7 +186,7 @@ def user_2_update():
     # the server is currently offline so the edits stay enqueued
     # the user reopens the screen so the data has to be loaded
 
-    print("recovering item again...")
+    log.debug("recovering item again...")
 
     node_id = "node_1"
     item_id = "item_1"
@@ -182,13 +198,13 @@ def user_2_update():
     old_item = None
     try:
         old_item = item_ref.get()
-        print('Document data: {}'.format(old_item.to_dict()))
+        log.debug('Document data: {}'.format(old_item.to_dict()))
     except google.cloud.exceptions.NotFound:
-        print('No such document!')
+        log.error('No such document!')
         raise Exception
     if not old_item:
         raise Exception
-    print("recovered data ok")
+    log.info("recovered data ok")
 
     old_text = None
     client_rev = None
@@ -196,7 +212,7 @@ def user_2_update():
         old_text = old_item.get('text')
         client_rev = old_item.get('client_rev')
     except KeyError:
-        print("ERROR recovering the item text")
+        log.error("ERROR recovering the item text")
         sys.exit(0)
 
     old_shadow = old_text
@@ -210,7 +226,7 @@ def user_2_update():
 
     # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
-    # print(text_patches)
+    # log.debug(text_patches)
 
     # prepare the update of shadow and client text revision
 
@@ -242,16 +258,16 @@ def user_2_update():
                 google.auth.exceptions.TransportError,
                 google.gax.errors.GaxError,
                 ):
-            print("Connection error to Firestore")
+            log.error("Connection error to Firestore")
             return False
-        print("edit enqueued")
+        log.info("edit enqueued")
         return True
 
     result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
     if result:
-        print('transaction 3 ended OK')
+        log.debug('transaction 3 ended OK')
     else:
-        print('ERROR updating item')
+        log.error('ERROR updating item')
         raise Exception
 
 
@@ -262,7 +278,7 @@ if __name__ == "__main__":
         user_2_update()
 
     except google.auth.exceptions.DefaultCredentialsError:
-        print(""" AUTH FAILED
+        log.warn(""" AUTH FAILED
 Check https://cloud.google.com/docs/authentication/getting-started
 
 In GCP Console, navigate to the Create service account key page.
