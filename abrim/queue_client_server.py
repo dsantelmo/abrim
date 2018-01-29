@@ -9,14 +9,22 @@ import grpc
 import google
 import requests
 import json
+import logging
 
-def test_proc(lock):
-    for i in range(randint(1, 11)):
-        lock.acquire()
-        print(".", end='')
-        sys.stdout.flush()
-        lock.release()
-        time.sleep(1) # do work instead
+LOGGING_LEVELS = {'critical': logging.CRITICAL,
+                  'error': logging.ERROR,
+                  'warning': logging.WARNING,
+                  'info': logging.INFO,
+                  'debug': logging.DEBUG}
+# FIXME http://docs.python-guide.org/en/latest/writing/logging/
+# It is strongly advised that you do not add any handlers other
+# than NullHandler to your library's loggers.
+logging.basicConfig(level=logging.DEBUG,
+              format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
+              datefmt='%Y-%m-%d %H:%M:%S')  # ,
+              # disable_existing_loggers=False)
+logging.StreamHandler(sys.stdout)
+log = logging.getLogger(__name__)
 
 
 def date_handler(obj):
@@ -66,7 +74,7 @@ def user_3_process_queue(lock):
             for queue_snapshot in queue:
                 queue_1_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
                 lock.acquire()
-                print("processing item {} queue_1_to_process item {}".format(item_id, queue_1_ref.id, ))
+                log.debug("processing item {} queue_1_to_process item {}".format(item_id, queue_1_ref.id, ))
                 lock.release()
 
                 # NOW SENT THE QUEUE ITEM TO THE SERVER
@@ -74,11 +82,11 @@ def user_3_process_queue(lock):
                 url_base = "http://localhost:5001"
                 url_route = "users/user_1/nodes/{}/items/{}".format(node_id,item_id,)
                 url = "{}/{}".format(url_base,url_route,)
-                print(url)
+                log.debug(url)
                 try:
                     post_result = __requests_post(url, queue_1_dict)
 
-                    print(post_result.status_code)
+                    log.info(post_result.status_code)
                     post_result.raise_for_status()
 
                     queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
@@ -90,9 +98,9 @@ def user_3_process_queue(lock):
 
                     transaction.delete(queue_1_ref)
                 except requests.exceptions.ConnectionError:
-                    print("ConnectionError!! Sleep 10 secs")
+                    log.info("ConnectionError!! Sleep 10 secs")
                     time.sleep(10)
-                # print("{}".format(queue_1_dict),)
+                # log.debug("{}".format(queue_1_dict),)
                 # try:
                 #     item_action = queue_1_dict['action']
                 #     item_client_rev = queue_1_dict['client_rev']
@@ -108,7 +116,7 @@ def user_3_process_queue(lock):
                 break
             else:
                 lock.acquire()
-                print("queue query got no results")
+                log.info("queue query got no results")
                 lock.release()
                 return False
         except (grpc._channel._Rendezvous,
@@ -116,11 +124,11 @@ def user_3_process_queue(lock):
                 google.gax.errors.GaxError,
                 ):
             lock.acquire()
-            print("Connection error to Firestore")
+            log.error("Connection error to Firestore")
             lock.release()
             raise Exception
         lock.acquire()
-        print("queue 1 sent!")
+        log.info("queue 1 sent!")
         lock.release()
         return True
 
@@ -128,9 +136,9 @@ def user_3_process_queue(lock):
 
     lock.acquire()
     if result:
-        print("one entry from queue 1 was correctly processed")
+        log.info("one entry from queue 1 was correctly processed")
     else:
-        print("no entries in queue 1. Nothing done! waiting 5 seconds")
+        log.info("no entries in queue 1. Nothing done! waiting 5 seconds")
         time.sleep(5)
     lock.release()
 
@@ -140,13 +148,13 @@ if __name__ == '__main__':
         lock = multiprocessing.Lock()
         p = multiprocessing.Process(target=user_3_process_queue, args=(lock,))
         p_name = p.name
-        print(p_name + " starting up")
+        log.debug(p_name + " starting up")
         p.start()
         # Wait for x seconds or until process finishes
         p.join(30)
         if p.is_alive():
-            print(p_name + " timeouts")
+            log.debug(p_name + " timeouts")
             p.terminate()
             p.join()
         else:
-            print(p_name + " finished ok")
+            log.debug(p_name + " finished ok")
