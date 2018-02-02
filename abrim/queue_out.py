@@ -86,8 +86,8 @@ def user_3_process_queue(lock):
                 try:
                     post_result = __requests_post(url, queue_1_dict)
 
-                    log.info(post_result.status_code)
-                    post_result.raise_for_status()
+                    log.info("HTTP Status code is: {}".format(post_result.status_code,))
+                    post_result.raise_for_status()  # fail if not 2xx
 
                     queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
                     transaction.set(queue_2_ref, {
@@ -99,6 +99,9 @@ def user_3_process_queue(lock):
                     transaction.delete(queue_1_ref)
                 except requests.exceptions.ConnectionError:
                     log.info("ConnectionError!! Sleep 10 secs")
+                    time.sleep(10)
+                except requests.exceptions.HTTPError as err:
+                    log.error(err)
                     time.sleep(10)
                 # log.debug("{}".format(queue_1_dict),)
                 # try:
