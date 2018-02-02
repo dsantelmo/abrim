@@ -11,9 +11,18 @@ import requests
 import json
 import logging
 
-# enable debug for HTTP requests
-import http.client as http_client
-http_client.HTTPConnection.debuglevel = 1
+full_debug = False
+if full_debug:
+    # enable debug for HTTP requests
+    import http.client as http_client
+    http_client.HTTPConnection.debuglevel = 1
+else:
+    # disable more with
+    # for key in logging.Logger.manager.loggerDict:
+    #    print(key)
+    logging.getLogger('requests').setLevel(logging.CRITICAL)
+    logging.getLogger('urllib3').setLevel(logging.CRITICAL)
+    logging.getLogger('google').setLevel(logging.CRITICAL)
 
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
                   'error': logging.ERROR,
@@ -31,6 +40,8 @@ logging.StreamHandler(sys.stdout)
 log = logging.getLogger(__name__)
 
 
+#for key in logging.Logger.manager.loggerDict:
+#    print(key)
 def date_handler(obj):
     return obj.isoformat() if hasattr(obj, 'isoformat') else obj
 
@@ -108,19 +119,6 @@ def user_3_process_queue(lock):
                 except requests.exceptions.HTTPError as err:
                     log.error(err)
                     time.sleep(10)
-                # log.debug("{}".format(queue_1_dict),)
-                # try:
-                #     item_action = queue_1_dict['action']
-                #     item_client_rev = queue_1_dict['client_rev']
-                #     item_create_date = queue_1_dict['create_date']
-                #     text_patches = None
-                #     try:
-                #         text_patches = queue_1_dict['text_patches']
-                #     except AttributeError:
-                #         pass
-                # except AttributeError:
-                #     raise
-
                 break
             else:
                 lock.acquire()

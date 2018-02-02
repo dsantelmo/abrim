@@ -6,6 +6,19 @@ import sys
 
 from flask import Flask, request, abort, jsonify, Response
 
+full_debug = False
+if full_debug:
+    # enable debug for HTTP requests
+    import http.client as http_client
+    http_client.HTTPConnection.debuglevel = 1
+else:
+    # disable more with
+    # for key in logging.Logger.manager.loggerDict:
+    #    print(key)
+    logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
+    logging.getLogger('_internal').setLevel(logging.CRITICAL)
+
+
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
                   'error': logging.ERROR,
                   'warning': logging.WARNING,
