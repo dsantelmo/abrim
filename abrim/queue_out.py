@@ -11,6 +11,10 @@ import requests
 import json
 import logging
 
+# enable debug for HTTP requests
+import http.client as http_client
+http_client.HTTPConnection.debuglevel = 1
+
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
                   'error': logging.ERROR,
                   'warning': logging.WARNING,
@@ -84,6 +88,7 @@ def user_3_process_queue(lock):
                 url = "{}/{}".format(url_base,url_route,)
                 log.debug(url)
                 try:
+                    log.debug("about to POST this: {}".format(queue_1_dict,))
                     post_result = __requests_post(url, queue_1_dict)
 
                     log.info("HTTP Status code is: {}".format(post_result.status_code,))
