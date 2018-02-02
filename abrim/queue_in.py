@@ -4,7 +4,7 @@ import argparse
 import logging
 import sys
 
-from flask import Flask, request, abort, jsonify
+from flask import Flask, request, abort, jsonify, Response
 
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
                   'error': logging.ERROR,
@@ -62,6 +62,10 @@ app = Flask(__name__)
 # #print(data.decode("utf-8"))
 # print(res.code)
 
+@app.errorhandler(405)
+def errorhandler405(e):
+    return Response('405', 405, {'Allow':'POST'})
+
 @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(user_id, node_id, item_id):
     if request.method == 'POST':
@@ -70,8 +74,8 @@ def _get_sync(user_id, node_id, item_id):
         #return '', 201  # HTTP 201: Created
         return '', 501  # HTTP 201: Created
     else:
-        log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
-        abort(404)
+        log.debug("HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
+        abort(405)
 
 
 
