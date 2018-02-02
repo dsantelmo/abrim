@@ -69,13 +69,29 @@ def errorhandler405(e):
 @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(user_id, node_id, item_id):
     if request.method == 'POST':
-        log.debug("{} {} {} {}".format(user_id, node_id, item_id, request.get_json(),))
+        req_json = request.get_json()
+        log.debug("{} {} {} {}".format(user_id, node_id, item_id, req_json,))
 
-        #return '', 201  # HTTP 201: Created
-        return '', 501  # HTTP 201: Created
+        try:
+            item_action = req_json['action']
+            item_rev = req_json['client_rev']
+            item_create_date = req_json['create_date']
+            log.debug("action: {}, rev: {}, date: {}".format(item_action,item_rev, item_create_date,))
+            try:
+                item_patches = req_json['text_patches']
+                log.debug("patches: {}".format(item_patches,))
+            except KeyError:
+                log.debug("no patches")
+            # return '', 201  # HTTP 201: Created
+            abort(501)
+        except KeyError:
+            log.error("HTTP 400 Bad Request")
+            abort(400)  # 400 Bad Request
+        log.error("HTTP 500 Internal Server Error")
+        abort(500)  # 500 Internal Server Error
     else:
         log.debug("HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
-        abort(405)
+        abort(405)  # 405 Method Not Allowed
 
 
 
