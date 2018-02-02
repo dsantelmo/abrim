@@ -23,11 +23,52 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# to test:
+#
+# import requests
+#
+# url = "http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1"
+#
+# payload = "{\n\t\"action\": \"create_item\",\n\t\"create_date\": \"2018-01-29T21:35:15.785000+00:00\",\n\t\"client_rev\": 0\n}"
+#
+# headers = {
+#     'Content-Type': "application/json",
+#     'Cache-Control': "no-cache",
+#     'Postman-Token': "173c0991-7697-8506-bbdb-f433d4909c20"
+#     }
+#
+#
+# response = requests.request("POST", url, data=payload, headers=headers)
+# print(response.status_code)
+#
+# or:
+# import http.client
+#
+# conn = http.client.HTTPConnection("127.0.0.1:5001")
+#
+# payload = "{\n\t\"action\": \"create_item\",\n\t\"create_date\": \"2018-01-29T21:35:15.785000+00:00\",\n\t\"client_rev\": 0\n}"
+#
+# headers = {
+#     'Content-Type': "application/json",
+#     'Cache-Control': "no-cache",
+#     'Postman-Token': "0cf06ca7-5611-8aed-3739-14bde335ef00"
+#     }
+#
+#
+# conn.request("POST", "users/user_1/nodes/node_1/items/item_1", payload, headers)
+#
+# res = conn.getresponse()
+# #data = res.read()
+# #print(data.decode("utf-8"))
+# print(res.code)
+
 @app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(user_id, node_id, item_id):
     if request.method == 'POST':
-        log.debug("{} {} {} {}".format(user_id, node_id, item_id, request,))
-        return '', 201  # HTTP 201: Created
+        log.debug("{} {} {} {}".format(user_id, node_id, item_id, request.get_json(),))
+
+        #return '', 201  # HTTP 201: Created
+        return '', 501  # HTTP 201: Created
     else:
         log.debug("HTTP 404 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
         abort(404)
