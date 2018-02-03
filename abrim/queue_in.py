@@ -3,6 +3,10 @@
 import argparse
 import logging
 import sys
+import diff_match_patch
+from google.cloud import firestore
+import grpc
+import google
 
 from flask import Flask, request, abort, jsonify, Response
 
@@ -34,6 +38,53 @@ logging.StreamHandler(sys.stdout)
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+
+def server_0_init():
+    # create node id if it doesn't exist
+    # node_id = uuid.uuid4().hex
+    node_id = "node_2"
+    return node_id
+
+
+def server_1_create(node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date):
+    log.debug("server_1_create transanction")
+
+    db = firestore.Client()
+    server_node_ref = db.collection('nodes').document(node_id)
+    other_node_ref = server_node_ref.collection('other_nodes').document(item_node_id)
+    item_ref = other_node_ref.collection('items').document(item_id)
+
+    transaction1 = db.transaction()
+
+    @firestore.transactional
+    def create_in_transaction(transaction1, node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date):
+        try:
+            server_node_ref = db.collection('nodes').document(node_id)
+            other_node_ref = server_node_ref.collection('other_nodes').document(item_node_id)
+            item_ref = other_node_ref.collection('items').document(item_id)
+
+            transaction1.set(item_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'other_node_create_date': item_create_date,
+                'client_rev': item_rev,
+            })
+        except (grpc._channel._Rendezvous,
+                google.auth.exceptions.TransportError,
+                google.gax.errors.GaxError,
+                ):
+            log.error("Connection error to Firestore")
+            return False
+        log.debug("edit enqueued")
+        return True
+
+    result = create_in_transaction(transaction1, node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date)
+    if result:
+        log.debug('transaction ended OK')
+    else:
+        log.error('ERROR saving new item')
+        raise Exception
+
 
 # to test:
 #
@@ -78,11 +129,13 @@ app = Flask(__name__)
 def errorhandler405(e):
     return Response('405', 405, {'Allow':'POST'})
 
-@app.route('/users/<string:user_id>/nodes/<string:node_id>/items/<string:item_id>', methods=['POST'])
-def _get_sync(user_id, node_id, item_id):
+@app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
+def _get_sync(item_user_id, item_node_id, item_id):
+    node_id = server_0_init()
+
     if request.method == 'POST':
         req_json = request.get_json()
-        log.debug("{} {} {} {}".format(user_id, node_id, item_id, req_json,))
+        log.debug("{} {} {} {}".format(item_user_id, item_node_id, item_id, req_json,))
 
         try:
             item_action = req_json['action']
@@ -94,8 +147,21 @@ def _get_sync(user_id, node_id, item_id):
                 log.debug("patches: {}".format(item_patches,))
             except KeyError:
                 log.debug("no patches")
-            # return '', 201  # HTTP 201: Created
-            abort(501)
+
+                if item_action == "create_item":
+                    log.debug("creating new item and shadow")
+                    try:
+                        server_1_create(node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date)
+                        return '', 201  # HTTP 201: Created
+                    except:
+                        log.error("Unknown error")
+                        abort(500)  # 500 Internal Server Error
+                else:
+                    log.error("HTTP 400 Bad Request")
+                    abort(400)  # 400 Bad Request
+
+            log.error("HTTP 500 Internal Server Error")
+            abort(500)  # 500 Internal Server Error
         except KeyError:
             log.error("HTTP 400 Bad Request")
             abort(400)  # 400 Bad Request
