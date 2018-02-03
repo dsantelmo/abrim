@@ -6,6 +6,9 @@ from google.cloud import firestore
 import grpc
 import google
 import logging
+import os
+from pathlib import Path
+
 
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
                   'error': logging.ERROR,
@@ -21,6 +24,41 @@ logging.basicConfig(level=logging.DEBUG,
               # disable_existing_loggers=False)
 logging.StreamHandler(sys.stdout)
 log = logging.getLogger(__name__)
+
+
+class AbrimConfig(object):
+    def load_config(self):
+        name = "Abrim"
+        author = "DST"
+
+        if sys.platform == 'darwin':
+            config_folder_path = "~/Library/Application Support/{}".format(name, )
+        elif sys.platform == 'win32':
+            try:
+                appdata = os.environ['APPDATA']
+                config_folder_path = "{}/{}/{}".format(appdata, author, name, )
+            except KeyError:
+                log.error("I think this is a Windows OS and %APPDATA% variable is missing")
+                raise
+        else:
+            config_folder_path = "~/.config/{}".format(name, )
+
+        config_folder = Path(config_folder_path)
+        config_file_path = config_folder / "abrim_config.ini"
+
+        if config_file_path.exists():
+            log.debug("trying to load config from {}".format(config_file_path, ))
+            raise Exception  # FIXME: add configparser
+        else:
+            log.debug("no config file, checking environment variable")
+            try:
+                self.node_id = os.environ['ABRIM_NODE_ID']
+            except KeyError:
+                log.error("can't locate NODE_ID value")
+                raise
+
+    def __init__(self):
+        self.load_config()
 
 
 def create_diff_edits(item_text2, item_shadow2):
@@ -39,16 +77,13 @@ def create_diff_edits(item_text2, item_shadow2):
     return text_patches2
 
 
-def user_0_create():
+def user_0_create(config, item_id):
     # create node id if it doesn't exist
     # node_id = uuid.uuid4().hex
-    node_id = "node_1"
+    node_id = config.node_id
 
     # create new item
-    # item_id = uuid.uuid4().hex
-    item_id = "item_1"
     item_text = "original text"
-    log.debug("node_id = " + node_id)
 
     db = firestore.Client()
     node_ref = db.collection('nodes').document(node_id)
@@ -91,15 +126,14 @@ def user_0_create():
         raise Exception
 
 
-def user_1_update():
+def user_1_update(config, item_id):
     # the edit is queued and the user closes the screen
     # the server is currently offline so the edits stay enqueued
     # the user reopens the screen so the data has to be loaded:
 
     log.debug("recovering item...")
 
-    node_id = "node_1"
-    item_id = "item_1"
+    node_id = config.node_id
 
     db = firestore.Client()
     node_ref = db.collection('nodes').document(node_id)
@@ -181,15 +215,14 @@ def user_1_update():
         raise Exception
 
 
-def user_2_update():
+def user_2_update(config, item_id):
     # once again the edit is queued and the user closes the screen
     # the server is currently offline so the edits stay enqueued
     # the user reopens the screen so the data has to be loaded
 
     log.debug("recovering item again...")
 
-    node_id = "node_1"
-    item_id = "item_1"
+    node_id = config.node_id
 
     db = firestore.Client()
     node_ref = db.collection('nodes').document(node_id)
@@ -270,15 +303,22 @@ def user_2_update():
         log.error('ERROR updating item')
         raise Exception
 
-
 if __name__ == "__main__":
+
+    config = AbrimConfig()
+
+    log.debug("NODE ID: {}".format(config.node_id,))
+
+    # item_id = uuid.uuid4().hex
+    item_id = "item_1"
+
     try:
-        user_0_create()
-        user_1_update()
-        user_2_update()
+        user_0_create(config, item_id)
+        user_1_update(config, item_id)
+        user_2_update(config, item_id)
 
     except google.auth.exceptions.DefaultCredentialsError:
-        log.warn(""" AUTH FAILED
+        log.warning(""" AUTH FAILED
 Check https://cloud.google.com/docs/authentication/getting-started
 
 In GCP Console, navigate to the Create service account key page.
