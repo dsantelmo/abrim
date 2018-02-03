@@ -16,7 +16,6 @@ else:
     # for key in logging.Logger.manager.loggerDict:
     #    print(key)
     logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
-    logging.getLogger('_internal').setLevel(logging.CRITICAL)
 
 
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
