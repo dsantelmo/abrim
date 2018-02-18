@@ -136,6 +136,7 @@ def _get_sync(item_user_id, item_node_id, item_id):
     if request.method == 'POST':
         req_json = request.get_json()
         log.debug("{} {} {} {}".format(item_user_id, item_node_id, item_id, req_json,))
+        log.debug("{} {} {} {}".format(type(item_user_id), type(item_node_id), type(item_id), type(req_json),))
 
         try:
             item_action = req_json['action']

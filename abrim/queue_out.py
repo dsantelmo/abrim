@@ -47,10 +47,14 @@ def date_handler(obj):
 
 
 def __requests_post(url, payload):
+    #prepare payload
+    temp_str = json.dumps(payload, default=date_handler)
+    temp_dict = json.loads(temp_str)
     return requests.post(
       url,
       headers={'Content-Type': 'application/json'},
-      json=json.dumps(payload, default=date_handler)
+      #json=json.dumps(payload, default=date_handler)
+      json=temp_dict
       )
 
 ### def items_send_get(node_id, item_id=None):
@@ -105,6 +109,7 @@ def user_3_process_queue(lock):
                     log.info("HTTP Status code is: {}".format(post_result.status_code,))
                     post_result.raise_for_status()  # fail if not 2xx
 
+                    log.debug("POST successful, archiving this item to queue_2_sent")
                     queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
                     transaction.set(queue_2_ref, {
                         'create_date': firestore.SERVER_TIMESTAMP,
@@ -112,6 +117,7 @@ def user_3_process_queue(lock):
                         'action': 'processed_item',
                     })
 
+                    log.debug("archiving successful, deleting item from queue_1_to_process")
                     transaction.delete(queue_1_ref)
                 except requests.exceptions.ConnectionError:
                     log.info("ConnectionError!! Sleep 10 secs")
