@@ -4,8 +4,6 @@ import re
 import sys
 import unittest
 
-import flask
-import werkzeug.exceptions
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from abrim import node
