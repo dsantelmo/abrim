@@ -85,7 +85,7 @@ def create_diff_edits(item_text2, item_shadow2):
     return text_patches2
 
 
-def create_item(config, item_id):
+def get_item_ref(db, config, item_id):
     node_id = config.node_id
     try:
         db_prefix = config.db_prefix
@@ -96,9 +96,14 @@ def create_item(config, item_id):
     # create new item
     item_text = "original text"
 
-    db = firestore.Client()
     node_ref = db.collection(db_path).document(node_id)
-    item_ref = node_ref.collection('items').document(item_id)
+    return node_ref.collection('items').document(item_id)
+
+
+def create_item(config, item_id, item_text):
+
+    db = firestore.Client()
+    item_ref = get_item_ref(db, config, item_id)
 
     transaction = db.transaction()
 
@@ -143,11 +148,8 @@ def update_item(config, item_id, new_text):
 
     log.debug("recovering item...")
 
-    node_id = config.node_id
-
     db = firestore.Client()
-    node_ref = db.collection('nodes').document(node_id)
-    item_ref = node_ref.collection('items').document(item_id)
+    item_ref = get_item_ref(db, config, item_id)
 
     old_item = None
     try:
@@ -186,12 +188,12 @@ def update_item(config, item_id, new_text):
     transaction = db.transaction()
 
     @firestore.transactional
-    def update_in_transaction(transaction1, node_id1, item_id1, client_rev1, new_text1, text_patches1):
+    def update_in_transaction(transaction1, item_id1, client_rev1, new_text1, text_patches1):
         try:
             new_client_rev = client_rev1 + 1
             new_item_shadow = new_text1
-            node_ref = db.collection('nodes').document(node_id1)
-            item_ref1 = node_ref.collection('items').document(item_id1)
+
+            item_ref1 = get_item_ref(db, config, item_id1)
             transaction1.update(item_ref1, {
                 'last_update_date': firestore.SERVER_TIMESTAMP,
                 'text': new_text1,
@@ -214,9 +216,10 @@ def update_item(config, item_id, new_text):
         log.info("edit enqueued")
         return True
 
-    result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
+    result = update_in_transaction(transaction, item_id, client_rev, new_text, text_patches)
     if result:
         log.debug('update transaction ended OK')
+        return True
     else:
         log.error('ERROR updating item')
         raise Exception
@@ -232,8 +235,8 @@ if __name__ == "__main__":
     item_id = "item_1"
 
     try:
-        create_item(config, item_id)
-        update_item(config, item_id, "the original text")
+        create_item(config, item_id, "the original text")
+        update_item(config, item_id, "a new text")
         update_item(config, item_id, "a newer text")
 
     except google.auth.exceptions.DefaultCredentialsError:
