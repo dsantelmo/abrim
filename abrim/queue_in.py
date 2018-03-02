@@ -129,6 +129,53 @@ def server_1_create(node_id, item_user_id, item_node_id, item_id, item_rev, item
 def errorhandler405(e):
     return Response('405', 405, {'Allow':'POST'})
 
+
+def parse_req(req_json):
+    try:
+        item_action = req_json['action']
+        item_rev = req_json['client_rev']
+        item_create_date = req_json['create_date']
+    except KeyError:
+        log.error("missing action or client_rev or create_date")
+        log.error("HTTP 400 Bad Request")
+        abort(400)
+
+    try:
+        item_patches = req_json['text_patches']
+    except KeyError:
+        log.debug("no patches")
+        item_patches = None
+    return item_action, item_rev, item_create_date, item_patches
+
+
+def execute_item_action(req_json, node_id, item_user_id, item_node_id, item_id):
+    item_action, item_rev, item_create_date, item_patches = parse_req(req_json)
+
+    log.debug("action: {}, rev: {}, date: {}, patches: {}".format(
+        item_action, item_rev, item_create_date, item_patches, ))
+
+    if item_action == "create_item":
+        if item_patches:
+            log.error("unexpected patches in action create_item, malformed request")
+            log.error("HTTP 400 Bad Request")
+            abort(400)
+        else:
+            log.debug("create_item seems OK, creating new item and shadow")
+            try:
+                server_1_create(node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date)
+                return '', 201  # HTTP 201: Created
+            except:
+                log.error("Unknown error")
+                abort(500)  # 500 Internal Server Error
+    elif item_action == "edit_item":
+        log.error("HTTP 500 Internal Server Error")
+        abort(500)  # 500 Internal Server Error
+    else:
+        log.error("don't know what is that action")
+        log.error("HTTP 400 Bad Request")
+        abort(400)  # 400 Bad Request
+
+
 @app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(item_user_id, item_node_id, item_id):
     node_id = server_0_init()
@@ -138,54 +185,8 @@ def _get_sync(item_user_id, item_node_id, item_id):
         log.debug("{} {} {} {}".format(item_user_id, item_node_id, item_id, req_json,))
         log.debug("{} {} {} {}".format(type(item_user_id), type(item_node_id), type(item_id), type(req_json),))
 
-        try:
-            item_action = req_json['action']
-            item_rev = req_json['client_rev']
-            item_create_date = req_json['create_date']
-            log.debug("action: {}, rev: {}, date: {}".format(item_action,item_rev, item_create_date,))
-            try:
-                item_patches = req_json['text_patches']
-                log.debug("patches: {}".format(item_patches,))
+        return execute_item_action(req_json, node_id, item_user_id, item_node_id, item_id)
 
-
-                #
-                #
-                #
-                #
-                #
-                #
-                #
-                # CONTINUE HERE
-                #
-                #
-                #
-                #
-                #
-                #
-                #
-                #
-                #
-
-            except KeyError:
-                log.debug("no patches")
-
-                if item_action == "create_item":
-                    log.debug("creating new item and shadow")
-                    try:
-                        server_1_create(node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date)
-                        return '', 201  # HTTP 201: Created
-                    except:
-                        log.error("Unknown error")
-                        abort(500)  # 500 Internal Server Error
-                else:
-                    log.error("HTTP 400 Bad Request")
-                    abort(400)  # 400 Bad Request
-
-            log.error("HTTP 500 Internal Server Error")
-            abort(500)  # 500 Internal Server Error
-        except KeyError:
-            log.error("HTTP 400 Bad Request")
-            abort(400)  # 400 Bad Request
         log.error("HTTP 500 Internal Server Error")
         abort(500)  # 500 Internal Server Error
     else:
