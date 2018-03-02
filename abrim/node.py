@@ -87,7 +87,10 @@ def create_diff_edits(item_text2, item_shadow2):
 
 def create_item(config, item_id):
     node_id = config.node_id
-    db_prefix = config.db_prefix
+    try:
+        db_prefix = config.db_prefix
+    except AttributeError:
+        db_prefix = ''
     db_path = db_prefix + 'nodes'
 
     # create new item
@@ -133,101 +136,12 @@ def create_item(config, item_id):
         raise Exception
 
 
-def user_1_update(config, item_id):
-    # the edit is queued and the user closes the screen
-    # the server is currently offline so the edits stay enqueued
-    # the user reopens the screen so the data has to be loaded:
+def update_item(config, item_id, new_text):
+
+    if not new_text:
+        raise Exception
 
     log.debug("recovering item...")
-
-    node_id = config.node_id
-
-    db = firestore.Client()
-    node_ref = db.collection('nodes').document(node_id)
-    item_ref = node_ref.collection('items').document(item_id)
-
-    old_item = None
-    try:
-        old_item = item_ref.get()
-        log.debug('Document data: {}'.format(old_item.to_dict()))
-    except google.cloud.exceptions.NotFound:
-        log.debug('No such document!')
-        raise Exception
-    if not old_item:
-        raise Exception
-        log.info("recovered data ok")
-
-    old_text = None
-    client_rev = None
-    try:
-        old_text = old_item.get('text')
-        client_rev = old_item.get('client_rev')
-    except KeyError:
-        log.error("ERROR recovering the item text")
-        sys.exit(0)
-
-    old_shadow = old_text
-    try:
-        old_shadow = old_item.get('shadow')
-    except KeyError:
-        pass
-
-    # the user changes the text so a new set of edits has to be created and enqueued
-    new_text = "new text"
-
-    # create edits
-    text_patches = create_diff_edits(new_text, old_shadow)
-    # log.debug(text_patches)
-
-    # prepare the update of shadow and client text revision
-
-    db = firestore.Client()
-
-    transaction = db.transaction()
-
-    @firestore.transactional
-    def update_in_transaction(transaction1, node_id1, item_id1, client_rev1, new_text1, text_patches1):
-        try:
-            new_client_rev = client_rev1 + 1
-            new_item_shadow = new_text1
-            node_ref = db.collection('nodes').document(node_id1)
-            item_ref1 = node_ref.collection('items').document(item_id1)
-            transaction1.update(item_ref1, {
-                'last_update_date': firestore.SERVER_TIMESTAMP,
-                'text': new_text1,
-                'shadow': new_item_shadow,
-                'client_rev': new_client_rev,
-            })
-            queue_ref = item_ref.collection('queue_1_to_process').document(str(new_client_rev))
-            transaction1.set(queue_ref, {
-                'create_date': firestore.SERVER_TIMESTAMP,
-                'client_rev': new_client_rev,
-                'action': 'edit_item',
-                'text_patches': text_patches1
-            })
-        except (grpc._channel._Rendezvous,
-                google.auth.exceptions.TransportError,
-                google.gax.errors.GaxError,
-                ):
-            log.error("Connection error to Firestore")
-            return False
-        log.info("edit enqueued")
-        return True
-
-    result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
-    if result:
-        log.debug('transaction 2 ended OK')
-    else:
-        log.error('ERROR updating item')
-        raise Exception
-
-
-def user_2_update(config, item_id):
-    # once again the edit is queued and the user closes the screen
-    # the server is currently offline so the edits stay enqueued
-    # the user reopens the screen so the data has to be loaded
-
-    log.debug("recovering item again...")
 
     node_id = config.node_id
 
@@ -261,9 +175,6 @@ def user_2_update(config, item_id):
     except KeyError:
         pass
 
-    # the user changes the text so a new set of edits has to be created and enqueued
-    new_text = "really new text"
-
     # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
     # log.debug(text_patches)
@@ -305,14 +216,15 @@ def user_2_update(config, item_id):
 
     result = update_in_transaction(transaction, node_id, item_id, client_rev, new_text, text_patches)
     if result:
-        log.debug('transaction 3 ended OK')
+        log.debug('update transaction ended OK')
     else:
         log.error('ERROR updating item')
         raise Exception
 
 if __name__ == "__main__":
 
-    config = AbrimConfig()
+    node_id = "node_1"
+    config = AbrimConfig("node_id")
 
     log.debug("NODE ID: {}".format(config.node_id,))
 
@@ -321,8 +233,8 @@ if __name__ == "__main__":
 
     try:
         create_item(config, item_id)
-        user_1_update(config, item_id)
-        user_2_update(config, item_id)
+        update_item(config, item_id, "the original text")
+        update_item(config, item_id, "a newer text")
 
     except google.auth.exceptions.DefaultCredentialsError:
         log.warning(""" AUTH FAILED
