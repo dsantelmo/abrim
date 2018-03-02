@@ -32,5 +32,5 @@ class TestNode(TestCase):
     def test_user_0_create(self):
         item_id = "item_1"
         warnings.simplefilter("ignore") # suppress "ResourceWarning: unclosed <ssl.SSLSocket..." warning
-        self.assertTrue(node.user_0_create(self.config, item_id))
+        self.assertTrue(node.create_item(self.config, item_id))
 

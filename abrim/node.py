@@ -85,7 +85,7 @@ def create_diff_edits(item_text2, item_shadow2):
     return text_patches2
 
 
-def user_0_create(config, item_id):
+def create_item(config, item_id):
     node_id = config.node_id
     db_prefix = config.db_prefix
     db_path = db_prefix + 'nodes'
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     item_id = "item_1"
 
     try:
-        user_0_create(config, item_id)
+        create_item(config, item_id)
         user_1_update(config, item_id)
         user_2_update(config, item_id)
 
