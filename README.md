@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/dsantelmo/abrim.svg?branch=master)](https://travis-ci.org/dsantelmo/abrim)
+<!--- [![Build Status](https://travis-ci.org/dsantelmo/abrim.svg?branch=master)](https://travis-ci.org/dsantelmo/abrim) --->
 
 cd .git/hooks/
 
