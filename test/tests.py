@@ -6,7 +6,6 @@ import unittest
 
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from abrim import node
 
 
 class NodeTestCase(unittest.TestCase):
