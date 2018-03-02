@@ -60,6 +60,8 @@ class AbrimConfig(object):
     def __init__(self, node_id=None):
         if not node_id:
             self.load_config()
+        else:
+            self.node_id = node_id
 
 
 def create_diff_edits(item_text2, item_shadow2):
