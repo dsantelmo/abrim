@@ -57,8 +57,9 @@ class AbrimConfig(object):
                 log.error("can't locate NODE_ID value")
                 raise
 
-    def __init__(self):
-        self.load_config()
+    def __init__(self, node_id=None):
+        if not node_id:
+            self.load_config()
 
 
 def create_diff_edits(item_text2, item_shadow2):

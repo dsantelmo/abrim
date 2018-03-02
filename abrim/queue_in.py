@@ -146,6 +146,26 @@ def _get_sync(item_user_id, item_node_id, item_id):
             try:
                 item_patches = req_json['text_patches']
                 log.debug("patches: {}".format(item_patches,))
+
+
+                #
+                #
+                #
+                #
+                #
+                #
+                #
+                # CONTINUE HERE
+                #
+                #
+                #
+                #
+                #
+                #
+                #
+                #
+                #
+
             except KeyError:
                 log.debug("no patches")
 
@@ -226,6 +246,8 @@ def teardown_request(exception):
 
 if __name__ == "__main__":  # pragma: no cover
     client_port = _init()
-    #app.run(host='0.0.0.0', port=client_port, use_reloader=False)
-    app.run(host='0.0.0.0', port=client_port)
+    # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
+    # app.run(host='0.0.0.0', port=client_port)
+    # for pycharm debugging
+    app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=False, use_reloader=False)
     __end()
