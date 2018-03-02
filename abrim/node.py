@@ -94,7 +94,7 @@ def user_0_create(config, item_id):
     item_text = "original text"
 
     db = firestore.Client()
-    node_ref = db.collection('db_path').document(node_id)
+    node_ref = db.collection(db_path).document(node_id)
     item_ref = node_ref.collection('items').document(item_id)
 
     transaction = db.transaction()
