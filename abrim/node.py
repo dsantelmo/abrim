@@ -57,7 +57,10 @@ class AbrimConfig(object):
                 log.error("can't locate NODE_ID value")
                 raise
 
-    def __init__(self, node_id=None):
+    def __init__(self, node_id=None, db_prefix=None):
+        if db_prefix:
+            self.db_prefix = db_prefix
+
         if not node_id:
             self.load_config()
         else:
@@ -84,22 +87,22 @@ def user_0_create(config, item_id):
     # create node id if it doesn't exist
     # node_id = uuid.uuid4().hex
     node_id = config.node_id
+    db_prefix = config.db_prefix
+    db_path = db_prefix + 'nodes'
 
     # create new item
     item_text = "original text"
 
     db = firestore.Client()
-    node_ref = db.collection('nodes').document(node_id)
+    node_ref = db.collection('db_path').document(node_id)
     item_ref = node_ref.collection('items').document(item_id)
 
     transaction = db.transaction()
 
     @firestore.transactional
-    def create_in_transaction(transaction1, item_id, item_text):
+    def create_in_transaction(transaction1, item_ref, item_text):
         try:
             client_rev = 0
-            node_ref = db.collection('nodes').document(node_id)
-            item_ref = node_ref.collection('items').document(item_id)
             transaction1.set(item_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
                 # 'last_update_date': firestore.SERVER_TIMESTAMP,
@@ -121,9 +124,10 @@ def user_0_create(config, item_id):
         log.debug("edit enqueued")
         return True
 
-    result = create_in_transaction(transaction, item_id, item_text)
+    result = create_in_transaction(transaction, item_ref, item_text)
     if result:
         log.debug('transaction ended OK')
+        return True
     else:
         log.error('ERROR saving new item')
         raise Exception
