@@ -1,5 +1,6 @@
 from unittest import TestCase
 import logging
+import warnings
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # FIXME use pathlib
@@ -30,5 +31,6 @@ class TestNode(TestCase):
 
     def test_user_0_create(self):
         item_id = "item_1"
+        warnings.simplefilter("ignore") # suppress "ResourceWarning: unclosed <ssl.SSLSocket..." warning
         self.assertTrue(node.user_0_create(self.config, item_id))
 
