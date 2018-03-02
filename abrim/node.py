@@ -101,17 +101,17 @@ def get_item_ref(db, config, item_id):
 
 
 @firestore.transactional
-def create_in_transaction(transaction1, item_ref, item_text):
+def create_in_transaction(transaction, item_ref, item_text):
     try:
         client_rev = 0
-        transaction1.set(item_ref, {
+        transaction.set(item_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
             # 'last_update_date': firestore.SERVER_TIMESTAMP,
             'text': item_text,
             'client_rev': client_rev,
         })
         queue_ref = item_ref.collection('queue_1_to_process').document(str(client_rev))
-        transaction1.set(queue_ref, {
+        transaction.set(queue_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
             'client_rev': client_rev,
             'action': 'create_item'
@@ -124,6 +124,7 @@ def create_in_transaction(transaction1, item_ref, item_text):
         return False
     log.debug("edit enqueued")
     return True
+
 
 def create_item(config, item_id, item_text):
 
@@ -140,24 +141,25 @@ def create_item(config, item_id, item_text):
         log.error('ERROR saving new item')
         raise Exception
 
-@firestore.transactional
-def update_in_transaction(transaction1, item_ref, client_rev1, new_text1, text_patches1):
-    try:
-        new_client_rev = client_rev1 + 1
-        new_item_shadow = new_text1
 
-        transaction1.update(item_ref, {
+@firestore.transactional
+def update_in_transaction(transaction, item_ref, client_rev, new_text, text_patches):
+    try:
+        new_client_rev = client_rev + 1
+        new_item_shadow = new_text
+
+        transaction.update(item_ref, {
             'last_update_date': firestore.SERVER_TIMESTAMP,
-            'text': new_text1,
+            'text': new_text,
             'shadow': new_item_shadow,
             'client_rev': new_client_rev,
         })
         queue_ref = item_ref.collection('queue_1_to_process').document(str(new_client_rev))
-        transaction1.set(queue_ref, {
+        transaction.set(queue_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
             'client_rev': new_client_rev,
             'action': 'edit_item',
-            'text_patches': text_patches1
+            'text_patches': text_patches
         })
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
@@ -167,6 +169,7 @@ def update_in_transaction(transaction1, item_ref, client_rev1, new_text1, text_p
         return False
     log.info("edit enqueued")
     return True
+
 
 def update_item(config, item_id, new_text):
 
@@ -223,6 +226,7 @@ def update_item(config, item_id, new_text):
     else:
         log.error('ERROR updating item')
         raise Exception
+
 
 if __name__ == "__main__":
 
