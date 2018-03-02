@@ -48,6 +48,8 @@ class AbrimConfig(object):
 
         if config_file_path.exists():
             log.debug("trying to load config from {}".format(config_file_path, ))
+            # create node id if it doesn't exist
+            # node_id = uuid.uuid4().hex
             raise Exception  # FIXME: add configparser
         else:
             log.debug("no config file, checking environment variable")
@@ -84,8 +86,6 @@ def create_diff_edits(item_text2, item_shadow2):
 
 
 def user_0_create(config, item_id):
-    # create node id if it doesn't exist
-    # node_id = uuid.uuid4().hex
     node_id = config.node_id
     db_prefix = config.db_prefix
     db_path = db_prefix + 'nodes'
