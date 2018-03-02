@@ -29,7 +29,7 @@ class TestNode(TestCase):
             '@@ -1,6 +1,6 @@\n aaa\n-b\n+a\n aa\n'
         )
 
-    def test_user_0_create(self):
+    def test_create_item(self):
         item_id = "item_1"
         warnings.simplefilter("ignore") # suppress "ResourceWarning: unclosed <ssl.SSLSocket..." warning
         self.assertTrue(node.create_item(self.config, item_id))
