@@ -122,9 +122,11 @@ def user_3_process_queue(lock):
                 except requests.exceptions.ConnectionError:
                     log.info("ConnectionError!! Sleep 10 secs")
                     time.sleep(10)
+                    return False
                 except requests.exceptions.HTTPError as err:
                     log.error(err)
                     time.sleep(10)
+                    return False
                 break
             else:
                 lock.acquire()
@@ -150,7 +152,7 @@ def user_3_process_queue(lock):
     if result:
         log.info("one entry from queue 1 was correctly processed")
     else:
-        log.info("no entries in queue 1. Nothing done! waiting 5 seconds")
+        log.info("Nothing done! waiting 5 seconds")
         time.sleep(5)
     lock.release()
 
