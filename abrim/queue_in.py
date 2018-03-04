@@ -3,12 +3,15 @@
 import argparse
 import logging
 import sys
-import diff_match_patch
+import os
 from google.cloud import firestore
 import grpc
 import google
 
 from flask import Flask, request, abort, jsonify, Response
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
+from node import AbrimConfig
 
 full_debug = False
 if full_debug:
@@ -40,15 +43,15 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
-def server_0_init():
-    # create node id if it doesn't exist
-    # node_id = uuid.uuid4().hex
-    node_id = "node_2"
-    return node_id
-
-
-def server_1_create(node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date):
+def server_1_create(config):
     log.debug("server_1_create transanction")
+
+    node_id = config.node_id
+    item_user_id = config.item_user_id
+    item_node_id = config.item_node_id
+    item_id = config.item_id
+    item_rev = config.item_rev
+    item_create_date = config.item_create_date
 
     db = firestore.Client()
     server_node_ref = db.collection('nodes').document(node_id)
@@ -148,11 +151,18 @@ def parse_req(req_json):
     return item_action, item_rev, item_create_date, item_patches
 
 
-def execute_item_action(req_json, node_id, item_user_id, item_node_id, item_id):
-    item_action, item_rev, item_create_date, item_patches = parse_req(req_json)
+def execute_item_action(config):
+    # node_id = config.node_id
+    # item_user_id = config.item_user_id
+    # item_node_id = config.item_node_id
+    # item_id = config.item_id
+    # item_action = config.item_action
+    # item_rev = config.item_rev
+    # item_create_date = config.item_create_date
+    # item_patches = config.item_patches
 
-    log.debug("action: {}, rev: {}, date: {}, patches: {}".format(
-        item_action, item_rev, item_create_date, item_patches, ))
+    item_action = config.item_action
+    item_patches = config.item_patches
 
     if item_action == "create_item":
         if item_patches:
@@ -162,12 +172,18 @@ def execute_item_action(req_json, node_id, item_user_id, item_node_id, item_id):
         else:
             log.debug("create_item seems OK, creating new item and shadow")
             try:
-                server_1_create(node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date)
+                server_1_create(config)
                 return '', 201  # HTTP 201: Created
             except:
                 log.error("Unknown error")
                 abort(500)  # 500 Internal Server Error
     elif item_action == "edit_item":
+        #############################################
+        #############################################
+        #############################################
+        #############################################
+        #############################################
+        #############################################
         log.error("HTTP 500 Internal Server Error")
         abort(500)  # 500 Internal Server Error
     else:
@@ -178,17 +194,17 @@ def execute_item_action(req_json, node_id, item_user_id, item_node_id, item_id):
 
 @app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(item_user_id, item_node_id, item_id):
-    node_id = server_0_init()
-
     if request.method == 'POST':
-        req_json = request.get_json()
-        log.debug("{} {} {} {}".format(item_user_id, item_node_id, item_id, req_json,))
-        log.debug("{} {} {} {}".format(type(item_user_id), type(item_node_id), type(item_id), type(req_json),))
+        config = AbrimConfig(node_id="node_2")
+        config.item_user_id = item_user_id
+        config.item_node_id = item_node_id
+        config.item_id = item_id
+        config.item_action, config.item_rev, config.item_create_date, config.item_patches = parse_req(request.get_json())
 
-        return execute_item_action(req_json, node_id, item_user_id, item_node_id, item_id)
+        for item in vars(config).items():
+            log.debug("{}: {} ({})".format(item[0],item[1],type(item[1])))
 
-        log.error("HTTP 500 Internal Server Error")
-        abort(500)  # 500 Internal Server Error
+        return execute_item_action(config)
     else:
         log.debug("HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
         abort(405)  # 405 Method Not Allowed
