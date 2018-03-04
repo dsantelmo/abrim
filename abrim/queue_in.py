@@ -231,7 +231,6 @@ def _get_sync(item_user_id, item_node_id, item_id):
         abort(405)  # 405 Method Not Allowed
 
 
-
 def _parse_args_helper():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
@@ -241,7 +240,6 @@ def _parse_args_helper():
     if not args.port or int(args.port) <= 0:
         return None, None
     return args.port, args.logginglevel #, args.initdb
-
 
 
 def _init():
