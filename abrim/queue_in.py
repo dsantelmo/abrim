@@ -43,8 +43,8 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
-def server_1_create(config):
-    log.debug("server_1_create transanction")
+def server_create_item(config):
+    log.debug("server_create_item transanction")
 
     node_id = config.node_id
     item_user_id = config.item_user_id
@@ -172,7 +172,7 @@ def execute_item_action(config):
         else:
             log.debug("create_item seems OK, creating new item and shadow")
             try:
-                server_1_create(config)
+                server_create_item(config)
                 return '', 201  # HTTP 201: Created
             except:
                 log.error("Unknown error")
@@ -201,8 +201,10 @@ def _get_sync(item_user_id, item_node_id, item_id):
         config.item_id = item_id
         config.item_action, config.item_rev, config.item_create_date, config.item_patches = parse_req(request.get_json())
 
+        x = 0
         for item in vars(config).items():
-            log.debug("{}: {} ({})".format(item[0],item[1],type(item[1])))
+            x += 1
+            log.debug("{}. {}: {} ({})".format(x, item[0],item[1],type(item[1])))
 
         return execute_item_action(config)
     else:
