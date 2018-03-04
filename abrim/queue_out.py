@@ -99,6 +99,8 @@ def user_3_process_queue(lock):
                 # NOW SENT THE QUEUE ITEM TO THE SERVER
                 queue_1_dict = queue_1_ref.get().to_dict()
                 url_base = "http://localhost:5001"
+                # url_base = "https://requestb.in/xctmjexc"
+                # url_base = "http://mockbin.org/bin/424a595a-a802-48ba-a44a-b6ddb553a0ee"
                 url_route = "users/user_1/nodes/{}/items/{}".format(node_id,item_id,)
                 url = "{}/{}".format(url_base,url_route,)
                 log.debug(url)
