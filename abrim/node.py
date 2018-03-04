@@ -231,7 +231,7 @@ def update_item(config, item_id, new_text):
 if __name__ == "__main__":
 
     node_id = "node_1"
-    config = AbrimConfig("node_id")
+    config = AbrimConfig("node_1")
 
     log.debug("NODE ID: {}".format(config.node_id,))
 
