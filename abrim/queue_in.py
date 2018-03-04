@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 
 def server_create_item(config):
-    log.debug("server_create_item transanction")
+    log.debug("server_create_item transaction")
 
     node_id = config.node_id
     item_user_id = config.item_user_id
@@ -87,6 +87,21 @@ def server_create_item(config):
     else:
         log.error('ERROR saving new item')
         raise Exception
+
+
+def server_update_item(config):
+    # node_id = config.node_id
+    # item_user_id = config.item_user_id
+    # item_node_id = config.item_node_id
+    # item_id = config.item_id
+    # item_action = config.item_action
+    # item_rev = config.item_rev
+    # item_create_date = config.item_create_date
+    # item_patches = config.item_patches
+
+
+    log.error('ERROR saving new item')
+    raise Exception
 
 
 # to test:
@@ -164,28 +179,32 @@ def execute_item_action(config):
     item_action = config.item_action
     item_patches = config.item_patches
 
+    if item_action == "create_item" and item_patches:
+        log.error("unexpected patches in action create_item, malformed request")
+        log.error("HTTP 400 Bad Request")
+        abort(400)
+
+    if item_action == "edit_item" and not item_patches:
+        log.error("missing patches in action edit_item, malformed request")
+        log.error("HTTP 400 Bad Request")
+        abort(400)
+
     if item_action == "create_item":
-        if item_patches:
-            log.error("unexpected patches in action create_item, malformed request")
-            log.error("HTTP 400 Bad Request")
-            abort(400)
-        else:
-            log.debug("create_item seems OK, creating new item and shadow")
-            try:
-                server_create_item(config)
-                return '', 201  # HTTP 201: Created
-            except:
-                log.error("Unknown error")
-                abort(500)  # 500 Internal Server Error
+        log.debug("create_item seems OK, creating new item and shadow")
+        try:
+            server_create_item(config)
+            return '', 201  # HTTP 201: Created
+        except:
+            log.error("Unknown error")
+            abort(500)  # 500 Internal Server Error
     elif item_action == "edit_item":
-        #############################################
-        #############################################
-        #############################################
-        #############################################
-        #############################################
-        #############################################
-        log.error("HTTP 500 Internal Server Error")
-        abort(500)  # 500 Internal Server Error
+        log.debug("edit_item seems OK, updating item")
+        try:
+            server_update_item(config)
+            return '', 201  # HTTP 201: Created
+        except:
+            log.error("Unknown error")
+            abort(500)  # 500 Internal Server Error
     else:
         log.error("don't know what is that action")
         log.error("HTTP 400 Bad Request")
