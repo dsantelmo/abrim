@@ -171,44 +171,32 @@ def execute_item_action(config):
     # item_user_id = config.item_user_id
     # item_node_id = config.item_node_id
     # item_id = config.item_id
-    # item_action = config.item_action
+    item_action = config.item_action
     # item_rev = config.item_rev
     # item_create_date = config.item_create_date
-    # item_patches = config.item_patches
-
-    item_action = config.item_action
     item_patches = config.item_patches
 
-    if item_action == "create_item" and item_patches:
-        log.error("unexpected patches in action create_item, malformed request")
+    if (item_action == "create_item" and item_patches) or (item_action == "edit_item" and not item_patches):
+        log.error("unexpected patches or action, malformed request")
         log.error("HTTP 400 Bad Request")
         abort(400)
 
-    if item_action == "edit_item" and not item_patches:
-        log.error("missing patches in action edit_item, malformed request")
-        log.error("HTTP 400 Bad Request")
-        abort(400)
-
-    if item_action == "create_item":
-        log.debug("create_item seems OK, creating new item and shadow")
-        try:
+    try:
+        if item_action == "create_item":
+            log.debug("create_item seems OK, creating new item and shadow")
             server_create_item(config)
             return '', 201  # HTTP 201: Created
-        except:
-            log.error("Unknown error")
-            abort(500)  # 500 Internal Server Error
-    elif item_action == "edit_item":
-        log.debug("edit_item seems OK, updating item")
-        try:
+        elif item_action == "edit_item":
+            log.debug("edit_item seems OK, updating item")
             server_update_item(config)
             return '', 201  # HTTP 201: Created
-        except:
-            log.error("Unknown error")
-            abort(500)  # 500 Internal Server Error
-    else:
-        log.error("don't know what is that action")
-        log.error("HTTP 400 Bad Request")
-        abort(400)  # 400 Bad Request
+        else:
+            log.error("don't know what is that action")
+            log.error("HTTP 400 Bad Request")
+            abort(400)  # 400 Bad Request
+    except:
+        log.error("Unknown error")
+        abort(500)  # 500 Internal Server Error
 
 
 @app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
