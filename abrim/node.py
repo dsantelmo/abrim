@@ -103,6 +103,8 @@ def get_item_ref(db, config, item_id):
 @firestore.transactional
 def create_in_transaction(transaction, item_ref, item_text):
     try:
+        # FIXME to avoid race conditions do first a ref.get(transaction=transaction)
+        # like in queue_in-> create_in_transaction
         client_rev = 0
         transaction.set(item_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
