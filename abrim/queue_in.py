@@ -57,6 +57,8 @@ def create_in_transaction(transaction, item_ref, item_rev, item_create_date):
                 'create_date': firestore.SERVER_TIMESTAMP,
                 'other_node_create_date': item_create_date,
                 'client_rev': item_rev,
+                'text': None,
+                'shadow': None,
             })
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
