@@ -43,11 +43,35 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
+# to avoid race conditions existence of the item and creation should be done in a transaction
+@firestore.transactional
+def create_in_transaction(transaction, item_ref, item_rev, item_create_date):
+    try:
+        try:
+            item_exist = item_ref.get(transaction=transaction)
+
+            log.error("Tried to create the item but it's already been created")
+            return False  # it shouldn't be there
+        except google.api.core.exceptions.NotFound:
+            transaction.set(item_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'other_node_create_date': item_create_date,
+                'client_rev': item_rev,
+            })
+    except (grpc._channel._Rendezvous,
+            google.auth.exceptions.TransportError,
+            google.gax.errors.GaxError,
+            ):
+        log.error("Connection error to Firestore")
+        return False
+    log.debug("creation enqueued")
+    return True
+
+
 def server_create_item(config):
     log.debug("server_create_item transaction")
 
     node_id = config.node_id
-    item_user_id = config.item_user_id
     item_node_id = config.item_node_id
     item_id = config.item_id
     item_rev = config.item_rev
@@ -58,37 +82,9 @@ def server_create_item(config):
     other_node_ref = server_node_ref.collection('other_nodes').document(item_node_id)
     item_ref = other_node_ref.collection('items').document(item_id)
 
-    transaction1 = db.transaction()
+    transaction = db.transaction()
 
-    # to avoid race conditions existence of the item and creation should be done in a transaction
-    @firestore.transactional
-    def create_in_transaction(transaction1, node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date):
-        try:
-            server_node_ref = db.collection('nodes').document(node_id)
-            other_node_ref = server_node_ref.collection('other_nodes').document(item_node_id)
-            item_ref = other_node_ref.collection('items').document(item_id)
-
-            try:
-                item_exist = item_ref.get(transaction=transaction1)
-
-                log.error("Tried to create the item but it's already been created")
-                return False #  it shouldn't be there
-            except google.api.core.exceptions.NotFound:
-                transaction1.set(item_ref, {
-                    'create_date': firestore.SERVER_TIMESTAMP,
-                    'other_node_create_date': item_create_date,
-                    'client_rev': item_rev,
-                })
-        except (grpc._channel._Rendezvous,
-                google.auth.exceptions.TransportError,
-                google.gax.errors.GaxError,
-                ):
-            log.error("Connection error to Firestore")
-            return False
-        log.debug("creation enqueued")
-        return True
-
-    result = create_in_transaction(transaction1, node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date)
+    result = create_in_transaction(transaction, item_ref, item_rev, item_create_date)
     if result:
         log.debug('transaction ended OK')
         return True
