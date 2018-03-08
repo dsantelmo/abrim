@@ -60,6 +60,7 @@ def server_create_item(config):
 
     transaction1 = db.transaction()
 
+    # to avoid race conditions existence of the item and creation should be done in a transaction
     @firestore.transactional
     def create_in_transaction(transaction1, node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date):
         try:
@@ -67,26 +68,33 @@ def server_create_item(config):
             other_node_ref = server_node_ref.collection('other_nodes').document(item_node_id)
             item_ref = other_node_ref.collection('items').document(item_id)
 
-            transaction1.set(item_ref, {
-                'create_date': firestore.SERVER_TIMESTAMP,
-                'other_node_create_date': item_create_date,
-                'client_rev': item_rev,
-            })
+            try:
+                item_exist = item_ref.get(transaction=transaction1)
+
+                log.error("Tried to create the item but it's already been created")
+                return False #  it shouldn't be there
+            except google.api.core.exceptions.NotFound:
+                transaction1.set(item_ref, {
+                    'create_date': firestore.SERVER_TIMESTAMP,
+                    'other_node_create_date': item_create_date,
+                    'client_rev': item_rev,
+                })
         except (grpc._channel._Rendezvous,
                 google.auth.exceptions.TransportError,
                 google.gax.errors.GaxError,
                 ):
             log.error("Connection error to Firestore")
             return False
-        log.debug("edit enqueued")
+        log.debug("creation enqueued")
         return True
 
     result = create_in_transaction(transaction1, node_id, item_user_id, item_node_id, item_id, item_rev, item_create_date)
     if result:
         log.debug('transaction ended OK')
+        return True
     else:
         log.error('ERROR saving new item')
-        raise Exception
+        return False
 
 
 def server_update_item(config):
@@ -100,7 +108,7 @@ def server_update_item(config):
     # item_patches = config.item_patches
 
 
-    log.error('ERROR saving new item')
+    log.error('ERROR updating the item')
     raise Exception
 
 
@@ -183,9 +191,11 @@ def execute_item_action(config):
 
     try:
         if item_action == "create_item":
-            log.debug("create_item seems OK, creating new item and shadow")
-            server_create_item(config)
-            return '', 201  # HTTP 201: Created
+            log.debug("create_item contents seem OK, creating new item and shadow")
+            if server_create_item(config):
+                return '', 201  # HTTP 201: Created
+            else:
+                return '', 204  # HTTP No Content - Item already exists...
         elif item_action == "edit_item":
             log.debug("edit_item seems OK, updating item")
             server_update_item(config)
