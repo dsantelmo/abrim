@@ -100,17 +100,20 @@ def server_create_item(config):
 def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches):
     try:
         try:
-            log.error("checking if the item exists")
+            log.debug("checking if the item exists")
             item_exist = item_ref.get(transaction=transaction)
             # exists so we can continue
         except google.api.core.exceptions.NotFound:
+            log.error("item_exist doesn't... exist")
             return False  # it doesn't exists
         try:
             patches_ref = item_ref.collection('patches').document(str(item_rev))
             patches_exist = patches_ref.get(transaction=transaction)
+            log.error("patches_exist... exists")
             return False  # it shouldn't be there
         except google.api.core.exceptions.NotFound:
-            transaction.set(patches_exist, {
+            log.debug("patches_exist doesn't exist, creating")
+            transaction.set(patches_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
                 'other_node_create_date': item_create_date,
                 'client_rev': item_rev,
@@ -194,14 +197,18 @@ def execute_item_action(config):
         if item_action == "create_item":
             log.debug("create_item contents seem OK, creating new item and shadow")
             if server_create_item(config):
+                log.debug("HTTP 201: Created")
                 return '', 201  # HTTP 201: Created
             else:
-                return '', 204  # HTTP No Content - Item already exists...
+                log.debug("HTTP 204 No Content")
+                return '', 204  # HTTP 204 No Content - Item already exists...
         elif item_action == "edit_item":
             log.debug("edit_item seems OK, updating item")
             if server_update_item(config):
+                log.debug("HTTP 201: Created")
                 return '', 201  # HTTP 201: Created
             else:
+                log.error("HTTP 404 Not Found")
                 abort(404)  # 404 Not Found
         else:
             log.error("don't know what is that action")
