@@ -95,19 +95,61 @@ def server_create_item(config):
         return False
 
 
+# to avoid race conditions existence of the item and creation should be done in a transaction
+@firestore.transactional
+def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches):
+    try:
+        try:
+            log.error("checking if the item exists")
+            item_exist = item_ref.get(transaction=transaction)
+            # exists so we can continue
+        except google.api.core.exceptions.NotFound:
+            return False  # it doesn't exists
+        try:
+            patches_ref = item_ref.collection('patches').document(str(item_rev))
+            patches_exist = patches_ref.get(transaction=transaction)
+            return False  # it shouldn't be there
+        except google.api.core.exceptions.NotFound:
+            transaction.set(patches_exist, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'other_node_create_date': item_create_date,
+                'client_rev': item_rev,
+                'patches': item_patches,
+            })
+    except (grpc._channel._Rendezvous,
+            google.auth.exceptions.TransportError,
+            google.gax.errors.GaxError,
+            ):
+        log.error("Connection error to Firestore")
+        return False
+    log.debug("creation enqueued")
+    return True
+
+
 def server_update_item(config):
-    # node_id = config.node_id
+    node_id = config.node_id
     # item_user_id = config.item_user_id
-    # item_node_id = config.item_node_id
-    # item_id = config.item_id
+    item_node_id = config.item_node_id
+    item_id = config.item_id
     # item_action = config.item_action
-    # item_rev = config.item_rev
-    # item_create_date = config.item_create_date
-    # item_patches = config.item_patches
+    item_rev = config.item_rev
+    item_create_date = config.item_create_date
+    item_patches = config.item_patches
 
+    db = firestore.Client()
+    server_node_ref = db.collection('nodes').document(node_id)
+    other_node_ref = server_node_ref.collection('other_nodes').document(item_node_id)
+    item_ref = other_node_ref.collection('items').document(item_id)
 
-    log.error('ERROR updating the item')
-    raise Exception
+    transaction = db.transaction()
+
+    result = enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches)
+    if result:
+        log.debug('transaction ended OK')
+        return True
+    else:
+        log.error('ERROR updating item')
+        return False
 
 
 # to test:
@@ -196,8 +238,10 @@ def execute_item_action(config):
                 return '', 204  # HTTP No Content - Item already exists...
         elif item_action == "edit_item":
             log.debug("edit_item seems OK, updating item")
-            server_update_item(config)
-            return '', 201  # HTTP 201: Created
+            if server_update_item(config):
+                return '', 201  # HTTP 201: Created
+            else:
+                abort(404)  # 404 Not Found
         else:
             log.error("don't know what is that action")
             log.error("HTTP 400 Bad Request")
