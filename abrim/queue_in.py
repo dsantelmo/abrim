@@ -66,7 +66,7 @@ def create_in_transaction(transaction, item_ref, item_rev, item_create_date):
             ):
         log.error("Connection error to Firestore")
         return False
-    log.debug("creation enqueued")
+    log.debug("creation enqueued correctly")
     return True
 
 
@@ -125,7 +125,7 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
             ):
         log.error("Connection error to Firestore")
         return False
-    log.debug("creation enqueued")
+    log.debug("update enqueued correctly")
     return True
 
 
