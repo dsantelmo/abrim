@@ -4,6 +4,7 @@ import argparse
 import logging
 import sys
 import os
+import diff_match_patch
 from google.cloud import firestore
 import grpc
 import google
@@ -86,6 +87,8 @@ def server_create_item(config):
 
     transaction = db.transaction()
 
+    log.debug("trying to create /nodes/{}/other_nodes/{}/items/{}".format(node_id,item_node_id,item_id,))
+
     result = create_in_transaction(transaction, item_ref, item_rev, item_create_date)
     if result:
         log.debug('transaction ended OK')
@@ -113,12 +116,46 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
             return False  # it shouldn't be there
         except google.api.core.exceptions.NotFound:
             log.debug("patches_exist doesn't exist, creating")
-            transaction.set(patches_ref, {
-                'create_date': firestore.SERVER_TIMESTAMP,
-                'other_node_create_date': item_create_date,
-                'client_rev': item_rev,
-                'patches': item_patches,
-            })
+
+            #patches = item_ref.collection('patches').get()
+            item = item_ref.get().to_dict()
+
+            try:
+                shadow = item['shadow']
+                if not shadow:
+                    shadow = ''
+                client_rev = item['client_rev']
+
+                if (client_rev + 1) != item_rev:
+                    log.debug("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
+                    return False
+
+                log.debug(item_patches)
+                diff_obj = diff_match_patch.diff_match_patch()
+                patches = diff_obj.patch_fromText(item_patches)
+                new_item_shadow, success = diff_obj.patch_apply(patches, "")
+
+                if not success:
+                    log.debug("patching failed")
+                    return False
+                else:
+                    log.debug("patching results: {}".format(new_item_shadow))
+
+
+                transaction.set(patches_ref, {
+                    'create_date': firestore.SERVER_TIMESTAMP,
+                    'other_node_create_date': item_create_date,
+                    'client_rev': item_rev,
+                    'patches': item_patches,
+                    'shadow': new_item_shadow,
+                })
+
+            except KeyError:
+                log.error("KeyError with shadow or client_rev")
+                return False
+
+
+
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
             google.gax.errors.GaxError,
@@ -145,6 +182,8 @@ def server_update_item(config):
     item_ref = other_node_ref.collection('items').document(item_id)
 
     transaction = db.transaction()
+
+    log.debug("trying to update /nodes/{}/other_nodes/{}/items/{}".format(node_id, item_node_id, item_id,))
 
     result = enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches)
     if result:
@@ -289,6 +328,33 @@ def teardown_request(exception):
 
 
 if __name__ == "__main__":  # pragma: no cover
+    #
+    # config = AbrimConfig(node_id="node_2")
+    #
+    # config.item_user_id = "user_1"
+    # config.node_id = "test_node2"
+    # config.item_id = "item_1"
+    # config.item_create_date = "2018 - 01 - 29T21: 35:15.785000 + 00: 00"
+    # config.item_action = "create_item"
+    # config.item_node_id = "node_1"
+    # config.item_rev = 0
+    #
+    # server_create_item(config)
+    #
+    #
+    # config.item_user_id = "user_1"
+    # config.node_id = "test_node2"
+    # config.item_id = "item_1"
+    # config.item_create_date = "2018-02-03T21:46:32.785000+00:00"
+    # config.item_action = "edit_item"
+    # config.item_node_id = "node_1"
+    # config.item_rev = 1
+    # config.item_patches = '@@ -0,0 +1,10 @@\n+a new text\n'
+    #
+    # server_update_item(config)
+    #
+    # sys.exit(0)
+    #
     client_port = _init()
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
