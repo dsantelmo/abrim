@@ -58,8 +58,6 @@ def create_in_transaction(transaction, item_ref, item_rev, item_create_date):
                 'create_date': firestore.SERVER_TIMESTAMP,
                 'other_node_create_date': item_create_date,
                 'client_rev': item_rev,
-                'text': None,
-                'shadow': None,
             })
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
@@ -120,6 +118,7 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
             #patches = item_ref.collection('patches').get()
             item = item_ref.get().to_dict()
 
+            log.debug("item: {}".format(item))
             try:
                 shadow = item['shadow']
                 if not shadow:
@@ -127,13 +126,13 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
                 client_rev = item['client_rev']
 
                 if (client_rev + 1) != item_rev:
-                    log.debug("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
+                    log.error("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
                     return False
 
                 log.debug(item_patches)
                 diff_obj = diff_match_patch.diff_match_patch()
                 patches = diff_obj.patch_fromText(item_patches)
-                new_item_shadow, success = diff_obj.patch_apply(patches, "")
+                new_item_shadow, success = diff_obj.patch_apply(patches, shadow)
 
                 if not success:
                     log.debug("patching failed")
@@ -141,12 +140,18 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
                 else:
                     log.debug("patching results: {}".format(new_item_shadow))
 
-
+                log.debug("updating patches_ref to: {}".format(item_rev))
                 transaction.set(patches_ref, {
                     'create_date': firestore.SERVER_TIMESTAMP,
                     'other_node_create_date': item_create_date,
                     'client_rev': item_rev,
                     'patches': item_patches,
+                })
+
+                log.debug("updating client_rev to: {}".format(item_rev))
+                transaction.set(item_ref, {
+                    'last_update_date': firestore.SERVER_TIMESTAMP,
+                    'client_rev': item_rev,
                     'shadow': new_item_shadow,
                 })
 
@@ -329,7 +334,7 @@ def teardown_request(exception):
 
 if __name__ == "__main__":  # pragma: no cover
     #
-    # config = AbrimConfig(node_id="node_2")
+    config = AbrimConfig(node_id="node_2")
     #
     # config.item_user_id = "user_1"
     # config.node_id = "test_node2"
@@ -352,9 +357,20 @@ if __name__ == "__main__":  # pragma: no cover
     # config.item_patches = '@@ -0,0 +1,10 @@\n+a new text\n'
     #
     # server_update_item(config)
+
+    # config.item_patches = "@@ -1,10 +1,12 @@\n a new\n+er\n  text\n"
+    # config.node_id = "node_2"
+    # config.item_create_date = "2018-03-11T17:08:25.774000+00:00"
+    # config.item_user_id = "user_1"
+    # config.item_rev = 2
+    # config.item_id = "item_1"
+    # config.item_node_id = "node_1"
+    # config.item_action = "edit_item"
+    #
+    # server_update_item(config)
     #
     # sys.exit(0)
-    #
+
     client_port = _init()
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
