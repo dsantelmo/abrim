@@ -101,7 +101,7 @@ def get_item_ref(db, config, item_id):
 
 
 @firestore.transactional
-def create_in_transaction(transaction, item_ref, item_text):
+def create_in_transaction(transaction, item_ref):
     try:
         # FIXME to avoid race conditions do first a ref.get(transaction=transaction)
         # like in queue_in-> create_in_transaction
@@ -109,7 +109,7 @@ def create_in_transaction(transaction, item_ref, item_text):
         transaction.set(item_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
             # 'last_update_date': firestore.SERVER_TIMESTAMP,
-            'text': item_text,
+            # 'text': item_text,
             'client_rev': client_rev,
         })
         queue_ref = item_ref.collection('queue_1_to_process').document(str(client_rev))
@@ -128,14 +128,14 @@ def create_in_transaction(transaction, item_ref, item_text):
     return True
 
 
-def create_item(config, item_id, item_text):
+def create_item(config, item_id):
 
     db = firestore.Client()
     item_ref = get_item_ref(db, config, item_id)
 
     transaction = db.transaction()
 
-    result = create_in_transaction(transaction, item_ref, item_text)
+    result = create_in_transaction(transaction, item_ref)
     if result:
         log.debug('transaction ended OK')
         return True
@@ -198,9 +198,14 @@ def update_item(config, item_id, new_text):
     client_rev = None
     try:
         old_text = old_item.get('text')
-        client_rev = old_item.get('client_rev')
     except KeyError:
         log.error("ERROR recovering the item text")
+        old_text = ""
+
+    try:
+        client_rev = old_item.get('client_rev')
+    except KeyError:
+        log.error("ERROR recovering the client_rev")
         sys.exit(0)
 
     old_shadow = old_text
@@ -241,7 +246,7 @@ if __name__ == "__main__":
     item_id = "item_1"
 
     try:
-        create_item(config, item_id, "the original text")
+        create_item(config, item_id)
         update_item(config, item_id, "a new text")
         update_item(config, item_id, "a newer text")
 
