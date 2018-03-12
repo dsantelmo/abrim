@@ -371,6 +371,49 @@ if __name__ == "__main__":  # pragma: no cover
     #
     # sys.exit(0)
 
+
+
+
+
+
+
+
+
+
+
+    db = firestore.Client()
+    server_node_ref = db.collection('nodes').document('node_2')
+    other_node_ref = server_node_ref.collection('other_nodes').document('node_1')
+    item_ref = other_node_ref.collection('items').document('item_1')
+
+    item_ref.set({
+        'last_update_date': firestore.SERVER_TIMESTAMP,
+        'client_rev': 2,
+        'shadow': "a newer text",
+    })
+
+    patches_ref = item_ref.collection('patches').document("1")
+    patches_ref.set({
+        'create_date': firestore.SERVER_TIMESTAMP,
+        'other_node_create_date': "2018-03-11T17:36:42.672000+00:00",
+        'client_rev': 1,
+        'patches': "@@ -0,0 +1,10 @@ +a new text",
+    })
+
+    patches_ref2 = item_ref.collection('patches').document("2")
+    patches_ref2.set({
+        'create_date': firestore.SERVER_TIMESTAMP,
+        'other_node_create_date': "2018-03-11T17:36:47.798000+00:00",
+        'client_rev': 2,
+        'patches': "@@ -1,10 +1,12 @@ a new +er text ",
+    })
+
+
+
+
+    sys.exit(0)
+
+
     client_port = _init()
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
