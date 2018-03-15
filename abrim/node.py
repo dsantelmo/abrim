@@ -220,10 +220,10 @@ def update_item(config, item_id, new_text):
 
     # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
-    old_shadow_adler32 = zlib.adler32(old_shadow)
-    old_shadow_sha512 = hashlib.sha512(old_shadow).hexdigest()
-    shadow_adler32 = zlib.adler32(new_text)
-    shadow_sha512 = hashlib.sha512(new_text).hexdigest()
+    old_shadow_adler32 = zlib.adler32(old_shadow.encode())
+    old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
+    shadow_adler32 = zlib.adler32(new_text.encode())
+    shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
     log.debug("old_shadow_adler32 {}".format(old_shadow_adler32))
     log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
     log.debug("shadow_adler32 {}".format(shadow_adler32))
