@@ -7,6 +7,8 @@ import grpc
 import google
 import logging
 import os
+import zlib
+import hashlib
 from pathlib import Path
 
 
@@ -145,15 +147,13 @@ def create_item(config, item_id):
 
 
 @firestore.transactional
-def update_in_transaction(transaction, item_ref, client_rev, new_text, text_patches):
+def update_in_transaction(transaction, item_ref, new_client_rev, new_text, text_patches,
+                          old_shadow_adler32, old_shadow_sha512, shadow_adler32, shadow_sha512):
     try:
-        new_client_rev = client_rev + 1
-        new_item_shadow = new_text
-
         transaction.update(item_ref, {
             'last_update_date': firestore.SERVER_TIMESTAMP,
             'text': new_text,
-            'shadow': new_item_shadow,
+            'shadow': new_text,
             'client_rev': new_client_rev,
         })
         queue_ref = item_ref.collection('queue_1_to_process').document(str(new_client_rev))
@@ -161,7 +161,11 @@ def update_in_transaction(transaction, item_ref, client_rev, new_text, text_patc
             'create_date': firestore.SERVER_TIMESTAMP,
             'client_rev': new_client_rev,
             'action': 'edit_item',
-            'text_patches': text_patches
+            'text_patches': text_patches,
+            'old_shadow_adler32': old_shadow_adler32,
+            'old_shadow_sha512': old_shadow_sha512,
+            'shadow_adler32': shadow_adler32,
+            'shadow_sha512': shadow_sha512,
         })
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
@@ -216,7 +220,14 @@ def update_item(config, item_id, new_text):
 
     # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
-    # log.debug(text_patches)
+    old_shadow_adler32 = zlib.adler32(old_shadow)
+    old_shadow_sha512 = hashlib.sha512(old_shadow).hexdigest()
+    shadow_adler32 = zlib.adler32(new_text)
+    shadow_sha512 = hashlib.sha512(new_text).hexdigest()
+    log.debug("old_shadow_adler32 {}".format(old_shadow_adler32))
+    log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
+    log.debug("shadow_adler32 {}".format(shadow_adler32))
+    log.debug("shadow_sha512 {}".format(shadow_sha512))
 
     # prepare the update of shadow and client text revision
 
@@ -226,7 +237,9 @@ def update_item(config, item_id, new_text):
 
     item_ref = get_item_ref(db, config, item_id)
 
-    result = update_in_transaction(transaction, item_ref, client_rev, new_text, text_patches)
+    new_client_rev = client_rev + 1
+    result = update_in_transaction(transaction, item_ref, new_client_rev, new_text, text_patches,
+                                   old_shadow_adler32, old_shadow_sha512, shadow_adler32, shadow_sha512)
     if result:
         log.debug('update transaction ended OK')
         return True
