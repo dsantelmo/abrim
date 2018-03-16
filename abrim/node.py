@@ -148,7 +148,7 @@ def create_item(config, item_id):
 
 @firestore.transactional
 def update_in_transaction(transaction, item_ref, new_client_rev, new_text, text_patches,
-                          old_shadow_adler32, old_shadow_sha512, shadow_adler32, shadow_sha512):
+                          old_shadow_adler32, shadow_adler32):
     try:
         transaction.update(item_ref, {
             'last_update_date': firestore.SERVER_TIMESTAMP,
@@ -163,9 +163,7 @@ def update_in_transaction(transaction, item_ref, new_client_rev, new_text, text_
             'action': 'edit_item',
             'text_patches': text_patches,
             'old_shadow_adler32': old_shadow_adler32,
-            'old_shadow_sha512': old_shadow_sha512,
             'shadow_adler32': shadow_adler32,
-            'shadow_sha512': shadow_sha512,
         })
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
@@ -221,13 +219,13 @@ def update_item(config, item_id, new_text):
     # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
     old_shadow_adler32 = zlib.adler32(old_shadow.encode())
-    old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
+    #old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
     shadow_adler32 = zlib.adler32(new_text.encode())
-    shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
+    #shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
     log.debug("old_shadow_adler32 {}".format(old_shadow_adler32))
-    log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
+    #log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
     log.debug("shadow_adler32 {}".format(shadow_adler32))
-    log.debug("shadow_sha512 {}".format(shadow_sha512))
+    #log.debug("shadow_sha512 {}".format(shadow_sha512))
 
     # prepare the update of shadow and client text revision
 
@@ -239,7 +237,7 @@ def update_item(config, item_id, new_text):
 
     new_client_rev = client_rev + 1
     result = update_in_transaction(transaction, item_ref, new_client_rev, new_text, text_patches,
-                                   old_shadow_adler32, old_shadow_sha512, shadow_adler32, shadow_sha512)
+                                   old_shadow_adler32, shadow_adler32)
     if result:
         log.debug('update transaction ended OK')
         return True
