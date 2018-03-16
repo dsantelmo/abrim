@@ -158,7 +158,7 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
                 log.error("new shadows adler32s don't match {} {}".format(shadow_adler32, test_shadow,))
                 return False
 
-            log.debug("shadows adler32s match {} {}".format(shadow_adler32, test_shadow,))
+            # TODO: think in maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
 
             log.debug("updating patches_ref to: {}".format(item_rev))
             transaction.set(patches_ref, {
