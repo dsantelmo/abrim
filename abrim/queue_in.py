@@ -205,6 +205,7 @@ def errorhandler405(e):
 
 
 def parse_req(req_json):
+    log.debug("parse_req: {}".format(req_json))
     try:
         item_action = req_json['action']
         item_rev = req_json['client_rev']
@@ -219,7 +220,14 @@ def parse_req(req_json):
     except KeyError:
         log.debug("no patches")
         item_patches = None
-    return item_action, item_rev, item_create_date, item_patches
+
+    try:
+        old_shadow_adler32 = req_json['old_shadow_adler32']
+        shadow_adler32 = req_json['shadow_adler32']
+    except KeyError:
+        log.debug("no old_shadow_adler32 or shadow_adler32")
+        item_patches = None
+    return item_action, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32
 
 
 def execute_item_action(config):
@@ -270,7 +278,7 @@ def _get_sync(item_user_id, item_node_id, item_id):
         config.item_user_id = item_user_id
         config.item_node_id = item_node_id
         config.item_id = item_id
-        config.item_action, config.item_rev, config.item_create_date, config.item_patches = parse_req(request.get_json())
+        config.item_action, config.item_rev, config.item_create_date, config.item_patches, config.old_shadow_adler32, config.shadow_adler32 = parse_req(request.get_json())
 
         x = 0
         for item in vars(config).items():

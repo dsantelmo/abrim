@@ -56,24 +56,56 @@ class TestNode(TestCase):
         self.config = node.AbrimConfig(
             node_id="test_node1",
             db_prefix="test_db_")
-        self.config.item_user_id = "user_1"
-        self.config.node_id = "test_node2"
-        self.config.item_id = "item_1"
-        self.config.queue_in = None
-        self.config.item_create_date = "2018 - 01 - 29T21: 35:15.785000 + 00: 00"
-        self.config.item_action = "create_item"
-        self.config.item_node_id = "node_1"
-        self.config.item_rev = 0
 
     def tearDown(self):
         logging.disable(logging.NOTSET)
 
-    def test_config(self):
-        self.assertEqual(self.config.node_id, "test_node2")
+    def test_parse_req(self):
+        req_json = {
+            "action": "edit_item",
+            "client_rev": 1,
+            "create_date": "2018-02-03T21:46:32.785000+00:00",
+            "text_patches": "@@ -0,0 +1,10 @@\n+a new text\n",
+            "old_shadow_adler32": 1,
+            "shadow_adler32": 317981617
+        }
+        item_action = "edit_item"
+        item_rev = 1
+        item_create_date = "2018-02-03T21:46:32.785000+00:00"
+        item_patches = '@@ -0,0 +1,10 @@\n+a new text\n'
+        old_shadow_adler32 = 1
+        shadow_adler32 = 317981617
 
+        parsed_req = (item_action, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32)
+
+        self.assertEqual(
+            queue_in.parse_req(req_json),
+            parsed_req
+        )
 
     def test_create_item(self):
-        item_id = "item_1"
-        new_text = "original text"
+        self.config.item_user_id = "user_1"
+        self.config.node_id = "test_node2"
+        self.config.item_id = "item_1"
+        self.config.item_create_date = "2018 - 01 - 29T21: 35:15.785000 + 00: 00"
+        self.config.item_action = "create_item"
+        self.config.item_node_id = "node_1"
+        self.config.item_rev = 0
         warnings.simplefilter("ignore") # suppress "ResourceWarning: unclosed <ssl.SSLSocket..." warning
         self.assertTrue(queue_in.server_create_item(self.config))
+
+    def test_server_update_item(self):
+        self.config.item_user_id = "user_1"
+        self.config.node_id = "test_node2"
+        self.config.item_id = "item_1"
+        self.config.item_create_date = "2018-02-03T21:46:32.785000+00:00"
+        self.config.item_action = "edit_item"
+        self.config.item_node_id = "node_1"
+        self.config.item_rev = 1
+        self.config.item_patches = """@@ -1,12 +1,7 @@
+        -original
+        +new
+          tex
+        """
+        warnings.simplefilter("ignore") # suppress "ResourceWarning: unclosed <ssl.SSLSocket..." warning
+        self.assertTrue(queue_in.server_update_item(self.config))
