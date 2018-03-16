@@ -121,45 +121,45 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
             log.debug("item: {}".format(item))
             try:
                 shadow = item['shadow']
-                if not shadow:
-                    shadow = ''
-                client_rev = item['client_rev']
-
-                if (client_rev + 1) != item_rev:
-                    log.error("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
-                    return False
-
-                log.debug(item_patches)
-                diff_obj = diff_match_patch.diff_match_patch()
-                patches = diff_obj.patch_fromText(item_patches)
-                new_item_shadow, success = diff_obj.patch_apply(patches, shadow)
-
-                if not success:
-                    log.debug("patching failed")
-                    return False
-                else:
-                    log.debug("patching results: {}".format(new_item_shadow))
-
-                log.debug("updating patches_ref to: {}".format(item_rev))
-                transaction.set(patches_ref, {
-                    'create_date': firestore.SERVER_TIMESTAMP,
-                    'other_node_create_date': item_create_date,
-                    'client_rev': item_rev,
-                    'patches': item_patches,
-                })
-
-                log.debug("updating client_rev to: {}".format(item_rev))
-                transaction.set(item_ref, {
-                    'last_update_date': firestore.SERVER_TIMESTAMP,
-                    'client_rev': item_rev,
-                    'shadow': new_item_shadow,
-                })
-
             except KeyError:
-                log.error("KeyError with shadow or client_rev")
+                shadow = None
+            try:
+                client_rev = item['client_rev']
+            except KeyError:
+                log.error("KeyError with client_rev")
                 return False
 
+            if not shadow:
+                shadow = ''
+            if (client_rev + 1) != item_rev:
+                log.error("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
+                return False
 
+            log.debug(item_patches)
+            diff_obj = diff_match_patch.diff_match_patch()
+            patches = diff_obj.patch_fromText(item_patches)
+            new_item_shadow, success = diff_obj.patch_apply(patches, shadow)
+
+            if not success:
+                log.debug("patching failed")
+                return False
+            else:
+                log.debug("patching results: {}".format(new_item_shadow))
+
+            log.debug("updating patches_ref to: {}".format(item_rev))
+            transaction.set(patches_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'other_node_create_date': item_create_date,
+                'client_rev': item_rev,
+                'patches': item_patches,
+            })
+
+            log.debug("updating client_rev to: {}".format(item_rev))
+            transaction.set(item_ref, {
+                'last_update_date': firestore.SERVER_TIMESTAMP,
+                'client_rev': item_rev,
+                'shadow': new_item_shadow,
+            })
 
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
