@@ -4,6 +4,7 @@ import argparse
 import logging
 import sys
 import os
+import zlib
 import diff_match_patch
 from google.cloud import firestore
 import grpc
@@ -98,7 +99,7 @@ def server_create_item(config):
 
 # to avoid race conditions existence of the item and creation should be done in a transaction
 @firestore.transactional
-def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches):
+def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32):
     try:
         try:
             log.debug("checking if the item exists")
@@ -131,6 +132,12 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
 
             if not shadow:
                 shadow = ''
+
+            test_shadow = zlib.adler32(shadow.encode())
+            if old_shadow_adler32 != test_shadow:
+                log.error("shadows adler32s don't match {} {}".format(old_shadow_adler32, test_shadow,))
+                return False
+
             if (client_rev + 1) != item_rev:
                 log.error("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
                 return False
@@ -145,6 +152,13 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
                 return False
             else:
                 log.debug("patching results: {}".format(new_item_shadow))
+
+            test_shadow = zlib.adler32(new_item_shadow.encode())
+            if shadow_adler32 != test_shadow:
+                log.error("new shadows adler32s don't match {} {}".format(shadow_adler32, test_shadow,))
+                return False
+
+            log.debug("shadows adler32s match {} {}".format(shadow_adler32, test_shadow,))
 
             log.debug("updating patches_ref to: {}".format(item_rev))
             transaction.set(patches_ref, {
@@ -180,6 +194,8 @@ def server_update_item(config):
     item_rev = config.item_rev
     item_create_date = config.item_create_date
     item_patches = config.item_patches
+    old_shadow_adler32 = config.old_shadow_adler32
+    shadow_adler32 = config.shadow_adler32
 
     db = firestore.Client()
     server_node_ref = db.collection('nodes').document(node_id)
@@ -190,7 +206,7 @@ def server_update_item(config):
 
     log.debug("trying to update /nodes/{}/other_nodes/{}/items/{}".format(node_id, item_node_id, item_id,))
 
-    result = enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches)
+    result = enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32)
     if result:
         log.debug('transaction ended OK')
         return True
@@ -225,8 +241,9 @@ def parse_req(req_json):
         old_shadow_adler32 = req_json['old_shadow_adler32']
         shadow_adler32 = req_json['shadow_adler32']
     except KeyError:
-        log.debug("no old_shadow_adler32 or shadow_adler32")
-        item_patches = None
+        log.debug("missing old_shadow_adler32 or shadow_adler32")
+        log.error("HTTP 400 Bad Request")
+        abort(400)
     return item_action, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32
 
 
@@ -421,6 +438,21 @@ if __name__ == "__main__":  # pragma: no cover
     #
     # sys.exit(0)
 
+
+
+    # previous to test update 1
+    # db = firestore.Client()
+    # server_node_ref = db.collection('nodes').document('node_2')
+    # other_node_ref = server_node_ref.collection('other_nodes').document('node_1')
+    # item_ref = other_node_ref.collection('items').document('item_1')
+    #
+    # item_ref.set({
+    #     'last_update_date': firestore.SERVER_TIMESTAMP,
+    #     'client_rev': 0,
+    # })
+    #
+    # patches_ref = item_ref.collection('patches').document("1")
+    # patches_ref.delete()
 
     client_port = _init()
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
