@@ -120,7 +120,7 @@ def process_out_queue():
     transaction = db.transaction()
 
     log.debug("processing item {}".format(item_id))
-    url_base = "http://localhost:5001"
+    url_base = "http://localhost:5002"
     # url_base = "https://requestb.in/xctmjexc"
     # url_base = "http://mockbin.org/bin/424a595a-a802-48ba-a44a-b6ddb553a0ee"
     url_route = "users/user_1/nodes/{}/items/{}".format(node_id, item_id, )
