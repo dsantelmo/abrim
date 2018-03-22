@@ -111,13 +111,23 @@ def patch_queue(transaction, item_ref, url):
 
 def server_patch_queue():
     node_id = "node_2"
-    item_id = "item_1"
+    other_node_id = "node_1"
 
     db = firestore.Client()
-    node_ref = db.collection('nodes').document(node_id)
-    item_ref = node_ref.collection('items').document(item_id)
+    other_nodes_ref = db.collection('nodes').document(node_id).collection('other_nodes')
+    for other_node in other_nodes_ref.get():
+        log.debug("processing patch queue from node {}".format(other_node.id))
+        items_ref = other_nodes_ref.document(str(other_node.id)).collection('items')
+        for item in items_ref.get():
+            log.debug("processing patches from item {}".format(item.id))
+            patches_ref = items_ref.document(str(item.id)).collection('patches')
+            for patch in patches_ref.get():
+                log.debug("processing patch {}".format(patch.id))
+                patch_ref = patches_ref.document(str(patch.id))
+                patch_dict = patch_ref.get().to_dict()
+                log.debug(patch_dict)
 
-    transaction = db.transaction()
+    #transaction = db.transaction()
 
     # log.debug("processing item {}".format(item_id))
     # url_base = "http://localhost:5001"
