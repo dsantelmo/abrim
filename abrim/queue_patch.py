@@ -121,7 +121,7 @@ def server_patch_queue():
         for item in items_ref.get():
             log.debug("processing patches from item {}".format(item.id))
             patches_ref = items_ref.document(str(item.id)).collection('patches')
-            for patch in patches_ref.get():
+            for patch in patches_ref.order_by('client_rev').get():
                 log.debug("processing patch {}".format(patch.id))
                 patch_ref = patches_ref.document(str(patch.id))
                 patch_dict = patch_ref.get().to_dict()
