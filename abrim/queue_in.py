@@ -144,6 +144,9 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
 
             log.debug(item_patches)
             diff_obj = diff_match_patch.diff_match_patch()
+            # these are FRAGILE patches and must match perfectly
+            diff_match_patch.Match_Threshold = 0
+            diff_match_patch.Match_Distance = 0
             patches = diff_obj.patch_fromText(item_patches)
             new_item_shadow, success = diff_obj.patch_apply(patches, shadow)
 
