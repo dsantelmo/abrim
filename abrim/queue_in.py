@@ -245,8 +245,10 @@ def parse_req(req_json):
         shadow_adler32 = req_json['shadow_adler32']
     except KeyError:
         log.debug("missing old_shadow_adler32 or shadow_adler32")
-        log.error("HTTP 400 Bad Request")
-        abort(400)
+        old_shadow_adler32 = None
+        shadow_adler32 = None
+        #log.error("HTTP 400 Bad Request")
+        #abort(400)
     return item_action, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32
 
 
