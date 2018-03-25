@@ -60,13 +60,15 @@ log = logging.getLogger(__name__)
 
 
 @firestore.transactional
-def try_to_apply_patch(transaction, new_item_ref, patch_ref, old_text_before, new_text, client_rev, other_node_create_date, create_date):
+def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref, old_text_before, new_text, client_rev, other_node_create_date, create_date):
     try:
         try:
-            new_item = new_item_ref.get()
-            old_text_now = ""
-            sys.exit(0)  # FIXME
-            time.sleep(99999)
+            new_item = new_item_ref.get().to_dict()
+            try:
+                old_text_now = new_item['text']
+            except KeyError:
+                log.error("error getting existing text!")
+                return False
         except google.api.core.exceptions.NotFound:
             old_text_now = ""
         if old_text_now == old_text_before:
@@ -79,9 +81,9 @@ def try_to_apply_patch(transaction, new_item_ref, patch_ref, old_text_before, ne
             })
             log.info("server text patched!")
 
-            patch_deleted_ref = patch_ref.collection('deleted').document(str(patch_ref.id))
+            patches_deleted_ref = other_node_item_ref.collection('patches_deleted').document(str(patch_ref.id))
             # FIXME save the patch here
-            transaction.set(patch_deleted_ref, {
+            transaction.set(patches_deleted_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
             })
             log.debug("patch archived")
@@ -103,6 +105,7 @@ def try_to_apply_patch(transaction, new_item_ref, patch_ref, old_text_before, ne
 
 
 def server_patch_queue():
+    log.debug("starting server_patch_queue")
     node_id = "node_2"
     other_node_id = "node_1"
 
@@ -113,7 +116,8 @@ def server_patch_queue():
         items_ref = other_nodes_ref.document(str(other_node.id)).collection('items')
         for item in items_ref.get():
             log.debug("processing patches from item {}".format(item.id))
-            patches_ref = items_ref.document(str(item.id)).collection('patches')
+            other_node_item_ref = items_ref.document(str(item.id))
+            patches_ref = other_node_item_ref.collection('patches')
             for patch in patches_ref.order_by('client_rev').get():
                 log.debug("processing patch {}".format(patch.id))
                 patch_ref = patches_ref.document(str(patch.id))
@@ -136,10 +140,12 @@ def server_patch_queue():
                 new_items_ref = db.collection('nodes').document(node_id).collection('items')
                 new_item_ref = new_items_ref.document(str(item.id))
                 try:
-                    new_item = new_item_ref.get()
-                    old_text_before = ""
-                    sys.exit(0) # FIXME
-                    time.sleep(99999)
+                    log.debug("node {} item {} exists".format(node_id, item.id))
+                    new_item_dict = new_item_ref.get().to_dict()
+                    try:
+                        old_text_before = new_item_dict['text']
+                    except KeyError:
+                        old_text_before = ""
                 except google.api.core.exceptions.NotFound:
                     log.debug("node {} item {} doesn't exist".format(node_id, item.id))
                     old_text_before = ""
@@ -157,28 +163,12 @@ def server_patch_queue():
                     time.sleep(100)
 
                 transaction = db.transaction()
-                try_to_apply_patch(transaction, new_item_ref, patch_ref, old_text_before, new_text, client_rev, other_node_create_date, create_date)
-
-
-    #transaction = db.transaction()
-
-    # log.debug("processing item {}".format(item_id))
-    # url_base = "http://localhost:5001"
-    # # url_base = "https://requestb.in/xctmjexc"
-    # # url_base = "http://mockbin.org/bin/424a595a-a802-48ba-a44a-b6ddb553a0ee"
-    # url_route = "users/user_1/nodes/{}/items/{}".format(node_id, item_id, )
-    # url = "{}/{}".format(url_base, url_route, )
-    # log.debug(url)
-    #
-    # result = patch_queue(transaction, item_ref, url)
-    #
-    # if result:
-    #     #lock.acquire()
-    #     log.info("one entry from queue 1 was correctly processed")
-    #     #lock.release()
-    # else:
-    #     log.info("Nothing done! waiting 2 additional seconds")
-    #     time.sleep(2)
+                result = try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref, old_text_before, new_text, client_rev, other_node_create_date, create_date)
+                if result:
+                    log.info("one patch was correctly processed")
+                else:
+                    log.info("Not patched! waiting 2 additional seconds")
+                    time.sleep(2)
 
 
 if __name__ == '__main__':
@@ -186,13 +176,14 @@ if __name__ == '__main__':
         #lock = multiprocessing.Lock()
         p = multiprocessing.Process(target=server_patch_queue, args=())
         p_name = p.name
-        log.debug(p_name + " starting up")
+        #log.debug(p_name + " starting up")
         p.start()
         # Wait for x seconds or until process finishes
-        p.join(30)
+        p.join(300)
         if p.is_alive():
             log.debug(p_name + " timeouts")
             p.terminate()
             p.join()
         else:
-            log.debug(p_name + " finished ok")
+            #log.debug(p_name + " finished ok")
+            pass
