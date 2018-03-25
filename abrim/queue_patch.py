@@ -60,54 +60,46 @@ log = logging.getLogger(__name__)
 
 
 @firestore.transactional
-def try_to_apply_patch(transaction, new_item_ref):
-    # try:
-    #     queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
-    #
-    #     for queue_snapshot in queue:
-    #         queue_1_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
-    #         log.debug("processing queue_1_to_process item {}".format(queue_1_ref.id, ))
-    #
-    #         # NOW SENT THE QUEUE ITEM TO THE SERVER
-    #         queue_1_dict = queue_1_ref.get().to_dict()
-    #         try:
-    #             log.debug("about to POST this: {}".format(queue_1_dict,))
-    #             post_result = __requests_post(url, queue_1_dict)
-    #
-    #             log.info("HTTP Status code is: {}".format(post_result.status_code,))
-    #             post_result.raise_for_status()  # fail if not 2xx
-    #
-    #             log.debug("POST successful, archiving this item to queue_2_sent")
-    #             queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
-    #             transaction.set(queue_2_ref, {
-    #                 'create_date': firestore.SERVER_TIMESTAMP,
-    #                 'client_rev': queue_1_ref.id,
-    #                 'action': 'processed_item',
-    #             })
-    #
-    #             log.debug("archiving successful, deleting item from queue_1_to_process")
-    #             transaction.delete(queue_1_ref)
-    #         except requests.exceptions.ConnectionError:
-    #             log.info("ConnectionError!! Sleep 15 secs")
-    #             time.sleep(15)
-    #             return False
-    #         except requests.exceptions.HTTPError as err:
-    #             log.error(err)
-    #             log.info("Sleep 15 secs")
-    #             time.sleep(15)
-    #             return False
-    #         break
-    #     else:
-    #         log.info("queue query got no results")
-    #         return False
-    # except (grpc._channel._Rendezvous,
-    #         google.auth.exceptions.TransportError,
-    #         google.gax.errors.GaxError,
-    #         ):
-    #     log.error("Connection error to Firestore")
-    #     raise Exception
-    # log.info("queue 1 sent!")
-    return True
+def try_to_apply_patch(transaction, new_item_ref, patch_ref, old_text_before, new_text, client_rev, other_node_create_date, create_date):
+    try:
+        try:
+            new_item = new_item_ref.get()
+            old_text_now = ""
+            sys.exit(0)  # FIXME
+            time.sleep(99999)
+        except google.api.core.exceptions.NotFound:
+            old_text_now = ""
+        if old_text_now == old_text_before:
+            transaction.set(new_item_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'client_rev': client_rev,
+                'other_node_create_date': other_node_create_date,
+                'patch_create_date': create_date,
+                'text': new_text,
+            })
+            log.info("server text patched!")
+
+            patch_deleted_ref = patch_ref.collection('deleted').document(str(patch_ref.id))
+            # FIXME save the patch here
+            transaction.set(patch_deleted_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+            })
+            log.debug("patch archived")
+
+            transaction.delete(patch_ref)
+            log.debug("patch deleted")
+
+            return True
+        else:
+            log.debug("server text changed. Discarding...")
+            return False
+    except (grpc._channel._Rendezvous,
+            google.auth.exceptions.TransportError,
+            google.gax.errors.GaxError,
+            ):
+        log.error("Connection error to Firestore")
+        raise Exception
+
 
 
 def server_patch_queue():
@@ -145,18 +137,19 @@ def server_patch_queue():
                 new_item_ref = new_items_ref.document(str(item.id))
                 try:
                     new_item = new_item_ref.get()
+                    old_text_before = ""
                     sys.exit(0) # FIXME
                     time.sleep(99999)
                 except google.api.core.exceptions.NotFound:
                     log.debug("node {} item {} doesn't exist".format(node_id, item.id))
-                    text = ""
+                    old_text_before = ""
 
                 diff_obj = diff_match_patch.diff_match_patch()
                 # these are FUZZY patches and mustn't match perfectly
                 diff_match_patch.Match_Threshold = 1
                 patches_obj = diff_obj.patch_fromText(patches)
-                new_item_text, success = diff_obj.patch_apply(patches_obj, text)
-                log.debug(new_item_text)
+                new_text, success = diff_obj.patch_apply(patches_obj, old_text_before)
+                log.debug(new_text)
                 log.debug(success)
 
                 if not success:
@@ -164,7 +157,7 @@ def server_patch_queue():
                     time.sleep(100)
 
                 transaction = db.transaction()
-                try_to_apply_patch (transaction, new_item_ref)
+                try_to_apply_patch(transaction, new_item_ref, patch_ref, old_text_before, new_text, client_rev, other_node_create_date, create_date)
 
 
     #transaction = db.transaction()
