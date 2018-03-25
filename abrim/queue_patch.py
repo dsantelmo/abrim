@@ -4,6 +4,7 @@ import multiprocessing
 import time
 from random import randint
 import sys
+import diff_match_patch
 from google.cloud import firestore
 import grpc
 import google
@@ -59,7 +60,7 @@ log = logging.getLogger(__name__)
 
 
 @firestore.transactional
-def patch_queue(transaction, item_ref, url):
+def try_to_apply_patch(transaction, new_item_ref):
     # try:
     #     queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
     #
@@ -126,6 +127,45 @@ def server_patch_queue():
                 patch_ref = patches_ref.document(str(patch.id))
                 patch_dict = patch_ref.get().to_dict()
                 log.debug(patch_dict)
+                try:
+                    patches = patch_dict['patches']
+                    client_rev = patch_dict['client_rev']
+                    other_node_create_date = patch_dict['other_node_create_date']
+                    create_date = patch_dict['create_date']
+                except KeyError:
+                    log.error("KeyError in patch. Wait 5 seconds")
+                    time.sleep(5)
+                    return False
+
+                # now we should get the server text and try to fuzzy apply the patch to it
+                # if the patch fails discard the patch
+                # if the patch works and server text has not changed, atomically accept the patch and change the text
+                # if the server text has changed after the patch repeat the process
+                new_items_ref = db.collection('nodes').document(node_id).collection('items')
+                new_item_ref = new_items_ref.document(str(item.id))
+                try:
+                    new_item = new_item_ref.get()
+                    sys.exit(0) # FIXME
+                    time.sleep(99999)
+                except google.api.core.exceptions.NotFound:
+                    log.debug("node {} item {} doesn't exist".format(node_id, item.id))
+                    text = ""
+
+                diff_obj = diff_match_patch.diff_match_patch()
+                # these are FUZZY patches and mustn't match perfectly
+                diff_match_patch.Match_Threshold = 1
+                patches_obj = diff_obj.patch_fromText(patches)
+                new_item_text, success = diff_obj.patch_apply(patches_obj, text)
+                log.debug(new_item_text)
+                log.debug(success)
+
+                if not success:
+                    log.debug("Patch failed. I should discard the patch") #FIXME
+                    time.sleep(100)
+
+                transaction = db.transaction()
+                try_to_apply_patch (transaction, new_item_ref)
+
 
     #transaction = db.transaction()
 
