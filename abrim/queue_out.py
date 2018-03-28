@@ -64,6 +64,8 @@ def send_queue(transaction, item_ref, url):
         queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
 
         for queue_snapshot in queue:
+            log.debug("processing item {}".format(item_id))
+            log.debug("trying to post to {}".format(url))
             queue_1_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
             log.debug("processing queue_1_to_process item {}".format(queue_1_ref.id, ))
 
@@ -97,7 +99,7 @@ def send_queue(transaction, item_ref, url):
                 return False
             break
         else:
-            log.info("queue query got no results")
+            # log.info("queue query got no results")
             return False
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
@@ -119,14 +121,11 @@ def process_out_queue():
 
     transaction = db.transaction()
 
-    log.debug("processing item {}".format(item_id))
     url_base = "http://localhost:5002"
     # url_base = "https://requestb.in/xctmjexc"
     # url_base = "http://mockbin.org/bin/424a595a-a802-48ba-a44a-b6ddb553a0ee"
     url_route = "users/user_1/nodes/{}/items/{}".format(node_id, item_id, )
     url = "{}/{}".format(url_base, url_route, )
-    log.debug(url)
-
     result = send_queue(transaction, item_ref, url)
 
     if result:
@@ -134,8 +133,8 @@ def process_out_queue():
         log.info("one entry from queue 1 was correctly processed")
         #lock.release()
     else:
-        log.info("Nothing done! waiting 2 additional seconds")
-        time.sleep(2)
+        log.info("Nothing done! waiting 15 additional seconds")
+        time.sleep(15)
 
 
 if __name__ == '__main__':
@@ -143,7 +142,7 @@ if __name__ == '__main__':
         #lock = multiprocessing.Lock()
         p = multiprocessing.Process(target=process_out_queue, args=())
         p_name = p.name
-        log.debug(p_name + " starting up")
+        # log.debug(p_name + " starting up")
         p.start()
         # Wait for x seconds or until process finishes
         p.join(30)
@@ -152,4 +151,5 @@ if __name__ == '__main__':
             p.terminate()
             p.join()
         else:
-            log.debug(p_name + " finished ok")
+            # log.debug(p_name + " finished ok")
+            pass
