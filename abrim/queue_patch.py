@@ -1,21 +1,25 @@
 #!/usr/bin/env python
 
-import multiprocessing
-import time
-from random import randint
-import sys
-import diff_match_patch
-from google.cloud import firestore
-import grpc
-import google
-import requests
-import json
 import logging
+import multiprocessing
+import os
+import sys
+import time
+import zlib
+
+import diff_match_patch
+import google
+import grpc
+from google.cloud import firestore
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
+from node import AbrimConfig, create_item, create_diff_edits
 
 full_debug = False
 if full_debug:
     # enable debug for HTTP requests
     import http.client as http_client
+
     http_client.HTTPConnection.debuglevel = 1
 else:
     # disable more with
@@ -34,11 +38,12 @@ LOGGING_LEVELS = {'critical': logging.CRITICAL,
 # It is strongly advised that you do not add any handlers other
 # than NullHandler to your library's loggers.
 logging.basicConfig(level=logging.DEBUG,
-              format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
-              datefmt='%Y-%m-%d %H:%M:%S')  # ,
-              # disable_existing_loggers=False)
+                    format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')  # ,
+# disable_existing_loggers=False)
 logging.StreamHandler(sys.stdout)
 log = logging.getLogger(__name__)
+
 
 #
 # #for key in logging.Logger.manager.loggerDict:
@@ -60,28 +65,82 @@ log = logging.getLogger(__name__)
 
 
 @firestore.transactional
-def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref, old_text_before, new_text, client_rev, other_node_create_date, create_date):
+def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref, old_text_before, new_text, client_rev,
+                       other_node_create_date, create_date, item_id):
     try:
         try:
             new_item = new_item_ref.get().to_dict()
+            log.debug("try_to_apply_patch::new_item: {}".format(new_item))
             try:
                 old_text_now = new_item['text']
             except KeyError:
-                log.error("error getting existing text!")
-                return False
+                log.debug("error getting existing text! I'm going to assume is a newly create item and continue...")
+                old_text_now = ""
         except google.api.core.exceptions.NotFound:
             old_text_now = ""
         if old_text_now == old_text_before:
-            transaction.set(new_item_ref, {
-                'create_date': firestore.SERVER_TIMESTAMP,
-                'client_rev': client_rev,
-                'other_node_create_date': other_node_create_date,
-                'patch_create_date': create_date,
-                'text': new_text,
-            })
-            log.info("server text patched!")
 
             patches_deleted_ref = other_node_item_ref.collection('patches_deleted').document(str(patch_ref.id))
+
+
+            # FIXME this should be a call to update_item but the Firestore transaction won't cooperate
+
+
+            # config = AbrimConfig("node_2")
+            # update_item(config, item_id, new_text, transaction)
+
+            # create edits
+            text_patches = create_diff_edits(new_text, old_text_before)
+            old_shadow_adler32 = zlib.adler32(old_text_before.encode())
+            # old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
+            shadow_adler32 = zlib.adler32(new_text.encode())
+            # shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
+            log.debug("old_shadow_adler32 {}".format(old_shadow_adler32))
+            # log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
+            log.debug("shadow_adler32 {}".format(shadow_adler32))
+            # log.debug("shadow_sha512 {}".format(shadow_sha512))
+
+            # prepare the update of shadow and client text revision
+
+            #new_client_rev = client_rev + 1
+
+            try:
+                transaction.update(new_item_ref, {
+                    'last_update_date': firestore.SERVER_TIMESTAMP,
+                    'text': new_text,
+                    'shadow': new_text,
+                    'client_rev': new_client_rev,
+                })
+                queue_ref = new_item_ref.collection('queue_1_to_process').document(str(new_client_rev))
+                transaction.set(queue_ref, {
+                    'create_date': firestore.SERVER_TIMESTAMP,
+                    'client_rev': new_client_rev,
+                    'action': 'edit_item',
+                    'text_patches': text_patches,
+                    'old_shadow_adler32': old_shadow_adler32,
+                    'shadow_adler32': shadow_adler32,
+                })
+            except (grpc._channel._Rendezvous,
+                    google.auth.exceptions.TransportError,
+                    google.gax.errors.GaxError,
+                    ):
+                log.error("Connection error to Firestore")
+                return False
+            log.info("edit enqueued")
+
+
+
+
+
+            # transaction.set(new_item_ref, {
+            #     'create_date': firestore.SERVER_TIMESTAMP,
+            #     'client_rev': client_rev,
+            #     'other_node_create_date': other_node_create_date,
+            #     'patch_create_date': create_date,
+            #     'text': new_text,
+            # })
+            log.info("server text patched!")
+
             # FIXME save the patch here
             transaction.set(patches_deleted_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
@@ -103,7 +162,6 @@ def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref
         raise Exception
 
 
-
 def server_patch_queue():
     log.debug("starting server_patch_queue")
     node_id = "node_2"
@@ -116,7 +174,7 @@ def server_patch_queue():
         items_ref = other_nodes_ref.document(str(other_node.id)).collection('items')
         for item in items_ref.get():
             log.debug("processing patches from item {}".format(item.id))
-            other_node_item_ref = items_ref.document(str(item.id))
+            other_node_item_ref = items_ref.document(item.id)
             patches_ref = other_node_item_ref.collection('patches')
             for patch in patches_ref.order_by('client_rev').get():
                 log.debug("processing patch {}".format(patch.id))
@@ -140,14 +198,17 @@ def server_patch_queue():
                 new_items_ref = db.collection('nodes').document(node_id).collection('items')
                 new_item_ref = new_items_ref.document(str(item.id))
                 try:
-                    log.debug("node {} item {} exists".format(node_id, item.id))
                     new_item_dict = new_item_ref.get().to_dict()
+                    log.debug("node {} item {} exists".format(node_id, item.id))
                     try:
                         old_text_before = new_item_dict['text']
                     except KeyError:
                         old_text_before = ""
                 except google.api.core.exceptions.NotFound:
                     log.debug("node {} item {} doesn't exist".format(node_id, item.id))
+
+                    config = AbrimConfig("node_2")
+                    create_item(config, str(item.id))
                     old_text_before = ""
 
                 diff_obj = diff_match_patch.diff_match_patch()
@@ -159,11 +220,12 @@ def server_patch_queue():
                 log.debug(success)
 
                 if not success:
-                    log.debug("Patch failed. I should discard the patch") #FIXME
+                    log.debug("Patch failed. I should discard the patch")  # FIXME
                     time.sleep(100)
 
                 transaction = db.transaction()
-                result = try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref, old_text_before, new_text, client_rev, other_node_create_date, create_date)
+                result = try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref, old_text_before,
+                                            new_text, client_rev, other_node_create_date, create_date, str(item.id))
                 if result:
                     log.info("one patch was correctly processed")
                 else:
@@ -173,10 +235,10 @@ def server_patch_queue():
 
 if __name__ == '__main__':
     while True:
-        #lock = multiprocessing.Lock()
+        # lock = multiprocessing.Lock()
         p = multiprocessing.Process(target=server_patch_queue, args=())
         p_name = p.name
-        #log.debug(p_name + " starting up")
+        # log.debug(p_name + " starting up")
         p.start()
         # Wait for x seconds or until process finishes
         p.join(300)
@@ -185,5 +247,5 @@ if __name__ == '__main__':
             p.terminate()
             p.join()
         else:
-            #log.debug(p_name + " finished ok")
+            # log.debug(p_name + " finished ok")
             pass
