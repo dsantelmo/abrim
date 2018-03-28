@@ -59,7 +59,7 @@ def __requests_post(url, payload):
 
 
 @firestore.transactional
-def send_queue(transaction, item_ref, url):
+def send_queue(transaction, item_ref, url, item_id):
     try:
         queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
 
@@ -126,7 +126,7 @@ def process_out_queue():
     # url_base = "http://mockbin.org/bin/424a595a-a802-48ba-a44a-b6ddb553a0ee"
     url_route = "users/user_1/nodes/{}/items/{}".format(node_id, item_id, )
     url = "{}/{}".format(url_base, url_route, )
-    result = send_queue(transaction, item_ref, url)
+    result = send_queue(transaction, item_ref, url, item_id)
 
     if result:
         #lock.acquire()
