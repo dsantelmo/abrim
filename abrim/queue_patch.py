@@ -165,17 +165,17 @@ def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref
 
 
 def server_patch_queue():
-    log.debug("starting server_patch_queue")
+    # log.debug("starting server_patch_queue")
     node_id = "node_2"
     other_node_id = "node_1"
 
     db = firestore.Client()
     other_nodes_ref = db.collection('nodes').document(node_id).collection('other_nodes')
     for other_node in other_nodes_ref.get():
-        log.debug("processing patch queue from node {}".format(other_node.id))
+        # log.debug("processing patch queue from node {}".format(other_node.id))
         items_ref = other_nodes_ref.document(str(other_node.id)).collection('items')
         for item in items_ref.get():
-            log.debug("processing patches from item {}".format(item.id))
+            # log.debug("processing patches from item {}".format(item.id))
             other_node_item_ref = items_ref.document(item.id)
             patches_ref = other_node_item_ref.collection('patches')
             for patch in patches_ref.order_by('client_rev').get():
