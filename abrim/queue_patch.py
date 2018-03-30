@@ -109,12 +109,12 @@ def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref
                     'last_update_date': firestore.SERVER_TIMESTAMP,
                     'text': new_text,
                     'shadow': new_text,
-                    'client_rev': new_client_rev,
+                    'client_rev': client_rev,
                 })
-                queue_ref = new_item_ref.collection('queue_1_to_process').document(str(new_client_rev))
+                queue_ref = new_item_ref.collection('queue_1_to_process').document(str(client_rev))
                 transaction.set(queue_ref, {
                     'create_date': firestore.SERVER_TIMESTAMP,
-                    'client_rev': new_client_rev,
+                    'client_rev': client_rev,
                     'action': 'edit_item',
                     'text_patches': text_patches,
                     'old_shadow_adler32': old_shadow_adler32,
@@ -214,7 +214,12 @@ def server_patch_queue():
                 diff_obj = diff_match_patch.diff_match_patch()
                 # these are FUZZY patches and mustn't match perfectly
                 diff_match_patch.Match_Threshold = 1
-                patches_obj = diff_obj.patch_fromText(patches)
+                try:
+                    patches_obj = diff_obj.patch_fromText(patches)
+                except ValueError as ve:
+                    log.error(ve)
+                    return
+
                 new_text, success = diff_obj.patch_apply(patches_obj, old_text_before)
                 log.debug(new_text)
                 log.debug(success)
@@ -234,6 +239,46 @@ def server_patch_queue():
 
 
 if __name__ == '__main__':
+
+    db = firestore.Client()
+    node_ref = db.collection('nodes').document("node_2")
+
+    node_ref.set({
+        'a': 'a'
+    })
+
+    other_node_ref = node_ref.collection('other_nodes').document("node_1")
+
+    other_node_ref.set({
+        'a': 'a'
+    })
+
+    item_ref = other_node_ref.collection('items').document("item_1")
+    item_ref.set({
+        "client_rev": 2,
+        "last_update_date": firestore.SERVER_TIMESTAMP,
+        "shadow": "a newer text"
+    })
+
+    patches_1_ref = item_ref.collection('patches').document("1")
+    patches_1_ref.set({
+        "client_rev": 1,
+        "create_date": firestore.SERVER_TIMESTAMP,
+        "other_node_create_date": firestore.SERVER_TIMESTAMP,
+        "patches": '@@ -0,0 +1,10 @@\n+a new text\n'
+    })
+
+    patches_2_ref = item_ref.collection('patches').document("2")
+    patches_2_ref.set({
+        "client_rev": 2,
+        "create_date": firestore.SERVER_TIMESTAMP,
+        "other_node_create_date": firestore.SERVER_TIMESTAMP,
+        "patches": "@@ -1,10 +1,12 @@\na new +er text\n"
+    })
+
+    # sys.exit(0)
+
+
     while True:
         # lock = multiprocessing.Lock()
         p = multiprocessing.Process(target=server_patch_queue, args=())
