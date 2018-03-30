@@ -73,6 +73,8 @@ def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref
             log.debug("try_to_apply_patch::new_item: {}".format(new_item))
             try:
                 old_text_now = new_item['text']
+                if not old_text_before:
+                    raise KeyError
             except KeyError:
                 log.debug("error getting existing text! I'm going to assume is a newly create item and continue...")
                 old_text_now = ""
@@ -202,6 +204,8 @@ def server_patch_queue():
                     log.debug("node {} item {} exists".format(node_id, item.id))
                     try:
                         old_text_before = new_item_dict['text']
+                        if not old_text_before:
+                            raise KeyError
                     except KeyError:
                         old_text_before = ""
                 except google.api.core.exceptions.NotFound:
@@ -215,6 +219,7 @@ def server_patch_queue():
                 # these are FUZZY patches and mustn't match perfectly
                 diff_match_patch.Match_Threshold = 1
                 try:
+                    log.debug("about to patch this: {}".format(patches))
                     patches_obj = diff_obj.patch_fromText(patches)
                 except ValueError as ve:
                     log.error(ve)
@@ -247,8 +252,15 @@ if __name__ == '__main__':
         'a': 'a'
     })
 
-    other_node_ref = node_ref.collection('other_nodes').document("node_1")
+    this_item_ref = node_ref.collection('items').document("item_1")
+    this_item_ref.set({
+        "client_rev": 0,
+        "last_update_date": firestore.SERVER_TIMESTAMP,
+        "shadow": None,
+        "text": None
+    })
 
+    other_node_ref = node_ref.collection('other_nodes').document("node_1")
     other_node_ref.set({
         'a': 'a'
     })
@@ -273,7 +285,7 @@ if __name__ == '__main__':
         "client_rev": 2,
         "create_date": firestore.SERVER_TIMESTAMP,
         "other_node_create_date": firestore.SERVER_TIMESTAMP,
-        "patches": "@@ -1,10 +1,12 @@\na new +er text\n"
+        "patches": '@@ -1,10 +1,12 @@\n a new\n+er text\n'
     })
 
     # sys.exit(0)
