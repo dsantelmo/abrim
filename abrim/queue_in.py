@@ -108,80 +108,84 @@ def patch_text(item_patches, text):
     return patched_text, success
 
 
+def _check_item_patch_exist(transaction, item_ref, item_rev):
+    try:
+        _ = item_ref.get(transaction=transaction)
+        # exists so we can continue
+    except google.api.core.exceptions.NotFound:
+        log.error("item_exist doesn't... exist")
+        return False  # it doesn't exists
+    try:
+        _ = item_ref.collection('patches').document(str(item_rev))
+        log.error("patches_exist... exists")
+        return False  # it shouldn't be there
+    except google.api.core.exceptions.NotFound:
+        return True
+
+
 # to avoid race conditions existence of the item and creation should be done in a transaction
 @firestore.transactional
 def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32):
     try:
+        if not _check_item_patch_exist(transaction, item_ref, item_rev):
+            return False
+
+        #patches = item_ref.collection('patches').get()
+        item = item_ref.get().to_dict()
+
+        log.debug("item: {}".format(item))
         try:
-            log.debug("checking if the item exists")
-            item_exist = item_ref.get(transaction=transaction)
-            # exists so we can continue
-        except google.api.core.exceptions.NotFound:
-            log.error("item_exist doesn't... exist")
-            return False  # it doesn't exists
+            shadow = item['shadow']
+        except KeyError:
+            shadow = None
         try:
-            patches_ref = item_ref.collection('patches').document(str(item_rev))
-            patches_exist = patches_ref.get(transaction=transaction)
-            log.error("patches_exist... exists")
-            return False  # it shouldn't be there
-        except google.api.core.exceptions.NotFound:
-            log.debug("patches_exist doesn't exist, creating")
+            client_rev = item['client_rev']
+        except KeyError:
+            log.error("KeyError with client_rev")
+            return False
 
-            #patches = item_ref.collection('patches').get()
-            item = item_ref.get().to_dict()
+        if not shadow:
+            shadow = ''
 
-            log.debug("item: {}".format(item))
-            try:
-                shadow = item['shadow']
-            except KeyError:
-                shadow = None
-            try:
-                client_rev = item['client_rev']
-            except KeyError:
-                log.error("KeyError with client_rev")
-                return False
+        test_shadow = zlib.adler32(shadow.encode())
+        if old_shadow_adler32 != test_shadow:
+            log.error("shadows adler32s don't match {} {}".format(old_shadow_adler32, test_shadow,))
+            return False
 
-            if not shadow:
-                shadow = ''
+        if (client_rev + 1) != item_rev:
+            log.error("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
+            return False
 
-            test_shadow = zlib.adler32(shadow.encode())
-            if old_shadow_adler32 != test_shadow:
-                log.error("shadows adler32s don't match {} {}".format(old_shadow_adler32, test_shadow,))
-                return False
+        new_item_shadow, success = patch_text(item_patches, shadow)
 
-            if (client_rev + 1) != item_rev:
-                log.error("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
-                return False
+        if not success:
+            log.debug("patching failed")
+            return False
+        else:
+            log.debug("patching results: {}".format(new_item_shadow))
 
-            new_item_shadow, success = patch_text(item_patches, shadow)
+        test_shadow = zlib.adler32(new_item_shadow.encode())
+        if shadow_adler32 != test_shadow:
+            log.error("new shadows adler32s don't match {} {}".format(shadow_adler32, test_shadow,))
+            return False
 
-            if not success:
-                log.debug("patching failed")
-                return False
-            else:
-                log.debug("patching results: {}".format(new_item_shadow))
+        # TODO: think in maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
 
-            test_shadow = zlib.adler32(new_item_shadow.encode())
-            if shadow_adler32 != test_shadow:
-                log.error("new shadows adler32s don't match {} {}".format(shadow_adler32, test_shadow,))
-                return False
+        log.debug("updating patches_ref to: {}".format(item_rev))
+        patches_ref = item_ref.collection('patches').document(str(item_rev))
+        transaction.set(patches_ref, {
+            'create_date': firestore.SERVER_TIMESTAMP,
+            'other_node_create_date': item_create_date,
+            'client_rev': item_rev,
+            'patches': item_patches,
+        })
 
-            # TODO: think in maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
-
-            log.debug("updating patches_ref to: {}".format(item_rev))
-            transaction.set(patches_ref, {
-                'create_date': firestore.SERVER_TIMESTAMP,
-                'other_node_create_date': item_create_date,
-                'client_rev': item_rev,
-                'patches': item_patches,
-            })
-
-            log.debug("updating client_rev to: {}".format(item_rev))
-            transaction.set(item_ref, {
-                'last_update_date': firestore.SERVER_TIMESTAMP,
-                'client_rev': item_rev,
-                'shadow': new_item_shadow,
-            })
+        log.debug("updating client_rev to: {}".format(item_rev))
+        transaction.set(item_ref, {
+            'last_update_date': firestore.SERVER_TIMESTAMP,
+            'client_rev': item_rev,
+            'shadow': new_item_shadow,
+        })
 
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
