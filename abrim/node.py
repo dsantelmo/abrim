@@ -201,7 +201,7 @@ def update_item(config, item_id, new_text):
     try:
         old_text = old_item.get('text')
     except KeyError:
-        log.error("ERROR recovering the item text")
+        log.debug("no item text")
         old_text = ""
 
     try:
