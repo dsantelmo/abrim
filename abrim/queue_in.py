@@ -113,11 +113,12 @@ def _check_item_patch_exist(transaction, item_ref, item_rev):
         _ = item_ref.get(transaction=transaction)
         # exists so we can continue
     except google.api.core.exceptions.NotFound:
-        log.error("item_exist doesn't... exist")
+        log.error("ERROR item to patch doesn't exist")
         return False  # it doesn't exists
     try:
-        _ = item_ref.collection('patches').document(str(item_rev))
-        log.error("patches_exist... exists")
+        patches_ref = item_ref.collection('patches').document(str(item_rev))
+        _ = patches_ref.get(transaction=transaction)
+        log.error("ERROR patch already exists")
         return False  # it shouldn't be there
     except google.api.core.exceptions.NotFound:
         return True
