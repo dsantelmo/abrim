@@ -97,6 +97,17 @@ def server_create_item(config):
         return False
 
 
+def patch_text(item_patches, text):
+    log.debug(item_patches)
+    diff_obj = diff_match_patch.diff_match_patch()
+    # these are FRAGILE patches and must match perfectly
+    diff_match_patch.Match_Threshold = 0
+    diff_match_patch.Match_Distance = 0
+    patches =  diff_obj.patch_fromText(item_patches)
+    patched_text, success = diff_obj.patch_apply(patches, text)
+    return patched_text, success
+
+
 # to avoid race conditions existence of the item and creation should be done in a transaction
 @firestore.transactional
 def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32):
@@ -142,13 +153,7 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
                 log.error("client_rev: {}, item_rev: {}".format(client_rev, item_rev,))
                 return False
 
-            log.debug(item_patches)
-            diff_obj = diff_match_patch.diff_match_patch()
-            # these are FRAGILE patches and must match perfectly
-            diff_match_patch.Match_Threshold = 0
-            diff_match_patch.Match_Distance = 0
-            patches = diff_obj.patch_fromText(item_patches)
-            new_item_shadow, success = diff_obj.patch_apply(patches, shadow)
+            new_item_shadow, success = patch_text(item_patches, shadow)
 
             if not success:
                 log.debug("patching failed")
