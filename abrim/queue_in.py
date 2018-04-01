@@ -124,6 +124,21 @@ def _check_item_patch_exist(transaction, item_ref, item_rev):
         return True
 
 
+def _get_shadow_and_rev(transaction, item_ref):
+    item = item_ref.get(transaction=transaction).to_dict()
+    log.debug("item: {}".format(item))
+    try:
+        shadow = item['shadow']
+    except KeyError:
+        shadow = ''
+    try:
+        client_rev = item['client_rev']
+    except KeyError:
+        log.error("KeyError with client_rev")
+        return False
+    return shadow, client_rev
+
+
 # to avoid race conditions existence of the item and creation should be done in a transaction
 @firestore.transactional
 def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32):
@@ -131,22 +146,7 @@ def enqueue_update_in_transaction(transaction, item_ref, item_rev, item_create_d
         if not _check_item_patch_exist(transaction, item_ref, item_rev):
             return False
 
-        #patches = item_ref.collection('patches').get()
-        item = item_ref.get().to_dict()
-
-        log.debug("item: {}".format(item))
-        try:
-            shadow = item['shadow']
-        except KeyError:
-            shadow = None
-        try:
-            client_rev = item['client_rev']
-        except KeyError:
-            log.error("KeyError with client_rev")
-            return False
-
-        if not shadow:
-            shadow = ''
+        shadow, client_rev = _get_shadow_and_rev(transaction, item_ref)
 
         test_shadow = zlib.adler32(shadow.encode())
         if old_shadow_adler32 != test_shadow:
