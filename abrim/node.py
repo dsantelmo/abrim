@@ -117,19 +117,19 @@ def create_in_transaction(transaction, item_ref, config):
 
         for node in config.known_nodes:
             log.debug("creating shadow for node {}".format(node))
-            shadow = item_ref.collection('shadows').document(node)
+            shadow = item_ref.collection('shadows').document('0').collection('nodes').document(node)
             transaction.set(shadow, {
                 'create_date': firestore.SERVER_TIMESTAMP,
                 'shadow': None,
-                'shadow_client_rev': 0,
                 'shadow_server_rev': 0
             })
-
-        queue_ref = item_ref.collection('queue_1_to_process').document('0')
-        transaction.set(queue_ref, {
-            'create_date': firestore.SERVER_TIMESTAMP,
-            'action': 'create_item'
-        })
+            queue_ref = item_ref.collection('queue_1_to_process').document('0').collection('nodes').document(node)
+            transaction.set(queue_ref, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'action': 'create_item',
+                'shadow': None,
+                'shadow_server_rev': 0
+            })
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
             google.gax.errors.GaxError,
