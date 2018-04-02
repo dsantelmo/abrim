@@ -103,7 +103,7 @@ def get_item_ref(db, config, item_id):
 
 
 @firestore.transactional
-def create_in_transaction(transaction, item_ref):
+def create_in_transaction(transaction, item_ref, config):
     try:
         # FIXME to avoid race conditions do first a ref.get(transaction=transaction)
         # like in queue_in-> create_in_transaction
@@ -114,6 +114,17 @@ def create_in_transaction(transaction, item_ref):
             # 'text': item_text,
             'client_rev': client_rev,
         })
+
+        for node in config.known_nodes:
+            log.debug("creating shadow for node {}".format(node))
+            shadow = item_ref.collection('shadows').document(node)
+            transaction.set(shadow, {
+                'create_date': firestore.SERVER_TIMESTAMP,
+                'shadow': None,
+                'shadow_client_rev': 0,
+                'shadow_server_rev': 0
+            })
+
         queue_ref = item_ref.collection('queue_1_to_process').document(str(client_rev))
         transaction.set(queue_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
@@ -137,7 +148,7 @@ def create_item(config, item_id):
 
     transaction = db.transaction()
 
-    result = create_in_transaction(transaction, item_ref)
+    result = create_in_transaction(transaction, item_ref, config)
     if result:
         log.debug('transaction ended OK')
         return True
@@ -250,6 +261,7 @@ if __name__ == "__main__":
 
     node_id = "node_1"
     config = AbrimConfig("node_1")
+    config.known_nodes = ['node_2', 'node_3',]
 
     log.debug("NODE ID: {}".format(config.node_id,))
 
