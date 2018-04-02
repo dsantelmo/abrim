@@ -45,25 +45,6 @@ logging.StreamHandler(sys.stdout)
 log = logging.getLogger(__name__)
 
 
-#
-# #for key in logging.Logger.manager.loggerDict:
-# #    print(key)
-# def date_handler(obj):
-#     return obj.isoformat() if hasattr(obj, 'isoformat') else obj
-#
-#
-# def __requests_post(url, payload):
-#     #prepare payload
-#     temp_str = json.dumps(payload, default=date_handler)
-#     temp_dict = json.loads(temp_str)
-#     return requests.post(
-#       url,
-#       headers={'Content-Type': 'application/json'},
-#       # json=json.dumps(payload, default=date_handler)
-#       json=temp_dict
-#       )
-
-
 @firestore.transactional
 def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref, old_text_before, new_text, client_rev,
                        other_node_create_date, create_date, item_id):
@@ -81,31 +62,20 @@ def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref
         except google.api.core.exceptions.NotFound:
             old_text_now = ""
         if old_text_now == old_text_before:
-
             patches_deleted_ref = other_node_item_ref.collection('patches_deleted').document(str(patch_ref.id))
-
-
-            # FIXME this should be a call to update_item but the Firestore transaction won't cooperate
-
-
-            # config = AbrimConfig("node_2")
-            # update_item(config, item_id, new_text, transaction)
 
             # create edits
             text_patches = create_diff_edits(new_text, old_text_before)
             old_shadow_adler32 = zlib.adler32(old_text_before.encode())
-            # old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
             shadow_adler32 = zlib.adler32(new_text.encode())
-            # shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
             log.debug("old_shadow_adler32 {}".format(old_shadow_adler32))
-            # log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
             log.debug("shadow_adler32 {}".format(shadow_adler32))
+            # old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
+            # shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
+            # log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
             # log.debug("shadow_sha512 {}".format(shadow_sha512))
 
             # prepare the update of shadow and client text revision
-
-            #new_client_rev = client_rev + 1
-
             try:
                 transaction.update(new_item_ref, {
                     'last_update_date': firestore.SERVER_TIMESTAMP,
@@ -113,34 +83,21 @@ def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref
                     'shadow': new_text,
                     'client_rev': client_rev,
                 })
-                queue_ref = new_item_ref.collection('queue_1_to_process').document(str(client_rev))
-                transaction.set(queue_ref, {
-                    'create_date': firestore.SERVER_TIMESTAMP,
-                    'client_rev': client_rev,
-                    'action': 'edit_item',
-                    'text_patches': text_patches,
-                    'old_shadow_adler32': old_shadow_adler32,
-                    'shadow_adler32': shadow_adler32,
-                })
+                # queue_ref = new_item_ref.collection('queue_1_to_process').document(str(client_rev))
+                # transaction.set(queue_ref, {
+                #     'create_date': firestore.SERVER_TIMESTAMP,
+                #     'client_rev': client_rev,
+                #     'action': 'edit_item',
+                #     'text_patches': text_patches,
+                #     'old_shadow_adler32': old_shadow_adler32,
+                #     'shadow_adler32': shadow_adler32,
+                # })
             except (grpc._channel._Rendezvous,
                     google.auth.exceptions.TransportError,
                     google.gax.errors.GaxError,
                     ):
                 log.error("Connection error to Firestore")
                 return False
-            log.info("edit enqueued")
-
-
-
-
-
-            # transaction.set(new_item_ref, {
-            #     'create_date': firestore.SERVER_TIMESTAMP,
-            #     'client_rev': client_rev,
-            #     'other_node_create_date': other_node_create_date,
-            #     'patch_create_date': create_date,
-            #     'text': new_text,
-            # })
             log.info("server text patched!")
 
             # FIXME save the patch here
@@ -148,9 +105,8 @@ def try_to_apply_patch(transaction, new_item_ref, other_node_item_ref, patch_ref
                 'create_date': firestore.SERVER_TIMESTAMP,
             })
             log.debug("patch archived")
-
             transaction.delete(patch_ref)
-            log.debug("patch deleted")
+            log.debug("original patch deleted")
 
             return True
         else:
