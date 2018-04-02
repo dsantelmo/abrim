@@ -112,10 +112,7 @@ def create_in_transaction(transaction, item_ref, config):
         except google.api.core.exceptions.NotFound:
             pass
         transaction.set(item_ref, {
-            'create_date': firestore.SERVER_TIMESTAMP,
-            # 'last_update_date': firestore.SERVER_TIMESTAMP,
-            # 'text': item_text,
-            'client_rev': client_rev,
+            'create_date': firestore.SERVER_TIMESTAMP
         })
 
         for node in config.known_nodes:
@@ -128,10 +125,9 @@ def create_in_transaction(transaction, item_ref, config):
                 'shadow_server_rev': 0
             })
 
-        queue_ref = item_ref.collection('queue_1_to_process').document(str(client_rev))
+        queue_ref = item_ref.collection('queue_1_to_process').document('0')
         transaction.set(queue_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
-            'client_rev': client_rev,
             'action': 'create_item'
         })
     except (grpc._channel._Rendezvous,
@@ -272,9 +268,10 @@ if __name__ == "__main__":
     item_id = "item_1"
 
     try:
+        # FIXME unify create_item and update_item
         create_item(config, item_id)
-        update_item(config, item_id, "a new text")
-        update_item(config, item_id, "a newer text")
+        #update_item(config, item_id, "a new text")
+        #update_item(config, item_id, "a newer text")
 
     except google.auth.exceptions.DefaultCredentialsError:
         log.warning(""" AUTH FAILED
