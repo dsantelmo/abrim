@@ -123,7 +123,11 @@ def create_in_transaction(transaction, item_ref, config):
                 'shadow': None,
                 'shadow_server_rev': 0
             })
-            queue_ref = item_ref.collection('queue_1_to_process').document('0').collection('nodes').document(node)
+            rev_ref = item_ref.collection('queue_1_to_process').document('0')
+            transaction.set(rev_ref, {
+                'client_rev': 0
+            })
+            queue_ref = rev_ref.collection('nodes').document(node)
             transaction.set(queue_ref, {
                 'create_date': firestore.SERVER_TIMESTAMP,
                 'action': 'create_item',
