@@ -105,9 +105,12 @@ def get_item_ref(db, config, item_id):
 @firestore.transactional
 def create_in_transaction(transaction, item_ref, config):
     try:
-        # FIXME to avoid race conditions do first a ref.get(transaction=transaction)
-        # like in queue_in-> create_in_transaction
-        client_rev = 0
+        try:
+            _ = item_ref.get(transaction=transaction)
+            log.error("Tried to create the item but it's already been created")
+            return False  # it shouldn't be there
+        except google.api.core.exceptions.NotFound:
+            pass
         transaction.set(item_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
             # 'last_update_date': firestore.SERVER_TIMESTAMP,
