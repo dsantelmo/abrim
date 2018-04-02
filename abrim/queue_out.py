@@ -59,44 +59,62 @@ def __requests_post(url, payload):
 
 
 @firestore.transactional
-def send_queue(transaction, item_ref, url, item_id):
+def send_queue(transaction, item_ref, item_id):
+    # /nodes/node_1/items/item_1/queue_1_to_process/0/nodes/node_2
+    known_nodes = ['node_2', 'node_3',]  # FIXME load config
+
+    url_base = "http://localhost:5002"
+    url_node = "node_2"
+    url_route = "users/user_1/nodes/{}/items/{}".format(url_node, item_id, )
+    url = "{}/{}".format(url_base, url_route, )
+    urls = {'node_2': url,}
+
     try:
         queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
 
         for queue_snapshot in queue:
             log.debug("processing item {}".format(item_id))
             log.debug("trying to post to {}".format(url))
-            queue_1_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
-            log.debug("processing queue_1_to_process item {}".format(queue_1_ref.id, ))
+            rev_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
+            log.debug("processing queue_1_to_process rev {}".format(rev_ref.id, ))
 
-            # NOW SENT THE QUEUE ITEM TO THE SERVER
-            queue_1_dict = queue_1_ref.get().to_dict()
-            try:
-                log.debug("about to POST this: {}".format(queue_1_dict,))
-                post_result = __requests_post(url, queue_1_dict)
+            for node in known_nodes:
+                try:
+                    url = urls[node]
+                except KeyError:
+                    continue
+                log.debug("processing queue_1_to_process rev {} for node {}".format(rev_ref.id, node,))
+                queue_ref = rev_ref.collection('nodes').document(node)
+                queue_dict = queue_ref.get(transaction=transaction).to_dict()
+                log.debug(queue_dict)
 
-                log.info("HTTP Status code is: {}".format(post_result.status_code,))
-                post_result.raise_for_status()  # fail if not 2xx
+                # NOW SENT THE QUEUE ITEM TO THE SERVER
+                try:
+                    log.debug("about to POST this: {}".format(queue_dict,))
+                    post_result = __requests_post(url, queue_dict)
 
-                log.debug("POST successful, archiving this item to queue_2_sent")
-                queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
-                transaction.set(queue_2_ref, {
-                    'create_date': firestore.SERVER_TIMESTAMP,
-                    'client_rev': queue_1_ref.id,
-                    'action': 'processed_item',
-                })
+                    log.info("HTTP Status code is: {}".format(post_result.status_code,))
+                    post_result.raise_for_status()  # fail if not 2xx
 
-                log.debug("archiving successful, deleting item from queue_1_to_process")
-                transaction.delete(queue_1_ref)
-            except requests.exceptions.ConnectionError:
-                log.info("ConnectionError!! Sleep 15 secs")
-                time.sleep(15)
-                return False
-            except requests.exceptions.HTTPError as err:
-                log.error(err)
-                log.info("Sleep 15 secs")
-                time.sleep(15)
-                return False
+                    log.debug("POST successful, archiving this item to queue_2_sent")
+                    queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
+                    transaction.set(queue_2_ref, {
+                        'create_date': firestore.SERVER_TIMESTAMP,
+                        'client_rev': queue_1_ref.id,
+                        'action': 'processed_item',
+                    })
+
+                    log.debug("archiving successful, deleting item from queue_1_to_process")
+                    transaction.delete(queue_1_ref)
+                except requests.exceptions.ConnectionError:
+                    log.info("ConnectionError!! Sleep 15 secs")
+                    time.sleep(15)
+                    return False
+                except requests.exceptions.HTTPError as err:
+                    log.error(err)
+                    log.info("Sleep 15 secs")
+                    time.sleep(15)
+                    return False
             break
         else:
             # log.info("queue query got no results")
@@ -121,12 +139,7 @@ def process_out_queue():
 
     transaction = db.transaction()
 
-    url_base = "http://localhost:5002"
-    # url_base = "https://requestb.in/xctmjexc"
-    # url_base = "http://mockbin.org/bin/424a595a-a802-48ba-a44a-b6ddb553a0ee"
-    url_route = "users/user_1/nodes/{}/items/{}".format(node_id, item_id, )
-    url = "{}/{}".format(url_base, url_route, )
-    result = send_queue(transaction, item_ref, url, item_id)
+    result = send_queue(transaction, item_ref, item_id)
 
     if result:
         #lock.acquire()
