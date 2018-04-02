@@ -149,7 +149,7 @@ def create_item(config, item_id):
 
     result = create_in_transaction(transaction, item_ref, config)
     if result:
-        log.debug('transaction ended OK')
+        log.debug('create_item ended OK')
         return True
     else:
         log.error('ERROR saving new item')
