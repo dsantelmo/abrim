@@ -237,7 +237,7 @@ def parse_req(req_json):
     log.debug("parse_req: {}".format(req_json))
     try:
         item_action = req_json['action']
-        item_rev = req_json['client_rev']
+        item_rev = req_json['shadow_server_rev']
         item_create_date = req_json['create_date']
     except KeyError:
         log.error("missing action or client_rev or create_date")

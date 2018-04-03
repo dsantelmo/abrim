@@ -73,19 +73,26 @@ def send_queue(transaction, item_ref, item_id):
         queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
 
         for queue_snapshot in queue:
-            log.debug("processing item {}".format(item_id))
-            log.debug("trying to post to {}".format(url))
+            log.debug("checking id {}".format(queue_snapshot.id))
             rev_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
-            log.debug("processing queue_1_to_process rev {}".format(rev_ref.id, ))
-
             for node in known_nodes:
                 try:
                     url = urls[node]
                 except KeyError:
+                    # log.debug("node {} without url".format(node))
                     continue
-                log.debug("processing queue_1_to_process rev {} for node {}".format(rev_ref.id, node,))
+
                 queue_ref = rev_ref.collection('nodes').document(node)
-                queue_dict = queue_ref.get(transaction=transaction).to_dict()
+                try:
+                    queue_dict = queue_ref.get(transaction=transaction).to_dict()
+                except google.api.core.exceptions.NotFound:
+                    # this node doesn't match the node in the query
+                    # FIXME this is an abomination... stop querying to fail...
+                    continue
+
+                log.debug("processing item {}".format(item_id))
+                log.debug("trying to post to {}".format(url))
+                log.debug("processing queue_1_to_process rev {} for node {}".format(rev_ref.id, node,))
                 log.debug(queue_dict)
 
                 # NOW SENT THE QUEUE ITEM TO THE SERVER
@@ -97,15 +104,15 @@ def send_queue(transaction, item_ref, item_id):
                     post_result.raise_for_status()  # fail if not 2xx
 
                     log.debug("POST successful, archiving this item to queue_2_sent")
-                    queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_1_ref.id))
+                    queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_ref.id))
                     transaction.set(queue_2_ref, {
                         'create_date': firestore.SERVER_TIMESTAMP,
-                        'client_rev': queue_1_ref.id,
+                        'client_rev': queue_ref.id,
                         'action': 'processed_item',
                     })
 
                     log.debug("archiving successful, deleting item from queue_1_to_process")
-                    transaction.delete(queue_1_ref)
+                    transaction.delete(queue_ref)
                 except requests.exceptions.ConnectionError:
                     log.info("ConnectionError!! Sleep 15 secs")
                     time.sleep(15)
