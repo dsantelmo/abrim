@@ -208,41 +208,41 @@ if __name__ == '__main__':
         'a': 'a'
     })
 
-    this_item_ref = node_ref.collection('items').document("item_1")
-    this_item_ref.set({
-        "client_rev": 0,
-        "last_update_date": firestore.SERVER_TIMESTAMP,
-        "shadow": None,
-        "text": None
-    })
+    # this_item_ref = node_ref.collection('items').document("item_1")
+    # this_item_ref.set({
+    #     "client_rev": 0,
+    #     "last_update_date": firestore.SERVER_TIMESTAMP,
+    #     "shadow": None,
+    #     "text": None
+    # })
 
     other_node_ref = node_ref.collection('other_nodes').document("node_1")
     other_node_ref.set({
         'a': 'a'
     })
-
-    item_ref = other_node_ref.collection('items').document("item_1")
-    item_ref.set({
-        "client_rev": 2,
-        "last_update_date": firestore.SERVER_TIMESTAMP,
-        "shadow": "a newer text"
-    })
-
-    patches_1_ref = item_ref.collection('patches').document("1")
-    patches_1_ref.set({
-        "client_rev": 1,
-        "create_date": firestore.SERVER_TIMESTAMP,
-        "other_node_create_date": firestore.SERVER_TIMESTAMP,
-        "patches": '@@ -0,0 +1,10 @@\n+a new text\n'
-    })
-
-    patches_2_ref = item_ref.collection('patches').document("2")
-    patches_2_ref.set({
-        "client_rev": 2,
-        "create_date": firestore.SERVER_TIMESTAMP,
-        "other_node_create_date": firestore.SERVER_TIMESTAMP,
-        "patches": '@@ -1,10 +1,12 @@\n a new\n+er text\n'
-    })
+    #
+    # item_ref = other_node_ref.collection('items').document("item_1")
+    # item_ref.set({
+    #     "client_rev": 2,
+    #     "last_update_date": firestore.SERVER_TIMESTAMP,
+    #     "shadow": "a newer text"
+    # })
+    #
+    # patches_1_ref = item_ref.collection('patches').document("1")
+    # patches_1_ref.set({
+    #     "client_rev": 1,
+    #     "create_date": firestore.SERVER_TIMESTAMP,
+    #     "other_node_create_date": firestore.SERVER_TIMESTAMP,
+    #     "patches": '@@ -0,0 +1,10 @@\n+a new text\n'
+    # })
+    #
+    # patches_2_ref = item_ref.collection('patches').document("2")
+    # patches_2_ref.set({
+    #     "client_rev": 2,
+    #     "create_date": firestore.SERVER_TIMESTAMP,
+    #     "other_node_create_date": firestore.SERVER_TIMESTAMP,
+    #     "patches": '@@ -1,10 +1,12 @@\n a new\n+er text\n'
+    # })
 
     # sys.exit(0)
 
