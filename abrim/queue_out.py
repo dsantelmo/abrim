@@ -64,7 +64,7 @@ def send_queue(transaction, item_ref, item_id):
     known_nodes = ['node_2', 'node_3',]  # FIXME load config
 
     url_base = "http://localhost:5002"
-    url_node = "node_2"
+    url_node = "node_1"  # FIXME don't trust node_id from url
     url_route = "users/user_1/nodes/{}/items/{}".format(url_node, item_id, )
     url = "{}/{}".format(url_base, url_route, )
     urls = {'node_2': url,}
