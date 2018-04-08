@@ -12,20 +12,36 @@ import hashlib
 from pathlib import Path
 
 
-LOGGING_LEVELS = {'critical': logging.CRITICAL,
-                  'error': logging.ERROR,
-                  'warning': logging.WARNING,
-                  'info': logging.INFO,
-                  'debug': logging.DEBUG}
-# FIXME http://docs.python-guide.org/en/latest/writing/logging/
-# It is strongly advised that you do not add any handlers other
-# than NullHandler to your library's loggers.
-logging.basicConfig(level=logging.DEBUG,
-              format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
-              datefmt='%Y-%m-%d %H:%M:%S')  # ,
-              # disable_existing_loggers=False)
-logging.StreamHandler(sys.stdout)
-log = logging.getLogger(__name__)
+def get_log(full_debug=False):
+    if full_debug:
+        # enable debug for HTTP requests
+        import http.client as http_client
+        http_client.HTTPConnection.debuglevel = 1
+    else:
+        # disable more with
+        # for key in logging.Logger.manager.loggerDict:
+        #    print(key)
+        logging.getLogger('requests').setLevel(logging.CRITICAL)
+        logging.getLogger('urllib3').setLevel(logging.CRITICAL)
+        logging.getLogger('google').setLevel(logging.CRITICAL)
+
+    LOGGING_LEVELS = {'critical': logging.CRITICAL,
+                      'error': logging.ERROR,
+                      'warning': logging.WARNING,
+                      'info': logging.INFO,
+                      'debug': logging.DEBUG}
+    # FIXME http://docs.python-guide.org/en/latest/writing/logging/
+    # It is strongly advised that you do not add any handlers other
+    # than NullHandler to your library's loggers.
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')  # ,
+    # disable_existing_loggers=False)
+    logging.StreamHandler(sys.stdout)
+    return logging.getLogger(__name__)
+
+
+log = get_log(full_debug=False)
 
 
 class AbrimConfig(object):
@@ -261,7 +277,6 @@ def update_item(config, item_id, new_text):
 
 
 if __name__ == "__main__":
-
     node_id = "node_1"
     config = AbrimConfig("node_1")
     config.known_nodes = ['node_2', 'node_3',]
