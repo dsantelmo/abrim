@@ -176,22 +176,11 @@ def create_item(config, item_id):
 @firestore.transactional
 def update_in_transaction(transaction, item_ref, new_text):
     log.debug("recovering item...")
-    try:
-        old_item = item_ref.get(transaction=transaction)
-        log.debug('Document exists, data: {}'.format(old_item.to_dict()))
-        try:
-            client_rev = old_item.get('client_rev')
-        except KeyError:
-            log.info("ERROR recovering the client_rev")
-            sys.exit(0)
-        try:
-            old_shadow = old_item.get('shadow')
-        except KeyError:
-            old_shadow = ""
-    except google.cloud.exceptions.NotFound:
-        log.error('No such document! Creating a new one')
-        client_rev = 0
-        old_shadow = ""
+    client_rev, old_shadow = _get_rev_shadow(item_ref, transaction)
+
+    if old_shadow == new_text:
+        log.info("new text equals old shadow, nothing done!")
+        return True
 
     # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
@@ -228,6 +217,26 @@ def update_in_transaction(transaction, item_ref, new_text):
         return False
     log.info('New update saved')
     return True
+
+
+def _get_rev_shadow(item_ref, transaction):
+    try:
+        old_item = item_ref.get(transaction=transaction)
+        log.debug('Document exists, data: {}'.format(old_item.to_dict()))
+        try:
+            client_rev = old_item.get('client_rev')
+        except KeyError:
+            log.info("ERROR recovering the client_rev")
+            sys.exit(0)
+        try:
+            old_shadow = old_item.get('shadow')
+        except KeyError:
+            old_shadow = ""
+    except google.cloud.exceptions.NotFound:
+        log.error('No such document! Creating a new one')
+        client_rev = 0
+        old_shadow = ""
+    return client_rev, old_shadow
 
 
 def update_item(config, item_id, new_text):
