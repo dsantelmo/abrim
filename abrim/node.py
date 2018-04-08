@@ -88,7 +88,7 @@ class AbrimConfig(object):
 
 
 def create_diff_edits(text, shadow):
-    log.debug("about to diff \"{}\" with \"{}\"".format(text,shadow,))
+    log.debug("about to diff \"{}\" with \"{}\"".format(shadow,text,))
     if shadow:
         diff_obj = diff_match_patch.diff_match_patch()
         diff_obj.Diff_Timeout = 1
