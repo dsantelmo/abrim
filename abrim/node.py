@@ -179,29 +179,35 @@ def update_in_transaction(transaction, item_ref, new_text):
     log.debug("recovering item...")
     client_rev, old_shadow = _get_rev_shadow(item_ref, transaction)
 
-    if old_shadow == new_text:
+    if old_shadow == new_text and client_rev != -1:
         log.info("new text equals old shadow, nothing done!")
         return True
 
-    text_patches = create_diff_edits(new_text, old_shadow)
-    old_shadow_adler32 = _create_hash(old_shadow)
-    shadow_adler32 = _create_hash(new_text)
-
+    client_rev += 1
     try:
-        transaction.set(item_ref, {
+        data = {
             'last_update_date': firestore.SERVER_TIMESTAMP,
             'text': new_text,
             'shadow': new_text,
             'client_rev': client_rev,
-        })
+        }
+        transaction.set(item_ref, data)
+        log.debug("item saved with data: {}".format(data))
+
+        text_patches = create_diff_edits(new_text, old_shadow)
+        old_shadow_adler32 = _create_hash(old_shadow)
+        shadow_adler32 = _create_hash(new_text)
+
         queue_ref = item_ref.collection('queue_1_to_process').document(str(client_rev))
-        transaction.set(queue_ref, {
+        data = {
             'create_date': firestore.SERVER_TIMESTAMP,
             'client_rev': client_rev,
             'text_patches': text_patches,
             'old_shadow_adler32': old_shadow_adler32,
             'shadow_adler32': shadow_adler32,
-        })
+        }
+        transaction.set(queue_ref, data)
+        log.debug("queue_1_to_process saved with data: {}".format(data))
         log.debug('About to commit transaction...')
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
@@ -235,7 +241,7 @@ def _get_rev_shadow(item_ref, transaction):
             old_shadow = ""
     except google.cloud.exceptions.NotFound:
         log.error('No such document! Creating a new one')
-        client_rev = 0
+        client_rev = -1
         old_shadow = ""
     return client_rev, old_shadow
 
@@ -243,7 +249,7 @@ def _get_rev_shadow(item_ref, transaction):
 def update_item(config, item_id, new_text):
 
     if not new_text:
-        raise Exception
+        new_text = ""
 
     db = firestore.Client()
     item_ref = get_item_ref(db, config, item_id)
