@@ -87,20 +87,17 @@ class AbrimConfig(object):
             self.node_id = node_id
 
 
-def create_diff_edits(item_text2, item_shadow2):
-    if item_shadow2 is None:
-        text_patches2 = None
-    else:
+def create_diff_edits(text, shadow):
+    log.debug("about to diff {} with {}".format(text,shadow,))
+    if shadow:
         diff_obj = diff_match_patch.diff_match_patch()
         diff_obj.Diff_Timeout = 1
-        diff = diff_obj.diff_main(item_shadow2, item_text2)
+        diff = diff_obj.diff_main(shadow, text)
         diff_obj.diff_cleanupSemantic(diff)  # FIXME: optional?
         patch = diff_obj.patch_make(diff)
         if patch:
-            text_patches2 = diff_obj.patch_toText(patch)
-        else:
-            text_patches2 = None
-    return text_patches2
+            return diff_obj.patch_toText(patch)
+    return None
 
 
 def get_item_ref(db, config, item_id):
