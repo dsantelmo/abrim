@@ -34,7 +34,7 @@ def get_log(full_debug=False):
     # It is strongly advised that you do not add any handlers other
     # than NullHandler to your library's loggers.
     logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s __ %(module)-12s __ %(levelname)-8s: %(message)s',
+                        format='%(asctime)s - %(module)s:%(funcName)-.25s:%(lineno)d %(levelname)-.5s: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')  # ,
     # disable_existing_loggers=False)
     logging.StreamHandler(sys.stdout)
