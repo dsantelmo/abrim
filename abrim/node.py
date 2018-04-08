@@ -182,16 +182,9 @@ def update_in_transaction(transaction, item_ref, new_text):
         log.info("new text equals old shadow, nothing done!")
         return True
 
-    # create edits
     text_patches = create_diff_edits(new_text, old_shadow)
-    old_shadow_adler32 = zlib.adler32(old_shadow.encode())
-    shadow_adler32 = zlib.adler32(new_text.encode())
-    log.debug("old_shadow_adler32 {}".format(old_shadow_adler32))
-    log.debug("shadow_adler32 {}".format(shadow_adler32))
-    #old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
-    #shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
-    #log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
-    #log.debug("shadow_sha512 {}".format(shadow_sha512))
+    old_shadow_adler32 = _create_hash(old_shadow)
+    shadow_adler32 = _create_hash(new_text)
 
     try:
         transaction.set(item_ref, {
@@ -217,6 +210,13 @@ def update_in_transaction(transaction, item_ref, new_text):
         return False
     log.info('New update saved')
     return True
+
+
+def _create_hash(text):
+    adler32 = zlib.adler32(text.encode())
+    log.debug("new hash {}".format(adler32))
+    # shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
+    return adler32
 
 
 def _get_rev_shadow(item_ref, transaction):
