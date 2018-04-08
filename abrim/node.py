@@ -89,15 +89,16 @@ class AbrimConfig(object):
 
 def create_diff_edits(text, shadow):
     log.debug("about to diff \"{}\" with \"{}\"".format(shadow,text,))
-    if shadow:
-        diff_obj = diff_match_patch.diff_match_patch()
-        diff_obj.Diff_Timeout = 1
-        diff = diff_obj.diff_main(shadow, text)
-        diff_obj.diff_cleanupSemantic(diff)  # FIXME: optional?
-        patch = diff_obj.patch_make(diff)
-        if patch:
-            return diff_obj.patch_toText(patch)
-    return None
+    diff_obj = diff_match_patch.diff_match_patch()
+    diff_obj.Diff_Timeout = 1
+    diff = diff_obj.diff_main(shadow, text)
+    diff_obj.diff_cleanupSemantic(diff)  # FIXME: optional?
+    patch = diff_obj.patch_make(diff)
+    if patch:
+        return diff_obj.patch_toText(patch)
+    else:
+        log.debug("no patch results...")
+        return None
 
 
 def get_item_ref(db, config, item_id):
