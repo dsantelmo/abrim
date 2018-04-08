@@ -174,31 +174,58 @@ def create_item(config, item_id):
 
 
 @firestore.transactional
-def update_in_transaction(transaction, item_ref, new_client_rev, new_text, text_patches,
-                          old_shadow_adler32, shadow_adler32):
+def update_in_transaction(transaction, item_ref, new_text):
+    log.debug("recovering item...")
     try:
-        transaction.update(item_ref, {
+        old_item = item_ref.get(transaction=transaction)
+        log.debug('Document exists, data: {}'.format(old_item.to_dict()))
+        try:
+            client_rev = old_item.get('client_rev')
+        except KeyError:
+            log.info("ERROR recovering the client_rev")
+            sys.exit(0)
+        try:
+            old_shadow = old_item.get('shadow')
+        except KeyError:
+            old_shadow = ""
+    except google.cloud.exceptions.NotFound:
+        log.error('No such document! Creating a new one')
+        client_rev = 0
+        old_shadow = ""
+
+    # create edits
+    text_patches = create_diff_edits(new_text, old_shadow)
+    old_shadow_adler32 = zlib.adler32(old_shadow.encode())
+    shadow_adler32 = zlib.adler32(new_text.encode())
+    log.debug("old_shadow_adler32 {}".format(old_shadow_adler32))
+    log.debug("shadow_adler32 {}".format(shadow_adler32))
+    #old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
+    #shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
+    #log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
+    #log.debug("shadow_sha512 {}".format(shadow_sha512))
+
+    try:
+        transaction.set(item_ref, {
             'last_update_date': firestore.SERVER_TIMESTAMP,
             'text': new_text,
             'shadow': new_text,
-            'client_rev': new_client_rev,
+            'client_rev': client_rev,
         })
-        queue_ref = item_ref.collection('queue_1_to_process').document(str(new_client_rev))
+        queue_ref = item_ref.collection('queue_1_to_process').document(str(client_rev))
         transaction.set(queue_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
-            'client_rev': new_client_rev,
-            'action': 'edit_item',
+            'client_rev': client_rev,
             'text_patches': text_patches,
             'old_shadow_adler32': old_shadow_adler32,
             'shadow_adler32': shadow_adler32,
         })
+        log.debug('About to commit transaction...')
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
             google.gax.errors.GaxError,
             ):
         log.error("Connection error to Firestore")
         return False
-    log.info("edit enqueued")
     return True
 
 
@@ -207,64 +234,10 @@ def update_item(config, item_id, new_text):
     if not new_text:
         raise Exception
 
-    log.debug("recovering item...")
-
     db = firestore.Client()
     item_ref = get_item_ref(db, config, item_id)
-
-    old_item = None
-    try:
-        old_item = item_ref.get()
-        log.debug('Document data: {}'.format(old_item.to_dict()))
-    except google.cloud.exceptions.NotFound:
-        log.error('No such document!')
-        raise Exception
-    if not old_item:
-        raise Exception
-    log.info("recovered data ok")
-
-    old_text = None
-    client_rev = None
-    try:
-        old_text = old_item.get('text')
-    except KeyError:
-        log.debug("no item text")
-        old_text = ""
-
-    try:
-        client_rev = old_item.get('client_rev')
-    except KeyError:
-        log.error("ERROR recovering the client_rev")
-        sys.exit(0)
-
-    old_shadow = old_text
-    try:
-        old_shadow = old_item.get('shadow')
-    except KeyError:
-        pass
-
-    # create edits
-    text_patches = create_diff_edits(new_text, old_shadow)
-    old_shadow_adler32 = zlib.adler32(old_shadow.encode())
-    #old_shadow_sha512 = hashlib.sha512(old_shadow.encode()).hexdigest()
-    shadow_adler32 = zlib.adler32(new_text.encode())
-    #shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
-    log.debug("old_shadow_adler32 {}".format(old_shadow_adler32))
-    #log.debug("old_shadow_sha512 {}".format(old_shadow_sha512))
-    log.debug("shadow_adler32 {}".format(shadow_adler32))
-    #log.debug("shadow_sha512 {}".format(shadow_sha512))
-
-    # prepare the update of shadow and client text revision
-
-    db = firestore.Client()
-
     transaction = db.transaction()
-
-    item_ref = get_item_ref(db, config, item_id)
-
-    new_client_rev = client_rev + 1
-    result = update_in_transaction(transaction, item_ref, new_client_rev, new_text, text_patches,
-                                   old_shadow_adler32, shadow_adler32)
+    result = update_in_transaction(transaction, item_ref, new_text)
     if result:
         log.debug('update transaction ended OK')
         return True
@@ -285,8 +258,8 @@ if __name__ == "__main__":
 
     try:
         # FIXME unify create_item and update_item
-        create_item(config, item_id)
-        #update_item(config, item_id, "a new text")
+        #create_item(config, item_id)
+        update_item(config, item_id, "a new text")
         #update_item(config, item_id, "a newer text")
 
     except google.auth.exceptions.DefaultCredentialsError:
