@@ -226,6 +226,7 @@ def update_in_transaction(transaction, item_ref, new_text):
             ):
         log.error("Connection error to Firestore")
         return False
+    log.info('New update saved')
     return True
 
 
