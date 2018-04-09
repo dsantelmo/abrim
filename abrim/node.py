@@ -177,31 +177,32 @@ def create_item(config, item_id):
 @firestore.transactional
 def update_in_transaction(transaction, item_ref, new_text):
     log.debug("recovering item...")
-    client_rev, old_shadow = _get_rev_shadow(item_ref, transaction)
-
-    if old_shadow == new_text and client_rev != -1:
+    shadow_client_rev, shadow_server_rev, old_shadow = _get_rev_shadow(item_ref, transaction)
+    if old_shadow == new_text and shadow_client_rev != -1:
         log.info("new text equals old shadow, nothing done!")
         return True
-
-    client_rev += 1
+    shadow_client_rev += 1
+    shadow_server_rev += 1
     try:
-        data = {
-            'last_update_date': firestore.SERVER_TIMESTAMP,
-            'text': new_text,
-            'shadow': new_text,
-            'client_rev': client_rev,
-        }
-        transaction.set(item_ref, data)
-        log.debug("item saved with data: {}".format(data))
-
         text_patches = create_diff_edits(new_text, old_shadow)
         old_shadow_adler32 = _create_hash(old_shadow)
         shadow_adler32 = _create_hash(new_text)
 
-        queue_ref = item_ref.collection('queue_1_to_process').document(str(client_rev))
+        data = {
+            'last_update_date': firestore.SERVER_TIMESTAMP,
+            'text': new_text,
+            'shadow': new_text,
+            'shadow_client_rev': shadow_client_rev,
+            'shadow_server_rev': shadow_server_rev
+        }
+        transaction.set(item_ref, data)
+        log.debug("item saved with data: {}".format(data))
+
+        queue_ref = item_ref.collection('queue_1_to_process').document(str(shadow_client_rev))
         data = {
             'create_date': firestore.SERVER_TIMESTAMP,
-            'client_rev': client_rev,
+            'shadow_client_rev': shadow_client_rev,
+            'shadow_server_rev': shadow_server_rev,
             'text_patches': text_patches,
             'old_shadow_adler32': old_shadow_adler32,
             'shadow_adler32': shadow_adler32,
@@ -231,9 +232,14 @@ def _get_rev_shadow(item_ref, transaction):
         old_item = item_ref.get(transaction=transaction)
         log.debug('Document exists, data: {}'.format(old_item.to_dict()))
         try:
-            client_rev = old_item.get('client_rev')
+            shadow_client_rev = old_item.get('shadow_client_rev')
         except KeyError:
-            log.info("ERROR recovering the client_rev")
+            log.info("ERROR recovering the shadow_client_rev")
+            sys.exit(0)
+        try:
+            shadow_server_rev = old_item.get('shadow_server_rev')
+        except KeyError:
+            log.info("ERROR recovering the shadow_server_rev")
             sys.exit(0)
         try:
             old_shadow = old_item.get('shadow')
@@ -241,9 +247,10 @@ def _get_rev_shadow(item_ref, transaction):
             old_shadow = ""
     except google.cloud.exceptions.NotFound:
         log.error('No such document! Creating a new one')
-        client_rev = -1
+        shadow_client_rev = -1
+        shadow_server_rev = -1
         old_shadow = ""
-    return client_rev, old_shadow
+    return shadow_client_rev, shadow_server_rev, old_shadow
 
 
 def update_item(config, item_id, new_text):
@@ -277,7 +284,7 @@ if __name__ == "__main__":
         # FIXME unify create_item and update_item
         #create_item(config, item_id)
         update_item(config, item_id, "a new text")
-        #update_item(config, item_id, "a newer text")
+        update_item(config, item_id, "a newer text")
 
     except google.auth.exceptions.DefaultCredentialsError:
         log.warning(""" AUTH FAILED
