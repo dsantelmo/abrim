@@ -181,6 +181,10 @@ def update_in_transaction(transaction, item_ref, new_text):
     if old_shadow == new_text and shadow_client_rev != -1:
         log.info("new text equals old shadow, nothing done!")
         return True
+    return _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction)
+
+
+def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction):
     shadow_client_rev += 1
     shadow_server_rev += 1
     try:
