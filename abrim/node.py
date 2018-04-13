@@ -141,26 +141,8 @@ def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, sha
     old_shadow_adler32 = _create_hash(old_shadow)
     shadow_adler32 = _create_hash(new_text)
     try:
-        base_data = {
-            'create_date': firestore.SERVER_TIMESTAMP,
-            'shadow_client_rev': shadow_client_rev,
-            'shadow_server_rev': shadow_server_rev
-        }
-        shadow_data = dict(base_data)
-        queue_data = dict(base_data)
-        item_data = dict(base_data)
-        shadow_data.update({
-            'shadow': new_text,
-            'old_shadow': old_shadow, # FIXME check if this is really needed
-        })
-        queue_data.update({
-            'text_patches': text_patches,
-            'old_shadow_adler32': old_shadow_adler32,
-            'shadow_adler32': shadow_adler32,
-        })
-        item_data.update({
-            'text': new_text,
-        })
+        item_data, queue_data, shadow_data = _prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32,
+                                                           shadow_client_rev, shadow_server_rev, text_patches)
 
         log.debug("creating shadow, queue and saving item for node {}".format(node_id))
         shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
@@ -178,6 +160,31 @@ def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, sha
         return False
     log.info('New update saved')
     return True
+
+
+def _prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shadow_client_rev, shadow_server_rev,
+                  text_patches):
+    base_data = {
+        'create_date': firestore.SERVER_TIMESTAMP,
+        'shadow_client_rev': shadow_client_rev,
+        'shadow_server_rev': shadow_server_rev
+    }
+    shadow_data = dict(base_data)
+    queue_data = dict(base_data)
+    item_data = dict(base_data)
+    shadow_data.update({
+        'shadow': new_text,
+        'old_shadow': old_shadow,  # FIXME check if this is really needed
+    })
+    queue_data.update({
+        'text_patches': text_patches,
+        'old_shadow_adler32': old_shadow_adler32,
+        'shadow_adler32': shadow_adler32,
+    })
+    item_data.update({
+        'text': new_text,
+    })
+    return item_data, queue_data, shadow_data
 
 
 def _create_hash(text):
