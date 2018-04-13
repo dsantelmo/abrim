@@ -101,7 +101,7 @@ def create_diff_edits(text, shadow):
         return None
 
 
-def get_item_ref(db, config, item_id):
+def _get_item_ref(db, config, item_id):
     node_id = config.node_id
     try:
         db_prefix = config.db_prefix
@@ -114,6 +114,14 @@ def get_item_ref(db, config, item_id):
 
     node_ref = db.collection(db_path).document(node_id)
     return node_ref.collection('items').document(item_id)
+
+
+def _get_shadow_revs_ref(item_ref, node_id):
+    return item_ref.collection('shadows').document(node_id).collection('revs')
+
+
+def _get_queue_1_revs_ref(item_ref, node_id):
+    return item_ref.collection('queue_1_to_process').document(node_id).collection('revs')
 
 
 @firestore.transactional
@@ -155,8 +163,8 @@ def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, sha
         })
 
         log.debug("creating shadow, queue and saving item for node {}".format(node_id))
-        shadow_ref = item_ref.collection('shadows').document(node_id).collection('revs').document(str(shadow_client_rev))
-        queue_ref = item_ref.collection('queue_1_to_process').document(node_id).collection('revs').document(str(shadow_client_rev))
+        shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
+        queue_ref = _get_queue_1_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
         transaction.set(shadow_ref, shadow_data)
         transaction.set(queue_ref, queue_data)
         transaction.set(item_ref, item_data)
@@ -182,9 +190,9 @@ def _create_hash(text):
 def _get_rev_shadow(item_ref, node_id, transaction):
     try:
         shadow = None
-        shadow_generator = item_ref.collection('shadows').document(node_id).collection('revs').order_by('shadow_client_rev', direction=firestore.Query.DESCENDING).limit(1).get(transaction=transaction)
+        shadow_generator = _get_shadow_revs_ref(item_ref, node_id).order_by('shadow_client_rev', direction=firestore.Query.DESCENDING).limit(1).get(transaction=transaction)
         for shadow_snapshot in shadow_generator:
-            shadow_ref = item_ref.collection('shadows').document(node_id).collection('revs').document(str(shadow_snapshot.id))
+            shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_snapshot.id))
             shadow = shadow_ref.get(transaction=transaction)
 
         if shadow:
@@ -219,7 +227,7 @@ def update_item(config, item_id, new_text):
         new_text = ""
 
     db = firestore.Client()
-    item_ref = get_item_ref(db, config, item_id)
+    item_ref = _get_item_ref(db, config, item_id)
 
     for node_id in config.known_nodes_ids:
         transaction = db.transaction()
