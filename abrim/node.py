@@ -117,102 +117,48 @@ def get_item_ref(db, config, item_id):
 
 
 @firestore.transactional
-def create_in_transaction(transaction, item_ref, config):
-    try:
-        try:
-            _ = item_ref.get(transaction=transaction)
-            log.error("Tried to create the item but it's already been created")
-            return False  # it shouldn't be there
-        except google.api.core.exceptions.NotFound:
-            pass
-        transaction.set(item_ref, {
-            'create_date': firestore.SERVER_TIMESTAMP
-        })
-
-        for node in config.known_nodes:
-            log.debug("creating shadow for node {}".format(node))
-            shadow = item_ref.collection('shadows').document('0').collection('nodes').document(node)
-            transaction.set(shadow, {
-                'create_date': firestore.SERVER_TIMESTAMP,
-                'shadow': None,
-                'shadow_server_rev': 0
-            })
-            rev_ref = item_ref.collection('queue_1_to_process').document('0')
-            transaction.set(rev_ref, {
-                'client_rev': 0
-            })
-            queue_ref = rev_ref.collection('nodes').document(node)
-            transaction.set(queue_ref, {
-                'create_date': firestore.SERVER_TIMESTAMP,
-                'action': 'create_item',
-                'shadow': None,
-                'shadow_server_rev': 0
-            })
-    except (grpc._channel._Rendezvous,
-            google.auth.exceptions.TransportError,
-            google.gax.errors.GaxError,
-            ):
-        log.error("Connection error to Firestore")
-        return False
-    log.debug("edit enqueued")
-    return True
-
-
-def create_item(config, item_id):
-
-    db = firestore.Client()
-    item_ref = get_item_ref(db, config, item_id)
-
-    transaction = db.transaction()
-
-    result = create_in_transaction(transaction, item_ref, config)
-    if result:
-        log.debug('create_item ended OK')
-        return True
-    else:
-        log.error('ERROR saving new item')
-        raise Exception
-
-
-@firestore.transactional
-def update_in_transaction(transaction, item_ref, new_text):
+def update_in_transaction(transaction, item_ref, new_text, node_id):
     log.debug("recovering item...")
-    shadow_client_rev, shadow_server_rev, old_shadow = _get_rev_shadow(item_ref, transaction)
+    shadow_client_rev, shadow_server_rev, old_shadow = _get_rev_shadow(item_ref, node_id, transaction)
     if old_shadow == new_text and shadow_client_rev != -1:
         log.info("new text equals old shadow, nothing done!")
         return True
-    return _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction)
+    return _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction, node_id)
 
 
-def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction):
+def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction, node_id):
     shadow_client_rev += 1
     shadow_server_rev += 1
+    text_patches = create_diff_edits(new_text, old_shadow)
+    old_shadow_adler32 = _create_hash(old_shadow)
+    shadow_adler32 = _create_hash(new_text)
     try:
-        text_patches = create_diff_edits(new_text, old_shadow)
-        old_shadow_adler32 = _create_hash(old_shadow)
-        shadow_adler32 = _create_hash(new_text)
-
-        data = {
-            'last_update_date': firestore.SERVER_TIMESTAMP,
-            'text': new_text,
-            'shadow': new_text,
+        base_data = {
+            'create_date': firestore.SERVER_TIMESTAMP,
             'shadow_client_rev': shadow_client_rev,
             'shadow_server_rev': shadow_server_rev
         }
-        transaction.set(item_ref, data)
-        log.debug("item saved with data: {}".format(data))
-
-        queue_ref = item_ref.collection('queue_1_to_process').document(str(shadow_client_rev))
-        data = {
-            'create_date': firestore.SERVER_TIMESTAMP,
-            'shadow_client_rev': shadow_client_rev,
-            'shadow_server_rev': shadow_server_rev,
+        shadow_data = queue_data = item_data = base_data
+        shadow_data.update({
+            'shadow': new_text,
+            'old_shadow': old_shadow, # FIXME check if this is really needed
+        })
+        queue_data.update({
             'text_patches': text_patches,
             'old_shadow_adler32': old_shadow_adler32,
             'shadow_adler32': shadow_adler32,
-        }
-        transaction.set(queue_ref, data)
-        log.debug("queue_1_to_process saved with data: {}".format(data))
+        })
+        item_data.update({
+            'text': new_text,
+        })
+
+        log.debug("creating shadow, queue and saving item for node {}".format(node_id))
+        shadow_ref = item_ref.collection('shadows').document(node_id).collection('revs').document(str(shadow_client_rev))
+        queue_ref = item_ref.collection('queue_1_to_process').document(node_id).collection('revs').document(str(shadow_client_rev))
+        transaction.set(shadow_ref, shadow_data)
+        transaction.set(queue_ref, queue_data)
+        transaction.set(item_ref, item_data)
+
         log.debug('About to commit transaction...')
     except (grpc._channel._Rendezvous,
             google.auth.exceptions.TransportError,
@@ -231,24 +177,32 @@ def _create_hash(text):
     return adler32
 
 
-def _get_rev_shadow(item_ref, transaction):
+def _get_rev_shadow(item_ref, node_id, transaction):
     try:
-        old_item = item_ref.get(transaction=transaction)
-        log.debug('Document exists, data: {}'.format(old_item.to_dict()))
-        try:
-            shadow_client_rev = old_item.get('shadow_client_rev')
-        except KeyError:
-            log.info("ERROR recovering the shadow_client_rev")
-            sys.exit(0)
-        try:
-            shadow_server_rev = old_item.get('shadow_server_rev')
-        except KeyError:
-            log.info("ERROR recovering the shadow_server_rev")
-            sys.exit(0)
-        try:
-            old_shadow = old_item.get('shadow')
-        except KeyError:
-            old_shadow = ""
+        shadow = None
+        shadow_generator = item_ref.collection('shadows').document(node_id).collection('revs').order_by('shadow_client_rev', direction=firestore.Query.DESCENDING).limit(1).get(transaction=transaction)
+        for shadow_snapshot in shadow_generator:
+            shadow_ref = item_ref.collection('shadows').document(node_id).collection('revs').document(str(shadow_snapshot.id))
+            shadow = shadow_ref.get(transaction=transaction)
+
+        if shadow:
+            try:
+                shadow_client_rev = shadow.get('shadow_client_rev')
+                log.debug('Document exists, data: {}'.format(shadow.to_dict()))
+            except KeyError:
+                log.info("ERROR recovering the shadow_client_rev")
+                sys.exit(0)
+            try:
+                shadow_server_rev = shadow.get('shadow_server_rev')
+            except KeyError:
+                log.info("ERROR recovering the shadow_server_rev")
+                sys.exit(0)
+            try:
+                old_shadow = shadow.get('shadow')
+            except KeyError:
+                old_shadow = ""
+        else:
+            raise google.cloud.exceptions.NotFound("raise")
     except google.cloud.exceptions.NotFound:
         log.error('No such document! Creating a new one')
         shadow_client_rev = -1
@@ -264,20 +218,22 @@ def update_item(config, item_id, new_text):
 
     db = firestore.Client()
     item_ref = get_item_ref(db, config, item_id)
-    transaction = db.transaction()
-    result = update_in_transaction(transaction, item_ref, new_text)
-    if result:
-        log.debug('update transaction ended OK')
-        return True
-    else:
-        log.error('ERROR updating item')
-        raise Exception
+
+    for node_id in config.known_nodes_ids:
+        transaction = db.transaction()
+        result = update_in_transaction(transaction, item_ref, new_text, node_id)
+        if result:
+            log.debug('update transaction ended OK')
+            return True
+        else:
+            log.error('ERROR updating item')
+            raise Exception
 
 
 if __name__ == "__main__":
     node_id = "node_1"
     config = AbrimConfig("node_1")
-    config.known_nodes = ['node_2', 'node_3',]
+    config.known_nodes_ids = ['node_2', 'node_3', ]
 
     log.debug("NODE ID: {}".format(config.node_id,))
 
@@ -287,6 +243,7 @@ if __name__ == "__main__":
     try:
         # FIXME unify create_item and update_item
         #create_item(config, item_id)
+        update_item(config, item_id, "")
         update_item(config, item_id, "a new text")
         update_item(config, item_id, "a newer text")
 
