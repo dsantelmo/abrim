@@ -138,7 +138,9 @@ def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, sha
             'shadow_client_rev': shadow_client_rev,
             'shadow_server_rev': shadow_server_rev
         }
-        shadow_data = queue_data = item_data = base_data
+        shadow_data = dict(base_data)
+        queue_data = dict(base_data)
+        item_data = dict(base_data)
         shadow_data.update({
             'shadow': new_text,
             'old_shadow': old_shadow, # FIXME check if this is really needed
