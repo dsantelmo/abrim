@@ -101,7 +101,7 @@ def create_diff_edits(text, shadow):
         return None
 
 
-def _get_item_ref(db, config, item_id):
+def get_item_ref(db, config, item_id):
     node_id = config.node_id
     try:
         db_prefix = config.db_prefix
@@ -120,7 +120,7 @@ def _get_shadow_revs_ref(item_ref, node_id):
     return item_ref.collection('shadows').document(node_id).collection('revs')
 
 
-def _get_queue_1_revs_ref(item_ref, node_id):
+def get_queue_1_revs_ref(item_ref, node_id):
     return item_ref.collection('queue_1_to_process').document(node_id).collection('revs')
 
 
@@ -146,7 +146,7 @@ def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, sha
 
         log.debug("creating shadow, queue and saving item for node {}".format(node_id))
         shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
-        queue_ref = _get_queue_1_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
+        queue_ref = get_queue_1_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
         transaction.set(shadow_ref, shadow_data)
         transaction.set(queue_ref, queue_data)
         transaction.set(item_ref, item_data)
@@ -234,7 +234,7 @@ def update_item(config, item_id, new_text):
         new_text = ""
 
     db = firestore.Client()
-    item_ref = _get_item_ref(db, config, item_id)
+    item_ref = get_item_ref(db, config, item_id)
 
     for node_id in config.known_nodes_ids:
         transaction = db.transaction()
