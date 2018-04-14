@@ -11,9 +11,8 @@ import requests
 import json
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
-from node import get_log
+from node import get_log, get_item_ref, get_queue_1_revs_ref, AbrimConfig
 log = get_log(full_debug=False)
-
 
 #for key in logging.Logger.manager.loggerDict:
 #    print(key)
@@ -34,69 +33,66 @@ def __requests_post(url, payload):
 
 
 @firestore.transactional
-def send_queue(transaction, item_ref, item_id):
+def send_queue(transaction, item_ref, config, remote_node_id):
     # /nodes/node_1/items/item_1/queue_1_to_process/0/nodes/node_2
-    known_nodes = ['node_2', 'node_3',]  # FIXME load config
-
+    node_id = config.node_id
+    item_id = config.item_id
     url_base = "http://localhost:5002"
-    url_node = "node_1"  # FIXME don't trust node_id from url
-    url_route = "users/user_1/nodes/{}/items/{}".format(url_node, item_id, )
+    url_route = "users/user_1/nodes/{}/items/{}".format(node_id, item_id, ) # FIXME don't trust node_id from url
     url = "{}/{}".format(url_base, url_route, )
     urls = {'node_2': url,}
 
     try:
-        queue = item_ref.collection('queue_1_to_process').order_by('client_rev').limit(1).get()
+        # log.debug("checking queue for node: {}".format(remote_node_id))
+        queue = get_queue_1_revs_ref(item_ref, remote_node_id).order_by('shadow_client_rev').limit(1).get()
 
         for queue_snapshot in queue:
-            log.debug("checking id {}".format(queue_snapshot.id))
-            rev_ref = item_ref.collection('queue_1_to_process').document(str(queue_snapshot.id))
-            for node in known_nodes:
-                try:
-                    url = urls[node]
-                except KeyError:
-                    # log.debug("node {} without url".format(node))
-                    continue
+            # log.debug("checking id {}".format(queue_snapshot.id))
+            rev_ref = get_queue_1_revs_ref(item_ref, remote_node_id).document(str(queue_snapshot.id))
+            try:
+                url = urls[remote_node_id]
+            except KeyError:
+                # log.debug("node {} without url".format(node))
+                continue
 
-                queue_ref = rev_ref.collection('nodes').document(node)
-                try:
-                    queue_dict = queue_ref.get(transaction=transaction).to_dict()
-                except google.api.core.exceptions.NotFound:
-                    # this node doesn't match the node in the query
-                    # FIXME this is an abomination... stop querying to fail...
-                    continue
+            try:
+                queue_dict = rev_ref.get(transaction=transaction).to_dict()
+            except google.api.core.exceptions.NotFound:
+                # this node doesn't match the node in the query
+                # FIXME this is an abomination... stop querying to fail...
+                continue
 
-                log.debug("processing item {}".format(item_id))
-                log.debug("trying to post to {}".format(url))
-                log.debug("processing queue_1_to_process rev {} for node {}".format(rev_ref.id, node,))
-                log.debug(queue_dict)
+            log.debug("processing item {}".format(item_id))
+            log.debug("trying to post to {}".format(url))
+            log.debug("processing queue_1_to_process rev {} for node {}".format(rev_ref.id, remote_node_id, ))
 
-                # NOW SENT THE QUEUE ITEM TO THE SERVER
-                try:
-                    log.debug("about to POST this: {}".format(queue_dict,))
-                    post_result = __requests_post(url, queue_dict)
+            # NOW SENT THE QUEUE ITEM TO THE SERVER
+            try:
+                log.debug("about to POST this: {}".format(queue_dict,))
+                post_result = __requests_post(url, queue_dict)
 
-                    log.info("HTTP Status code is: {}".format(post_result.status_code,))
-                    post_result.raise_for_status()  # fail if not 2xx
+                log.info("HTTP Status code is: {}".format(post_result.status_code,))
+                post_result.raise_for_status()  # fail if not 2xx
 
-                    log.debug("POST successful, archiving this item to queue_2_sent")
-                    queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_ref.id))
-                    transaction.set(queue_2_ref, {
-                        'create_date': firestore.SERVER_TIMESTAMP,
-                        'client_rev': queue_ref.id,
-                        'action': 'processed_item',
-                    })
+                log.debug("POST successful, archiving this item to queue_2_sent")
+                queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_ref.id))
+                transaction.set(queue_2_ref, {
+                    'create_date': firestore.SERVER_TIMESTAMP,
+                    'client_rev': queue_ref.id,
+                    'action': 'processed_item',
+                })
 
-                    log.debug("archiving successful, deleting item from queue_1_to_process")
-                    transaction.delete(queue_ref)
-                except requests.exceptions.ConnectionError:
-                    log.info("ConnectionError!! Sleep 15 secs")
-                    time.sleep(15)
-                    return False
-                except requests.exceptions.HTTPError as err:
-                    log.error(err)
-                    log.info("Sleep 15 secs")
-                    time.sleep(15)
-                    return False
+                log.debug("archiving successful, deleting item from queue_1_to_process")
+                transaction.delete(queue_ref)
+            except requests.exceptions.ConnectionError:
+                log.info("ConnectionError!! Sleep 15 secs")
+                time.sleep(15)
+                return False
+            except requests.exceptions.HTTPError as err:
+                log.error(err)
+                log.info("Sleep 15 secs")
+                time.sleep(15)
+                return False
             break
         else:
             # log.info("queue query got no results")
@@ -111,17 +107,11 @@ def send_queue(transaction, item_ref, item_id):
     return True
 
 
-def process_out_queue():
-    node_id = "node_1"
-    item_id = "item_1"
-
+def process_out_queue(config, node_id):
     db = firestore.Client()
-    node_ref = db.collection('nodes').document(node_id)
-    item_ref = node_ref.collection('items').document(item_id)
-
+    item_ref = get_item_ref(db, config, config.item_id)
     transaction = db.transaction()
-
-    result = send_queue(transaction, item_ref, item_id)
+    result = send_queue(transaction, item_ref, config, node_id)
 
     if result:
         #lock.acquire()
@@ -133,18 +123,23 @@ def process_out_queue():
 
 
 if __name__ == '__main__':
+    config = AbrimConfig("node_1")
+    config.known_nodes_ids = ['node_2', 'node_3', ]
+    config.item_id = "item_1"
+
     while True:
-        #lock = multiprocessing.Lock()
-        p = multiprocessing.Process(target=process_out_queue, args=())
-        p_name = p.name
-        # log.debug(p_name + " starting up")
-        p.start()
-        # Wait for x seconds or until process finishes
-        p.join(30)
-        if p.is_alive():
-            log.debug(p_name + " timeouts")
-            p.terminate()
-            p.join()
-        else:
-            # log.debug(p_name + " finished ok")
-            pass
+        for node_id in config.known_nodes_ids:
+            #lock = multiprocessing.Lock()
+            p = multiprocessing.Process(target=process_out_queue, args=(config, node_id))
+            p_name = p.name
+            # log.debug(p_name + " starting up")
+            p.start()
+            # Wait for x seconds or until process finishes
+            p.join(30)
+            if p.is_alive():
+                log.debug(p_name + " timeouts")
+                p.terminate()
+                p.join()
+            else:
+                # log.debug(p_name + " finished ok")
+                pass
