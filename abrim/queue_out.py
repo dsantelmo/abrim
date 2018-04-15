@@ -37,10 +37,7 @@ def send_queue(transaction, item_ref, config, remote_node_id):
     # /nodes/node_1/items/item_1/queue_1_to_process/0/nodes/node_2
     node_id = config.node_id
     item_id = config.item_id
-    url_base = "http://localhost:5002"
-    url_route = "users/user_1/nodes/{}/items/{}".format(node_id, item_id, ) # FIXME don't trust node_id from url
-    url = "{}/{}".format(url_base, url_route, )
-    urls = {'node_2': url,}
+    url = config.urls[remote_node_id]
 
     try:
         # log.debug("checking queue for node: {}".format(remote_node_id))
@@ -49,11 +46,6 @@ def send_queue(transaction, item_ref, config, remote_node_id):
         for queue_snapshot in queue:
             # log.debug("checking id {}".format(queue_snapshot.id))
             rev_ref = get_queue_1_revs_ref(item_ref, remote_node_id).document(str(queue_snapshot.id))
-            try:
-                url = urls[remote_node_id]
-            except KeyError:
-                # log.debug("node {} without url".format(node))
-                continue
 
             try:
                 queue_dict = rev_ref.get(transaction=transaction).to_dict()
@@ -128,10 +120,22 @@ if __name__ == '__main__':
     config.known_nodes_ids = ['node_2', 'node_3', ]
     config.item_id = "item_1"
 
+    url_base = "http://localhost:5002"
+    url_route = "users/user_1/nodes/{}/items/{}".format(config.node_id, config.item_id, ) # FIXME don't trust node_id from url
+    url = "{}/{}".format(url_base, url_route, )
+    urls = {'node_2': url,}
+    config.urls = urls
+
     while True:
-        for node_id in config.known_nodes_ids:
+        for remote_node_id in config.known_nodes_ids:
+            try:
+                config.urls[remote_node_id]
+            except KeyError:
+                # log.debug("node {} without url".format(node))
+                continue
+
             #lock = multiprocessing.Lock()
-            p = multiprocessing.Process(target=process_out_queue, args=(config, node_id))
+            p = multiprocessing.Process(target=process_out_queue, args=(config, remote_node_id))
             p_name = p.name
             # log.debug(p_name + " starting up")
             p.start()
