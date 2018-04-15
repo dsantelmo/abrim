@@ -21,6 +21,8 @@ def date_handler(obj):
 
 
 def __requests_post(url, payload):
+    log.debug("about to POST: {}".format(payload))
+    log.debug("to URL: {}".format(url))
     #prepare payload
     temp_str = json.dumps(payload, default=date_handler)
     temp_dict = json.loads(temp_str)
@@ -34,11 +36,6 @@ def __requests_post(url, payload):
 
 @firestore.transactional
 def send_queue(transaction, item_ref, config, remote_node_id):
-    # /nodes/node_1/items/item_1/queue_1_to_process/0/nodes/node_2
-    node_id = config.node_id
-    item_id = config.item_id
-    url = config.urls[remote_node_id]
-
     try:
         # log.debug("checking queue for node: {}".format(remote_node_id))
         queue = get_queue_1_revs_ref(item_ref, remote_node_id).order_by('shadow_client_rev').limit(1).get()
@@ -55,14 +52,10 @@ def send_queue(transaction, item_ref, config, remote_node_id):
                 time.sleep(15)
                 return False
 
-            log.debug("processing item {}".format(item_id))
-            log.debug("trying to post to {}".format(url))
-            log.debug("processing queue_1_to_process rev {} for node {}".format(rev_ref.id, remote_node_id, ))
-
+            log.debug("/nodes/{}/items/{}/queue_1_to_process/{}/revs/{}".format(config.node_id, config.item_id, remote_node_id, rev_ref.id, ))
             # NOW SENT THE QUEUE ITEM TO THE SERVER
             try:
-                log.debug("about to POST this: {}".format(queue_dict,))
-                post_result = __requests_post(url, queue_dict)
+                post_result = __requests_post(config.urls[remote_node_id], queue_dict)
 
                 log.info("HTTP Status code is: {}".format(post_result.status_code,))
                 post_result.raise_for_status()  # fail if not 2xx
