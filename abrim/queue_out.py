@@ -58,9 +58,10 @@ def send_queue(transaction, item_ref, config, remote_node_id):
             try:
                 queue_dict = rev_ref.get(transaction=transaction).to_dict()
             except google.api.core.exceptions.NotFound:
-                # this node doesn't match the node in the query
-                # FIXME this is an abomination... stop querying to fail...
-                continue
+                log.error("queue item not found")
+                log.info("Sleep 15 secs")
+                time.sleep(15)
+                return False
 
             log.debug("processing item {}".format(item_id))
             log.debug("trying to post to {}".format(url))
