@@ -64,12 +64,12 @@ def send_queue(transaction, item_ref, config, remote_node_id):
                 queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_ref.id))
                 transaction.set(queue_2_ref, {
                     'create_date': firestore.SERVER_TIMESTAMP,
-                    'client_rev': queue_ref.id,
+                    'client_rev': rev_ref.id,
                     'action': 'processed_item',
                 })
 
                 log.debug("archiving successful, deleting item from queue_1_to_process")
-                transaction.delete(queue_ref)
+                transaction.delete(rev_ref)
             except requests.exceptions.ConnectionError:
                 log.info("ConnectionError!! Sleep 15 secs")
                 time.sleep(15)
