@@ -77,6 +77,24 @@ class AbrimConfig(object):
                 log.error("can't locate NODE_ID value")
                 raise
 
+    def get_db_path(self):
+        node_id = self.node_id
+        filename = 'abrim_' + node_id + '.sqlite'
+        try:
+            import appdirs
+            udd = appdirs.user_data_dir("abrim", "abrim_node")
+            db_path = os.path.join(udd, filename)
+            if not os.path.exists(udd):
+                os.makedirs(udd)
+        except ImportError:
+            try:
+                db_path = "." \
+                          + os.path.basename(sys.modules['__main__'].__file__) \
+                          + filename
+            except AttributeError:
+                db_path = filename + '_error.sqlite'
+        self.db_path = db_path
+
     def __init__(self, node_id=None, db_prefix=None):
         if db_prefix:
             self.db_prefix = db_prefix
@@ -85,6 +103,10 @@ class AbrimConfig(object):
             self.load_config()
         else:
             self.node_id = node_id
+        self.get_db_path()
+
+
+
 
 
 def create_diff_edits(text, shadow):
@@ -253,7 +275,9 @@ if __name__ == "__main__":
     config.known_nodes_ids = ['node_2', 'node_3', ]
 
     log.debug("NODE ID: {}".format(config.node_id,))
+    log.debug("db_path: {}".format(config.db_path))
 
+    sys.exit(0)
     # item_id = uuid.uuid4().hex
     item_id = "item_1"
 
