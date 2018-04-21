@@ -141,8 +141,8 @@ def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, sha
     old_shadow_adler32 = _create_hash(old_shadow)
     shadow_adler32 = _create_hash(new_text)
     try:
-        item_data, queue_data, shadow_data = _prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32,
-                                                           shadow_client_rev, shadow_server_rev, text_patches)
+        item_data, queue_data, shadow_data = prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32,
+                                                          shadow_client_rev, shadow_server_rev, text_patches)
 
         log.debug("creating shadow, queue and saving item for node {}".format(node_id))
         shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
@@ -162,8 +162,8 @@ def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, sha
     return True
 
 
-def _prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shadow_client_rev, shadow_server_rev,
-                  text_patches):
+def prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shadow_client_rev, shadow_server_rev,
+                 text_patches):
     base_data = {
         'create_date': firestore.SERVER_TIMESTAMP,
         'shadow_client_rev': shadow_client_rev,
