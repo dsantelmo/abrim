@@ -10,6 +10,7 @@ import os
 import zlib
 import hashlib
 from pathlib import Path
+import sqlite3
 
 
 def get_log(full_debug=False):
@@ -95,6 +96,38 @@ class AbrimConfig(object):
                 db_path = filename + '_error.sqlite'
         self.db_path = db_path
 
+    def _init_db(self, con):
+        cur = con.cursor()
+
+        cur.execute("""CREATE TABLE IF NOT EXISTS nodes
+          (node_uuid TEXT,
+           node_base_url TEXT
+           )""")
+
+        cur.execute("""CREATE TABLE IF NOT EXISTS items
+          (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+           stamp INT,
+           node_uuid TEXT,
+           item_uuid TEXT,
+           text TEXT,
+           rev INT
+           )""")
+
+        cur.execute("""SELECT node_uuid FROM nodes
+                       WHERE node_base_url IS NULL""")
+        node_uuid = cur.fetchone()
+        if node_uuid is None:
+            node_uuid = "node_1"  # uuid.uuid4().hex
+            insert = (node_uuid,
+                      None
+                      )
+            cur.execute("""INSERT OR IGNORE INTO nodes
+                           (node_uuid,
+                            node_base_url)
+                           VALUES (?,?)""", insert)
+        con.commit()
+        return cur
+
     def __init__(self, node_id=None, db_prefix=None):
         if db_prefix:
             self.db_prefix = db_prefix
@@ -104,8 +137,8 @@ class AbrimConfig(object):
         else:
             self.node_id = node_id
         self.get_db_path()
-
-
+        with sqlite3.connect(self.db_path) as con:
+            self.cur = self._init_db(con)
 
 
 
@@ -277,7 +310,6 @@ if __name__ == "__main__":
     log.debug("NODE ID: {}".format(config.node_id,))
     log.debug("db_path: {}".format(config.db_path))
 
-    sys.exit(0)
     # item_id = uuid.uuid4().hex
     item_id = "item_1"
 
