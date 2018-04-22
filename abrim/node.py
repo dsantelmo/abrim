@@ -96,38 +96,58 @@ class AbrimConfig(object):
                 db_path = filename + '_error.sqlite'
         self.db_path = db_path
 
-    def _init_db(self):
-        con = self.con
-        cur = con.cursor()
+    def _init_db(self, con):
+        self.con = con
+        self.cur = self.con.cursor()
 
-        cur.execute("""CREATE TABLE IF NOT EXISTS nodes
-          (node_uuid TEXT PRIMARY KEY,
-           node_base_url TEXT
-           )""")
+        self.cur.executescript("""CREATE TABLE IF NOT EXISTS nodes
+           (id TEXT PRIMARY KEY NOT NULL,
+            base_url TEXT
+            );
+            
+           CREATE TABLE IF NOT EXISTS items
+           (id TEXT PRIMARY KEY NOT NULL,
+            text TEXT,
+            node TEXT NOT NULL,
+            FOREIGN KEY(node) REFERENCES nodes(id)
+            );
+            
+           CREATE TABLE IF NOT EXISTS shadows
+           (id TEXT PRIMARY KEY NOT NULL,
+            item TEXT NOT NULL,
+            shadow TEXT,
+            rev INTEGER NOT NULL,
+            other_node_rev INTEGER NOT NULL,
+            other_node TEXT NOT NULL,
+            FOREIGN KEY(item) REFERENCES items(id)
+            FOREIGN KEY(other_node) REFERENCES nodes(id)
+            );
+            
+            """)
 
-        cur.execute("""CREATE TABLE IF NOT EXISTS items
-          (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-           stamp INT,
-           node_uuid TEXT,
-           item_uuid TEXT,
-           text TEXT,
-           rev INT
-           )""")
+        self.con.commit()
 
-        cur.execute("""SELECT node_uuid FROM nodes
-                       WHERE node_base_url IS NULL""")
-        node_uuid = cur.fetchone()
-        if node_uuid is None:
-            node_uuid = "node_1"  # uuid.uuid4().hex
-            insert = (node_uuid,
-                      None
-                      )
-            cur.execute("""INSERT OR IGNORE INTO nodes
-                           (node_uuid,
-                            node_base_url)
-                           VALUES (?,?)""", insert)
-        con.commit()
-        return cur
+        self.start_transaction()
+        try:
+            self.cur.execute("""SELECT id FROM nodes
+                           WHERE base_url IS NULL""")
+            node_uuid = self.cur.fetchone()
+            if node_uuid is None:
+                node_uuid = "node_1"  # uuid.uuid4().hex
+                insert = (node_uuid,
+                          None
+                          )
+                self.cur.execute("""INSERT OR IGNORE INTO nodes
+                               (id,
+                                base_url)
+                               VALUES (?,?)""", insert)
+            self.end_transaction()
+        except Exception as err:
+            log.error("rollback in _init_db")
+            log.error(err)
+            self.cur.execute("rollback")
+            raise
+
 
     def add_known_node(self, node_id, url):
         con = self.con
@@ -135,19 +155,39 @@ class AbrimConfig(object):
         insert = (node_id,
                   url)
         cur.execute("""INSERT OR IGNORE INTO nodes
-                           (node_uuid,
-                            node_base_url)
+                           (id,
+                            base_url)
                            VALUES (?,?)""", insert)
         con.commit()
 
 
     def get_known_nodes(self):
         cur = self.cur
-        cur.execute("""SELECT node_uuid, node_base_url
+        cur.execute("""SELECT id, base_url
                        FROM nodes
-                       ORDER BY node_uuid ASC""")
+                       WHERE id <> ?
+                       ORDER BY id ASC""", (self.node_id,))
         return cur.fetchall()
 
+
+    def start_transaction(self):
+        self.cur.execute("begin")
+        if self.con.in_transaction:
+            log.debug("transaction started")
+        else:
+            log.error("NOT in_transaction")
+            raise Exception
+
+    def end_transaction(self):
+        if not self.con.in_transaction:
+            log.debug("explicit end requested, but transaction already ended")
+        self.cur.execute("commit")
+        self.con.commit()
+        if not self.con.in_transaction:
+            log.debug("transaction ended")
+        else:
+            log.error("transaction NOT ended")
+            raise Exception
 
     def __init__(self, node_id=None, db_prefix=None):
         if db_prefix:
@@ -159,9 +199,9 @@ class AbrimConfig(object):
             self.node_id = node_id
         self.get_db_path()
         with sqlite3.connect(self.db_path) as con:
-            self.con = con
+            con.isolation_level = None
             con.row_factory = sqlite3.Row
-            self.cur = self._init_db()
+            self._init_db(con)
 
 
 def create_diff_edits(text, shadow):
@@ -201,14 +241,16 @@ def get_queue_1_revs_ref(item_ref, node_id):
     return item_ref.collection('queue_1_to_process').document(node_id).collection('revs')
 
 
-@firestore.transactional
-def update_in_transaction(transaction, item_ref, new_text, node_id):
-    log.debug("recovering item...")
-    shadow_client_rev, shadow_server_rev, old_shadow = _get_rev_shadow(item_ref, node_id, transaction)
-    if old_shadow == new_text and shadow_client_rev != -1:
-        log.info("new text equals old shadow, nothing done!")
-        return True
-    return _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction, node_id)
+# @firestore.transactional
+# def update_in_transaction(config, transaction, item_ref, new_text, other_node_id, item_id):
+#     log.debug("recovering item...")
+#
+#     shadow_client_rev, shadow_server_rev, old_shadow = _get_rev_shadow(item_ref, other_node_id, transaction)
+#
+#     if old_shadow == new_text and shadow_client_rev != -1:
+#         log.info("new text equals old shadow, nothing done!")
+#         return True
+#     return _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction, other_node_id)
 
 
 def _enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction, node_id):
@@ -270,58 +312,94 @@ def _create_hash(text):
     # shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
     return adler32
 
+#
+# def _get_rev_shadow(item_ref, node_id, transaction):
+#     try:
+#         shadow = None
+#         shadow_generator = _get_shadow_revs_ref(item_ref, node_id).order_by('shadow_client_rev', direction=firestore.Query.DESCENDING).limit(1).get(transaction=transaction)
+#         for shadow_snapshot in shadow_generator:
+#             shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_snapshot.id))
+#             shadow = shadow_ref.get(transaction=transaction)
+#
+#         if shadow:
+#             try:
+#                 shadow_client_rev = shadow.get('shadow_client_rev')
+#                 log.debug('Document exists, data: {}'.format(shadow.to_dict()))
+#             except KeyError:
+#                 log.info("ERROR recovering the shadow_client_rev")
+#                 sys.exit(0)
+#             try:
+#                 shadow_server_rev = shadow.get('shadow_server_rev')
+#             except KeyError:
+#                 log.info("ERROR recovering the shadow_server_rev")
+#                 sys.exit(0)
+#             try:
+#                 old_shadow = shadow.get('shadow')
+#             except KeyError:
+#                 old_shadow = ""
+#         else:
+#             raise google.cloud.exceptions.NotFound("raise")
+#     except google.cloud.exceptions.NotFound:
+#         log.error('No such document! Creating a new one')
+#         shadow_client_rev = -1
+#         shadow_server_rev = -1
+#         old_shadow = ""
+#     return shadow_client_rev, shadow_server_rev, old_shadow
+#
 
-def _get_rev_shadow(item_ref, node_id, transaction):
-    try:
-        shadow = None
-        shadow_generator = _get_shadow_revs_ref(item_ref, node_id).order_by('shadow_client_rev', direction=firestore.Query.DESCENDING).limit(1).get(transaction=transaction)
-        for shadow_snapshot in shadow_generator:
-            shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_snapshot.id))
-            shadow = shadow_ref.get(transaction=transaction)
 
-        if shadow:
-            try:
-                shadow_client_rev = shadow.get('shadow_client_rev')
-                log.debug('Document exists, data: {}'.format(shadow.to_dict()))
-            except KeyError:
-                log.info("ERROR recovering the shadow_client_rev")
-                sys.exit(0)
-            try:
-                shadow_server_rev = shadow.get('shadow_server_rev')
-            except KeyError:
-                log.info("ERROR recovering the shadow_server_rev")
-                sys.exit(0)
-            try:
-                old_shadow = shadow.get('shadow')
-            except KeyError:
-                old_shadow = ""
-        else:
-            raise google.cloud.exceptions.NotFound("raise")
-    except google.cloud.exceptions.NotFound:
-        log.error('No such document! Creating a new one')
-        shadow_client_rev = -1
-        shadow_server_rev = -1
-        old_shadow = ""
-    return shadow_client_rev, shadow_server_rev, old_shadow
+def _get_rev_shadow(config, other_node_id, item_id):
+    cur = config.cur
+    cur.execute("""SELECT id, shadow, rev, other_node_rev
+                FROM shadows
+                WHERE id = ?
+                    AND other_node = ?
+                ORDER BY rev DESC LIMIT 1""", (item_id, other_node_id,))
+    shadow = cur.fetchone()
+    if shadow is None:
+        log.debug("shadow doesn't exist. Creating...")
 
+    else:
+        log.debug("shadow exists")
+
+    return None, None, None
+
+def _save_item(config, item_id, new_text):
+    config.cur.execute("""INSERT OR REPLACE INTO items
+                   (id,
+                    text,
+                    node)
+                   VALUES (?,?,?)""", (item_id, new_text, config.node_id))
 
 def update_item(config, item_id, new_text):
 
     if not new_text:
         new_text = ""
 
-    db = firestore.Client()
-    item_ref = get_item_ref(db, config, item_id)
+    config.start_transaction()
 
-    for node_id, _ in config.get_known_nodes():
-        transaction = db.transaction()
-        result = update_in_transaction(transaction, item_ref, new_text, node_id)
-        if result:
-            log.debug('update transaction ended OK')
-            return True
-        else:
-            log.error('ERROR updating item')
-            raise Exception
+    _save_item(config, item_id, new_text)
+
+    # db = firestore.Client()
+    # item_ref = get_item_ref(db, config, item_id)
+
+    for other_node_id, _ in config.get_known_nodes():
+
+        shadow_client_rev, shadow_server_rev, old_shadow = _get_rev_shadow(config, other_node_id, item_id)
+
+        # transaction = db.transaction()
+        # result = update_in_transaction(config, transaction, item_ref, new_text, other_node_id, item_id)
+
+
+    config.end_transaction()
+
+    sys.exit(0)
+    if result:
+        log.debug('update transaction ended OK')
+        return True
+    else:
+        log.error('ERROR updating item')
+        raise Exception
 
 
 if __name__ == "__main__":
@@ -335,33 +413,7 @@ if __name__ == "__main__":
     # item_id = uuid.uuid4().hex
     item_id = "item_1"
 
-    try:
-        # FIXME unify create_item and update_item
-        #create_item(config, item_id)
-        update_item(config, item_id, "")
-        update_item(config, item_id, "a new text")
-        update_item(config, item_id, "a newer text")
-
-    except google.auth.exceptions.DefaultCredentialsError:
-        log.warning(""" AUTH FAILED
-Check https://cloud.google.com/docs/authentication/getting-started
-
-In GCP Console, navigate to the Create service account key page.
-From the Service account dropdown, select New service account.
-Input a name into the form field.
-From the Role dropdown, select Project > Owner.
-
-Note: The Role field authorizes your service account to access resources. 
-You can view and change this field later using Google Cloud Platform Console.
-If you are developing a production application, specify more granular
-permissions than Project > Owner. For more information, see granting roles to
-service accounts.
-Click the Create button. A JSON file that contains your key downloads to your
-computer.
-
-Unix: export GOOGLE_APPLICATION_CREDENTIALS="/home/user/Downloads/service-account-file.json"
-PowerShell: $env:GOOGLE_APPLICATION_CREDENTIALS="C:\\Users\\username\\Downloads\\service-account-file.json"
-Windows cmd: set GOOGLE_APPLICATION_CREDENTIALS="C:\\Users\\username\\Downloads\\service-account-file.json"
-""")
-        raise
+    update_item(config, item_id, "")
+    update_item(config, item_id, "a new text")
+    update_item(config, item_id, "a newer text")
     sys.exit(0)
