@@ -96,11 +96,12 @@ class AbrimConfig(object):
                 db_path = filename + '_error.sqlite'
         self.db_path = db_path
 
-    def _init_db(self, con):
+    def _init_db(self):
+        con = self.con
         cur = con.cursor()
 
         cur.execute("""CREATE TABLE IF NOT EXISTS nodes
-          (node_uuid TEXT,
+          (node_uuid TEXT PRIMARY KEY,
            node_base_url TEXT
            )""")
 
@@ -128,6 +129,26 @@ class AbrimConfig(object):
         con.commit()
         return cur
 
+    def add_known_node(self, node_id, url):
+        con = self.con
+        cur = self.cur
+        insert = (node_id,
+                  url)
+        cur.execute("""INSERT OR IGNORE INTO nodes
+                           (node_uuid,
+                            node_base_url)
+                           VALUES (?,?)""", insert)
+        con.commit()
+
+
+    def get_known_nodes(self):
+        cur = self.cur
+        cur.execute("""SELECT node_uuid, node_base_url
+                       FROM nodes
+                       ORDER BY node_uuid ASC""")
+        return cur.fetchall()
+
+
     def __init__(self, node_id=None, db_prefix=None):
         if db_prefix:
             self.db_prefix = db_prefix
@@ -138,8 +159,9 @@ class AbrimConfig(object):
             self.node_id = node_id
         self.get_db_path()
         with sqlite3.connect(self.db_path) as con:
-            self.cur = self._init_db(con)
-
+            self.con = con
+            con.row_factory = sqlite3.Row
+            self.cur = self._init_db()
 
 
 def create_diff_edits(text, shadow):
@@ -291,7 +313,7 @@ def update_item(config, item_id, new_text):
     db = firestore.Client()
     item_ref = get_item_ref(db, config, item_id)
 
-    for node_id in config.known_nodes_ids:
+    for node_id, _ in config.get_known_nodes():
         transaction = db.transaction()
         result = update_in_transaction(transaction, item_ref, new_text, node_id)
         if result:
@@ -305,7 +327,7 @@ def update_item(config, item_id, new_text):
 if __name__ == "__main__":
     node_id = "node_1"
     config = AbrimConfig(node_id)
-    config.known_nodes_ids = ['node_2', 'node_3', ]
+    config.add_known_node('node_2', "http://localhost:5002")
 
     log.debug("NODE ID: {}".format(config.node_id,))
     log.debug("db_path: {}".format(config.db_path))
