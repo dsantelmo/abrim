@@ -210,7 +210,7 @@ class Db(object):
 
     def __init__(self, node_id, db_prefix="", drop_db=False):
         if not node_id:
-            raise
+            raise Exception
         else:
             self.node_id = node_id
             self.db_prefix = db_prefix
