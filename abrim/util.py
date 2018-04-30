@@ -98,7 +98,7 @@ class Db(object):
             rev INTEGER NOT NULL,
             other_node_rev INTEGER NOT NULL,
             shadow TEXT,
-            PRIMARY KEY(item, other_node),
+            PRIMARY KEY(item, other_node, rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
