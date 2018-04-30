@@ -16,21 +16,19 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathl
 from util import get_log, AbrimConfig
 log = get_log(full_debug=False)
 
-
-
-def get_item_ref(db, config, item_id):
-    node_id = config.node_id
-    try:
-        db_prefix = config.db_prefix
-    except AttributeError:
-        db_prefix = ''
-    db_path = db_prefix + 'nodes'
-
-    # create new item
-    item_text = "original text"
-
-    node_ref = db.collection(db_path).document(node_id)
-    return node_ref.collection('items').document(item_id)
+# def get_item_ref(db, config, item_id):
+#     node_id = config.node_id
+#     try:
+#         db_prefix = config.db_prefix
+#     except AttributeError:
+#         db_prefix = ''
+#     db_path = db_prefix + 'nodes'
+#
+#     # create new item
+#     item_text = "original text"
+#
+#     node_ref = db.collection(db_path).document(node_id)
+#     return node_ref.collection('items').document(item_id)
 
 
 def _get_shadow_revs_ref(item_ref, node_id):
@@ -103,8 +101,7 @@ def update_item(config, item_id, new_text=""):
     # item_ref = get_item_ref(db, config, item_id)
 
     for other_node_id, _ in config.db.get_known_nodes():
-
-        shadow_client_rev, shadow_server_rev, old_shadow = config.db.get_rev_shadow(other_node_id, item_id)
+        rev, other_node_rev, shadow = config.db.get_rev_shadow(other_node_id, item_id)
 
         # transaction = db.transaction()
         # result = update_in_transaction(config, transaction, item_ref, new_text, other_node_id, item_id)
@@ -123,6 +120,7 @@ def update_item(config, item_id, new_text=""):
 
 if __name__ == "__main__":
     node_id = "node_1"
+    # config = AbrimConfig(node_id, drop_db=True)
     config = AbrimConfig(node_id)
     config.db.add_known_node('node_2', "http://localhost:5002")
 

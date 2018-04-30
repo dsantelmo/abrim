@@ -64,10 +64,21 @@ class Db(object):
                 db_path = filename + '_error.sqlite'
         self.db_path = db_path
 
+    def drop_db(self):
+        self.cur.executescript("""
+            DROP TABLE IF EXISTS nodes;
+            DROP TABLE IF EXISTS items;
+            DROP TABLE IF EXISTS shadows;
+            """)
 
-    def _init_db(self, con):
+        self.con.commit()
+
+    def _init_db(self, con, drop_db):
         self.con = con
         self.cur = self.con.cursor()
+
+        if drop_db:
+            self.drop_db()
 
         self.cur.executescript("""CREATE TABLE IF NOT EXISTS nodes
            (id TEXT PRIMARY KEY NOT NULL,
@@ -82,13 +93,13 @@ class Db(object):
             );
             
            CREATE TABLE IF NOT EXISTS shadows
-           (id TEXT PRIMARY KEY NOT NULL,
-            item TEXT NOT NULL,
-            shadow TEXT,
+           (item TEXT NOT NULL,
+            other_node TEXT NOT NULL,
             rev INTEGER NOT NULL,
             other_node_rev INTEGER NOT NULL,
-            other_node TEXT NOT NULL,
-            FOREIGN KEY(item) REFERENCES items(id)
+            shadow TEXT,
+            PRIMARY KEY(item, other_node),
+            FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
             
@@ -118,38 +129,54 @@ class Db(object):
             raise
 
     def add_known_node(self, node_id, url):
-        con = self.con
-        cur = self.cur
         insert = (node_id,
                   url)
-        cur.execute("""INSERT OR IGNORE INTO nodes
+        self.cur.execute("""INSERT OR IGNORE INTO nodes
                            (id,
                             base_url)
                            VALUES (?,?)""", insert)
-        con.commit()
+        self.con.commit()
 
 
     def get_known_nodes(self):
-        cur = self.cur
-        cur.execute("""SELECT id, base_url
+        self.cur.execute("""SELECT id, base_url
                        FROM nodes
                        WHERE id <> ?
                        ORDER BY id ASC""", (self.node_id,))
-        return cur.fetchall()
+        return self.cur.fetchall()
 
 
     def get_rev_shadow(self, other_node_id, item_id):
-        self.cur.execute("""SELECT id, shadow, rev, other_node_rev
+        self.cur.execute("""SELECT shadow, rev, other_node_rev
                 FROM shadows
-                WHERE id = ?
+                WHERE item = ?
                 AND other_node = ?
                 ORDER BY rev DESC LIMIT 1""", (item_id, other_node_id,))
         shadow = self.cur.fetchone()
         if shadow is None:
             log.debug("shadow doesn't exist. Creating...")
+            rev = 0
+            other_node_rev = 0
+            shadow = ""
+            insert = (item_id,
+                      other_node_id,
+                      rev,
+                      other_node_rev,
+                      shadow
+                      )
+            self.cur.execute("""INSERT OR IGNORE INTO shadows
+                               (item, other_node, rev, other_node_rev, shadow)
+                               VALUES (?,?,?,?,?)""", insert)
         else:
             log.debug("shadow exists")
-        return None, None, None
+            try:
+                rev = shadow['rev']
+                other_node_rev = shadow['other_node_rev']
+                shadow = shadow['shadow']
+            except (TypeError, IndexError) as err:
+                log.error(err)
+                raise
+        return rev, other_node_rev, shadow
 
 
     def save_item(self, item_id, new_text):
@@ -181,7 +208,7 @@ class Db(object):
             raise Exception
 
 
-    def __init__(self, node_id, db_prefix=""):
+    def __init__(self, node_id, db_prefix="", drop_db=False):
         if not node_id:
             raise
         else:
@@ -192,7 +219,7 @@ class Db(object):
         with sqlite3.connect(self.db_path) as con:
             con.isolation_level = None
             con.row_factory = sqlite3.Row
-            self._init_db(con)
+            self._init_db(con, drop_db)
 
 
 
@@ -233,12 +260,12 @@ class AbrimConfig(object):
 
 
 
-    def __init__(self, node_id=None, db_prefix=""):
+    def __init__(self, node_id=None, db_prefix="", drop_db=False):
         if not node_id:
             self.load_config()
         else:
             self.node_id = node_id
-        self.db = Db(self.node_id, db_prefix)
+        self.db = Db(self.node_id, db_prefix, drop_db)
 
 
 def create_diff_edits(text, shadow):
