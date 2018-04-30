@@ -155,8 +155,8 @@ class Db(object):
         shadow = self.cur.fetchone()
         if shadow is None:
             log.debug("shadow doesn't exist. Creating...")
-            rev = 0
-            other_node_rev = 0
+            rev = -1
+            other_node_rev = -1
             shadow = ""
             insert = (item_id,
                       other_node_id,
@@ -186,7 +186,31 @@ class Db(object):
                         node)
                        VALUES (?,?,?)""", (item_id, new_text, self.node_id))
 
+    def enqueue_client_edits(self, other_node_id, item_id, new_text, old_shadow, rev, other_node_rev):
+        #_enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction, node_id):
+        return True
 
+
+        try:
+            item_data, queue_data, shadow_data = prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32,
+                                                              shadow_client_rev, shadow_server_rev, text_patches)
+
+            log.debug("creating shadow, queue and saving item for node {}".format(node_id))
+            shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
+            queue_ref = get_queue_1_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
+            transaction.set(shadow_ref, shadow_data)
+            transaction.set(queue_ref, queue_data)
+            transaction.set(item_ref, item_data)
+
+            log.debug('About to commit transaction...')
+        except (grpc._channel._Rendezvous,
+                google.auth.exceptions.TransportError,
+                google.gax.errors.GaxError,
+                ):
+            log.error("Connection error to Firestore")
+            return False
+        log.info('New update saved')
+        return True
 
     def start_transaction(self):
         self.cur.execute("begin")
@@ -283,7 +307,7 @@ def create_diff_edits(text, shadow):
 
 
 
-def _create_hash(text):
+def create_hash(text):
     adler32 = zlib.adler32(text.encode())
     log.debug("new hash {}".format(adler32))
     # shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
