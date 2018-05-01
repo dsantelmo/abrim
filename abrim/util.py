@@ -11,6 +11,7 @@ import zlib
 import hashlib
 from pathlib import Path
 import sqlite3
+import random
 
 
 def get_log(full_debug=False):
@@ -121,9 +122,10 @@ class Db(object):
                                (id,
                                 base_url)
                                VALUES (?,?)""", insert)
+            self._log_debug_trans("_init_db done")
             self.end_transaction()
         except Exception as err:
-            log.error("rollback in _init_db")
+            self._log_debug_trans("rollback in _init_db")
             log.error(err)
             self.cur.execute("rollback")
             raise
@@ -154,7 +156,7 @@ class Db(object):
                 ORDER BY rev DESC LIMIT 1""", (item_id, other_node_id,))
         shadow = self.cur.fetchone()
         if shadow is None:
-            log.debug("shadow doesn't exist. Creating...")
+            self._log_debug_trans("shadow doesn't exist. Creating...")
             rev = -1
             other_node_rev = -1
             shadow = ""
@@ -168,7 +170,7 @@ class Db(object):
                                (item, other_node, rev, other_node_rev, shadow)
                                VALUES (?,?,?,?,?)""", insert)
         else:
-            log.debug("shadow exists")
+            self._log_debug_trans("shadow exists")
             try:
                 rev = shadow['rev']
                 other_node_rev = shadow['other_node_rev']
@@ -235,10 +237,21 @@ class Db(object):
         log.info('New update saved')
         return True
 
+    def _get_trans_prefix(self):
+        if self.con.in_transaction:
+            return "[trans-" + str(self._transaction_code) + "] "
+        else:
+            return ""
+
+    def _log_debug_trans(self, msg):
+        debug_msg = "{}" + msg
+        log.debug(debug_msg.format(self._get_trans_prefix()))
+
     def start_transaction(self):
         self.cur.execute("begin")
         if self.con.in_transaction:
-            log.debug("transaction started")
+            self._transaction_code = random.randint(0, 1000000)
+            self._log_debug_trans("transaction started")
         else:
             log.error("NOT in_transaction")
             raise Exception
@@ -246,12 +259,11 @@ class Db(object):
     def end_transaction(self):
         if not self.con.in_transaction:
             log.debug("explicit end requested, but transaction already ended")
+        self._log_debug_trans("transaction ending")
         self.cur.execute("commit")
         self.con.commit()
-        if not self.con.in_transaction:
-            log.debug("transaction ended")
-        else:
-            log.error("transaction NOT ended")
+        if self.con.in_transaction:
+            self._log_debug_trans("transaction NOT ended")
             raise Exception
 
 
