@@ -18,7 +18,7 @@ log = get_log(full_debug=False)
 
 
 def update_item(config, item_id, new_text=""):
-    config.db.start_transaction()
+    config.db.start_transaction("update_item")
 
     config.db.save_item(item_id, new_text)
 
