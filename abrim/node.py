@@ -22,9 +22,6 @@ def update_item(config, item_id, new_text=""):
 
     config.db.save_item(item_id, new_text)
 
-    # db = firestore.Client()
-    # item_ref = get_item_ref(db, config, item_id)
-
     for other_node_id, _ in config.db.get_known_nodes():
         rev, other_node_rev, old_shadow = config.db.get_rev_shadow(other_node_id, item_id)
 
@@ -41,6 +38,7 @@ def update_item(config, item_id, new_text=""):
         log.info("new enqueued edit for {} (rev {}) at {}".format(item_id, rev, other_node_id,))
         sys.exit(0)
         config.db.enqueue_client_edits(other_node_id, item_id, new_text, old_shadow, rev, other_node_rev)
+
     config.db.end_transaction()
 
 

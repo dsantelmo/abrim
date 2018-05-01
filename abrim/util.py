@@ -108,7 +108,7 @@ class Db(object):
 
         self.con.commit()
 
-        self.start_transaction()
+        self.start_transaction("init the DB")
         try:
             self.cur.execute("""SELECT id FROM nodes
                            WHERE base_url IS NULL""")
@@ -247,11 +247,14 @@ class Db(object):
         debug_msg = "{}" + msg
         log.debug(debug_msg.format(self._get_trans_prefix()))
 
-    def start_transaction(self):
+    def start_transaction(self, msg=""):
         self.cur.execute("begin")
         if self.con.in_transaction:
             self._transaction_code = random.randint(0, 1000000)
-            self._log_debug_trans("transaction started")
+            edited_msg = ""
+            if msg:
+                edited_msg = ": " + msg
+            self._log_debug_trans("transaction started{}".format(edited_msg))
         else:
             log.error("NOT in_transaction")
             raise Exception
