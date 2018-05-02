@@ -36,8 +36,10 @@ def update_item(config, item_id, new_text=""):
         shadow_adler32 = create_hash(new_text)
 
         log.info("new enqueued edit for {} (rev {}) at {}".format(item_id, rev, other_node_id,))
-        sys.exit(0)
+
+        config.db.save_new_shadow(other_node_id, item_id, new_text, rev, other_node_rev)
         config.db.enqueue_client_edits(other_node_id, item_id, new_text, old_shadow, rev, other_node_rev)
+        sys.exit(0) # avoid commiting the transaction for the time being
 
     config.db.end_transaction()
 

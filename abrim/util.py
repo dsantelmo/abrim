@@ -187,11 +187,14 @@ class Db(object):
                         text,
                         node)
                        VALUES (?,?,?)""", (item_id, new_text, self.node_id))
+        self._log_debug_trans("item {} updated".format(item_id))
+
+    def save_new_shadow(self, other_node_id, item_id, new_text, rev, other_node_rev):
+        pass
+
 
     def enqueue_client_edits(self, other_node_id, item_id, new_text, old_shadow, rev, other_node_rev):
-        #_enqueue_client_edits(item_ref, new_text, old_shadow, shadow_client_rev, shadow_server_rev, transaction, node_id):
-        return True
-
+        pass
         # def prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shadow_client_rev, shadow_server_rev,
         #                  text_patches):
         #     base_data = {
@@ -215,27 +218,27 @@ class Db(object):
         #         'text': new_text,
         #     })
         #     return item_data, queue_data, shadow_data
-
-        try:
-            item_data, queue_data, shadow_data = prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32,
-                                                              shadow_client_rev, shadow_server_rev, text_patches)
-
-            log.debug("creating shadow, queue and saving item for node {}".format(node_id))
-            shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
-            queue_ref = get_queue_1_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
-            transaction.set(shadow_ref, shadow_data)
-            transaction.set(queue_ref, queue_data)
-            transaction.set(item_ref, item_data)
-
-            log.debug('About to commit transaction...')
-        except (grpc._channel._Rendezvous,
-                google.auth.exceptions.TransportError,
-                google.gax.errors.GaxError,
-                ):
-            log.error("Connection error to Firestore")
-            return False
-        log.info('New update saved')
-        return True
+        #
+        # try:
+        #     item_data, queue_data, shadow_data = prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32,
+        #                                                       shadow_client_rev, shadow_server_rev, text_patches)
+        #
+        #     log.debug("creating shadow, queue and saving item for node {}".format(node_id))
+        #     shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
+        #     queue_ref = get_queue_1_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
+        #     transaction.set(shadow_ref, shadow_data)
+        #     transaction.set(queue_ref, queue_data)
+        #     transaction.set(item_ref, item_data)
+        #
+        #     log.debug('About to commit transaction...')
+        # except (grpc._channel._Rendezvous,
+        #         google.auth.exceptions.TransportError,
+        #         google.gax.errors.GaxError,
+        #         ):
+        #     log.error("Connection error to Firestore")
+        #     return False
+        # log.info('New update saved')
+        # return True
 
     def _get_trans_prefix(self):
         if self.con.in_transaction:
@@ -243,7 +246,7 @@ class Db(object):
         else:
             return ""
 
-    def _log_debug_trans(self, msg):
+    def _log_debug_trans(self, msg):  # FIXME maybe use extra or add a filter in logger
         debug_msg = "{}" + msg
         log.debug(debug_msg.format(self._get_trans_prefix()))
 
