@@ -217,7 +217,7 @@ class Db(object):
             other_node_id,
             rev,
             other_node_rev,
-            create_diff_edits(new_text, old_shadow),
+            create_diff_edits(new_text, old_shadow),  # maybe doing a slow blocking diff inside a transaction is wrong
             create_hash(old_shadow),
             create_hash(new_text),
             )
