@@ -104,6 +104,19 @@ class Db(object):
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
             
+           CREATE TABLE IF NOT EXISTS edits
+           (item TEXT NOT NULL,
+            other_node TEXT NOT NULL,
+            rev INTEGER NOT NULL,
+            other_node_rev INTEGER NOT NULL,
+            edits TEXT,
+            old_shadow_adler32 TEXT,
+            shadow_adler32 TEXT,
+            PRIMARY KEY(item, other_node, rev),
+            FOREIGN KEY(item) REFERENCES items(id),
+            FOREIGN KEY(other_node) REFERENCES nodes(id)
+            );
+            
             """)
 
         self.con.commit()
@@ -190,11 +203,33 @@ class Db(object):
         self._log_debug_trans("item {} updated".format(item_id))
 
     def save_new_shadow(self, other_node_id, item_id, new_text, rev, other_node_rev):
-        pass
+        insert = (item_id,
+                  other_node_id,
+                  rev,
+                  other_node_rev,
+                  new_text
+                  )
+        self.cur.execute("""INSERT OR IGNORE INTO shadows
+                           (item, other_node, rev, other_node_rev, shadow)
+                           VALUES (?,?,?,?,?)""", insert)
+        self._log_debug_trans("shadow {} {} {} saved".format(item_id,other_node_id,rev))
 
 
     def enqueue_client_edits(self, other_node_id, item_id, new_text, old_shadow, rev, other_node_rev):
-        pass
+        insert = (
+            item_id,
+            other_node_id,
+            rev,
+            other_node_rev,
+            create_diff_edits(new_text, old_shadow),
+            create_hash(old_shadow),
+            create_hash(new_text),
+            )
+        self.cur.execute("""INSERT OR IGNORE INTO edits
+                           (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
+                           VALUES (?,?,?,?,?,?,?)""", insert)
+        self._log_debug_trans("edits {} {} {} saved".format(item_id,other_node_id,rev))
+
         # def prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shadow_client_rev, shadow_server_rev,
         #                  text_patches):
         #     base_data = {

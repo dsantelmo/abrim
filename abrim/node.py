@@ -24,22 +24,13 @@ def update_item(config, item_id, new_text=""):
 
     for other_node_id, _ in config.db.get_known_nodes():
         rev, other_node_rev, old_shadow = config.db.get_rev_shadow(other_node_id, item_id)
-
         if old_shadow == new_text and rev > -1:
             log.info("new text equals old shadow, nothing done! for {} at {}".format(item_id, other_node_id,))
             continue
-
         rev += 1
         other_node_rev += 1
-        text_patches = create_diff_edits(new_text, old_shadow)
-        old_shadow_adler32 = create_hash(old_shadow)
-        shadow_adler32 = create_hash(new_text)
-
-        log.info("new enqueued edit for {} (rev {}) at {}".format(item_id, rev, other_node_id,))
-
         config.db.save_new_shadow(other_node_id, item_id, new_text, rev, other_node_rev)
         config.db.enqueue_client_edits(other_node_id, item_id, new_text, old_shadow, rev, other_node_rev)
-        sys.exit(0) # avoid commiting the transaction for the time being
 
     config.db.end_transaction()
 
