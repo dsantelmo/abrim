@@ -2,13 +2,9 @@
 
 import sys
 import diff_match_patch
-from google.cloud import firestore
-import grpc
-import google
 import logging
 import os
 import zlib
-import hashlib
 from pathlib import Path
 import sqlite3
 import random
@@ -27,11 +23,6 @@ def get_log(full_debug=False):
         logging.getLogger('urllib3').setLevel(logging.CRITICAL)
         logging.getLogger('google').setLevel(logging.CRITICAL)
 
-    LOGGING_LEVELS = {'critical': logging.CRITICAL,
-                      'error': logging.ERROR,
-                      'warning': logging.WARNING,
-                      'info': logging.INFO,
-                      'debug': logging.DEBUG}
     # FIXME http://docs.python-guide.org/en/latest/writing/logging/
     # It is strongly advised that you do not add any handlers other
     # than NullHandler to your library's loggers.
@@ -51,6 +42,7 @@ class Db(object):
         node_id = self.node_id
         filename = 'abrim_' + node_id + '.sqlite'
         try:
+            # noinspection PyUnresolvedReferences
             import appdirs
             udd = appdirs.user_data_dir("abrim", "abrim_node")
             db_path = os.path.join(udd, filename)
@@ -209,7 +201,7 @@ class Db(object):
         self.cur.execute("""INSERT OR IGNORE INTO shadows
                            (item, other_node, rev, other_node_rev, shadow)
                            VALUES (?,?,?,?,?)""", insert)
-        self._log_debug_trans("shadow {} {} {} saved".format(item_id,other_node_id,rev))
+        self._log_debug_trans("shadow {} {} {} saved".format(item_id, other_node_id, rev))
 
     def enqueue_client_edits(self, other_node_id, item_id, new_text, old_shadow, rev, other_node_rev):
         insert = (
@@ -224,7 +216,7 @@ class Db(object):
         self.cur.execute("""INSERT OR IGNORE INTO edits
                            (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
                            VALUES (?,?,?,?,?,?,?)""", insert)
-        self._log_debug_trans("edits {} {} {} saved".format(item_id,other_node_id,rev))
+        self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, rev))
 
     def _get_trans_prefix(self):
         if self.con.in_transaction:
@@ -265,6 +257,8 @@ class Db(object):
             self.node_id = node_id
             self.db_prefix = db_prefix
 
+        self._transaction_code = None
+        self.db_path = ""
         self.get_db_path()
         with sqlite3.connect(self.db_path) as con:
             con.isolation_level = None
@@ -317,7 +311,7 @@ def create_diff_edits(text, shadow):
     if text == shadow:
         log.debug("both texts are the same...")
         return None
-    log.debug("about to diff \"{}\" with \"{}\"".format(shadow,text,))
+    log.debug("about to diff \"{}\" with \"{}\"".format(shadow, text,))
     diff_obj = diff_match_patch.diff_match_patch()
     diff_obj.Diff_Timeout = 1
     diff = diff_obj.diff_main(shadow, text)
@@ -333,7 +327,6 @@ def create_diff_edits(text, shadow):
 def create_hash(text):
     adler32 = zlib.adler32(text.encode())
     log.debug("new hash {}".format(adler32))
-    # shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
     return adler32
 
 

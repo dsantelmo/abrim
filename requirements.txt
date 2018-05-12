@@ -1,4 +1,4 @@
+appdirs
 diff-match-patch
-google-cloud-firestore
 # Flask
 # requests

@@ -1,18 +1,10 @@
 #!/usr/bin/env python
 
 import sys
-import diff_match_patch
-from google.cloud import firestore
-import grpc
-import google
-import logging
 import os
-import zlib
-import hashlib
-from pathlib import Path
-import sqlite3
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
+# noinspection PyPep8,PyUnresolvedReferences
 from util import get_log, create_diff_edits, create_hash, AbrimConfig
 log = get_log(full_debug=False)
 
@@ -38,16 +30,16 @@ def update_item(config, item_id, new_text=""):
 if __name__ == "__main__":
     node_id = "node_1"
     # config = AbrimConfig(node_id, drop_db=True)
-    config = AbrimConfig(node_id)
-    config.db.add_known_node('node_2', "http://localhost:5002")
+    config_ = AbrimConfig(node_id)
+    config_.db.add_known_node('node_2', "http://localhost:5002")
 
-    log.debug("NODE ID: {}".format(config.node_id,))
-    log.debug("db_path: {}".format(config.db.db_path))
+    log.debug("NODE ID: {}".format(config_.node_id,))
+    log.debug("db_path: {}".format(config_.db.db_path))
 
     # item_id = uuid.uuid4().hex
-    item_id = "item_1"
+    item_id_ = "item_1"
 
-    update_item(config, item_id, "")
-    update_item(config, item_id, "a new text")
-    update_item(config, item_id, "a newer text")
+    update_item(config_, item_id_, "")
+    update_item(config_, item_id_, "a new text")
+    update_item(config_, item_id_, "a newer text")
     sys.exit(0)
