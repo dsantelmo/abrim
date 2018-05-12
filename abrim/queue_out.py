@@ -4,14 +4,13 @@ import multiprocessing
 import time
 from random import randint
 import sys
-from google.cloud import firestore
 import grpc
 import google
 import requests
 import json
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
-from node import get_log, get_item_ref, get_queue_1_revs_ref, AbrimConfig
+from node import get_log, AbrimConfig
 log = get_log(full_debug=False)
 
 #for key in logging.Logger.manager.loggerDict:
@@ -34,8 +33,9 @@ def __requests_post(url, payload):
       )
 
 
-@firestore.transactional
-def send_queue(transaction, item_ref, config, remote_node_id):
+def send_queue(config):
+
+    return None
     try:
         # log.debug("checking queue for node: {}".format(remote_node_id))
         queue = get_queue_1_revs_ref(item_ref, remote_node_id).order_by('shadow_client_rev').limit(1).get()
@@ -93,12 +93,22 @@ def send_queue(transaction, item_ref, config, remote_node_id):
     return True
 
 
-def process_out_queue(config, node_id):
-    db = firestore.Client()
-    item_ref = get_item_ref(db, config, config.item_id)
-    transaction = db.transaction()
-    result = send_queue(transaction, item_ref, config, node_id)
+def process_out_queue(node_id):
+    config = AbrimConfig(node_id)
+    config.db.add_known_node('node_2', "http://localhost:5002")
 
+    log.debug("NODE ID: {}".format(config.node_id,))
+    log.debug("db_path: {}".format(config.db.db_path))
+
+    config.db.start_transaction("process_out_queue")
+
+    for other_node_id, other_node_url in config.db.get_known_nodes():
+        if other_node_url:
+            log.error(other_node_url)
+            result = send_queue(config)
+
+    sys.exit(0)
+    config.db.end_transaction()
     if result:
         #lock.acquire()
         log.info("one entry from queue 1 was correctly processed")
@@ -109,35 +119,25 @@ def process_out_queue(config, node_id):
 
 
 if __name__ == '__main__':
-    config = AbrimConfig("node_1")
-    config.known_nodes_ids = ['node_2', 'node_3', ]
-    config.item_id = "item_1"
-
-    url_base = "http://localhost:5002"
-    url_route = "users/user_1/nodes/{}/items/{}".format(config.node_id, config.item_id, ) # FIXME don't trust node_id from url
-    url = "{}/{}".format(url_base, url_route, )
-    urls = {'node_2': url,}
-    config.urls = urls
+    node_id_ = "node_1"
+    # url_base = "http://localhost:5002"
+    # url_route = "users/user_1/nodes/{}/items/{}".format(config_.node_id, config_.item_id, ) # FIXME don't trust node_id from url
+    # url = "{}/{}".format(url_base, url_route, )
+    # urls = {'node_2': url,}
+    # config_.urls = urls
 
     while True:
-        for remote_node_id in config.known_nodes_ids:
-            try:
-                config.urls[remote_node_id]
-            except KeyError:
-                # log.debug("node {} without url".format(node))
-                continue
-
-            #lock = multiprocessing.Lock()
-            p = multiprocessing.Process(target=process_out_queue, args=(config, remote_node_id))
-            p_name = p.name
-            # log.debug(p_name + " starting up")
-            p.start()
-            # Wait for x seconds or until process finishes
-            p.join(30)
-            if p.is_alive():
-                log.debug(p_name + " timeouts")
-                p.terminate()
-                p.join()
-            else:
-                # log.debug(p_name + " finished ok")
-                pass
+        #lock = multiprocessing.Lock()
+        p = multiprocessing.Process(target=process_out_queue, args=(node_id_, ))
+        p_name = p.name
+        # log.debug(p_name + " starting up")
+        p.start()
+        # Wait for x seconds or until process finishes
+        p.join(30)
+        if p.is_alive():
+            log.debug(p_name + " timeouts")
+            p.terminate()
+            p.join()
+        else:
+            # log.debug(p_name + " finished ok")
+            pass
