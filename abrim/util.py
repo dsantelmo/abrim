@@ -152,14 +152,12 @@ class Db(object):
                            VALUES (?,?)""", insert)
         self.con.commit()
 
-
     def get_known_nodes(self):
         self.cur.execute("""SELECT id, base_url
                        FROM nodes
                        WHERE id <> ?
                        ORDER BY id ASC""", (self.node_id,))
         return self.cur.fetchall()
-
 
     def get_rev_shadow(self, other_node_id, item_id):
         self.cur.execute("""SELECT shadow, rev, other_node_rev
@@ -193,7 +191,6 @@ class Db(object):
                 raise
         return rev, other_node_rev, shadow
 
-
     def save_item(self, item_id, new_text):
         self.cur.execute("""INSERT OR REPLACE INTO items
                        (id,
@@ -214,7 +211,6 @@ class Db(object):
                            VALUES (?,?,?,?,?)""", insert)
         self._log_debug_trans("shadow {} {} {} saved".format(item_id,other_node_id,rev))
 
-
     def enqueue_client_edits(self, other_node_id, item_id, new_text, old_shadow, rev, other_node_rev):
         insert = (
             item_id,
@@ -229,51 +225,6 @@ class Db(object):
                            (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
                            VALUES (?,?,?,?,?,?,?)""", insert)
         self._log_debug_trans("edits {} {} {} saved".format(item_id,other_node_id,rev))
-
-        # def prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shadow_client_rev, shadow_server_rev,
-        #                  text_patches):
-        #     base_data = {
-        #         'create_date': firestore.SERVER_TIMESTAMP,
-        #         'shadow_client_rev': shadow_client_rev,
-        #         'shadow_server_rev': shadow_server_rev
-        #     }
-        #     shadow_data = dict(base_data)
-        #     queue_data = dict(base_data)
-        #     item_data = dict(base_data)
-        #     shadow_data.update({
-        #         'shadow': new_text,
-        #         'old_shadow': old_shadow,  # FIXME check if this is really needed
-        #     })
-        #     queue_data.update({
-        #         'text_patches': text_patches,
-        #         'old_shadow_adler32': old_shadow_adler32,
-        #         'shadow_adler32': shadow_adler32,
-        #     })
-        #     item_data.update({
-        #         'text': new_text,
-        #     })
-        #     return item_data, queue_data, shadow_data
-        #
-        # try:
-        #     item_data, queue_data, shadow_data = prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32,
-        #                                                       shadow_client_rev, shadow_server_rev, text_patches)
-        #
-        #     log.debug("creating shadow, queue and saving item for node {}".format(node_id))
-        #     shadow_ref = _get_shadow_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
-        #     queue_ref = get_queue_1_revs_ref(item_ref, node_id).document(str(shadow_client_rev))
-        #     transaction.set(shadow_ref, shadow_data)
-        #     transaction.set(queue_ref, queue_data)
-        #     transaction.set(item_ref, item_data)
-        #
-        #     log.debug('About to commit transaction...')
-        # except (grpc._channel._Rendezvous,
-        #         google.auth.exceptions.TransportError,
-        #         google.gax.errors.GaxError,
-        #         ):
-        #     log.error("Connection error to Firestore")
-        #     return False
-        # log.info('New update saved')
-        # return True
 
     def _get_trans_prefix(self):
         if self.con.in_transaction:
@@ -307,7 +258,6 @@ class Db(object):
             self._log_debug_trans("transaction NOT ended")
             raise Exception
 
-
     def __init__(self, node_id, db_prefix="", drop_db=False):
         if not node_id:
             raise Exception
@@ -320,7 +270,6 @@ class Db(object):
             con.isolation_level = None
             con.row_factory = sqlite3.Row
             self._init_db(con, drop_db)
-
 
 
 class AbrimConfig(object):
@@ -356,10 +305,6 @@ class AbrimConfig(object):
                 log.error("can't locate NODE_ID value")
                 raise
 
-
-
-
-
     def __init__(self, node_id=None, db_prefix="", drop_db=False):
         if not node_id:
             self.load_config()
@@ -385,12 +330,12 @@ def create_diff_edits(text, shadow):
         return None
 
 
-
 def create_hash(text):
     adler32 = zlib.adler32(text.encode())
     log.debug("new hash {}".format(adler32))
     # shadow_sha512 = hashlib.sha512(new_text.encode()).hexdigest()
     return adler32
+
 
 if __name__ == "__main__":
     pass
