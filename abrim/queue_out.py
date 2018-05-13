@@ -30,64 +30,26 @@ def __requests_post(url, payload):
       )
 
 
-def send_edit(config):
-
-    return None
+def send_edit(edit, other_node_url):
+    #log.debug("/nodes/{}/items/{}/queue_1_to_process/{}/revs/{}".format(config.node_id, config.item_id, remote_node_id, rev_ref.id, ))
+    # NOW SENT THE QUEUE ITEM TO THE SERVER
     try:
-        # log.debug("checking queue for node: {}".format(remote_node_id))
-        queue = get_queue_1_revs_ref(item_ref, remote_node_id).order_by('shadow_client_rev').limit(1).get()
+        post_result = __requests_post(other_node_url, edit)
 
-        for queue_snapshot in queue:
-            # log.debug("checking id {}".format(queue_snapshot.id))
-            rev_ref = get_queue_1_revs_ref(item_ref, remote_node_id).document(str(queue_snapshot.id))
+        log.info("HTTP Status code is: {}".format(post_result.status_code,))
+        post_result.raise_for_status()  # fail if not 2xx
 
-            try:
-                queue_dict = rev_ref.get(transaction=transaction).to_dict()
-            except google.api.core.exceptions.NotFound:
-                log.error("queue item not found")
-                log.info("Sleep 15 secs")
-                time.sleep(15)
-                return False
-
-            log.debug("/nodes/{}/items/{}/queue_1_to_process/{}/revs/{}".format(config.node_id, config.item_id, remote_node_id, rev_ref.id, ))
-            # NOW SENT THE QUEUE ITEM TO THE SERVER
-            try:
-                post_result = __requests_post(config.urls[remote_node_id], queue_dict)
-
-                log.info("HTTP Status code is: {}".format(post_result.status_code,))
-                post_result.raise_for_status()  # fail if not 2xx
-
-                log.debug("POST successful, archiving this item to queue_2_sent")
-                queue_2_ref = item_ref.collection('queue_2_sent').document(str(queue_ref.id))
-                transaction.set(queue_2_ref, {
-                    'create_date': firestore.SERVER_TIMESTAMP,
-                    'client_rev': rev_ref.id,
-                    'action': 'processed_item',
-                })
-
-                log.debug("archiving successful, deleting item from queue_1_to_process")
-                transaction.delete(rev_ref)
-            except requests.exceptions.ConnectionError:
-                log.info("ConnectionError!! Sleep 15 secs")
-                time.sleep(15)
-                return False
-            except requests.exceptions.HTTPError as err:
-                log.error(err)
-                log.info("Sleep 15 secs")
-                time.sleep(15)
-                return False
-            break
-        else:
-            # log.info("queue query got no results")
-            return False
-    except (grpc._channel._Rendezvous,
-            google.auth.exceptions.TransportError,
-            google.gax.errors.GaxError,
-            ):
-        log.error("Connection error to Firestore")
-        raise Exception
-    log.info("queue 1 sent!")
-    return True
+        log.debug("POST successful, archiving this item to queue_2_sent")
+        return True
+    except requests.exceptions.ConnectionError:
+        log.info("ConnectionError!! Sleep 15 secs")
+        time.sleep(15)
+        return False
+    except requests.exceptions.HTTPError as err:
+        log.error(err)
+        log.info("Sleep 15 secs")
+        time.sleep(15)
+        return False
 
 
 def get_first_queued_edit(config, other_node_id):
@@ -96,6 +58,18 @@ def get_first_queued_edit(config, other_node_id):
 
 def archive_edit(config, edit):
     pass
+
+
+def delete_edit(config, edit_rowid):
+    pass
+
+
+def prepare_url(config_, item_id, other_node_url):
+    url_route = "{}/users/user_1/nodes/{}/items/{}".format(
+        other_node_url,
+        config_.node_id,
+        item_id, )  # FIXME don't trust node_id from url
+    return url_route
 
 
 def process_out_queue(lock, node_id):
@@ -112,11 +86,14 @@ def process_out_queue(lock, node_id):
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
                 config.db.start_transaction("process_out_queue")
-                edit = get_first_queued_edit(config, other_node_id)
+                edit_rowid, edit = get_first_queued_edit(config, other_node_id)
                 if not edit:
                     break
-                result = send_edit(edit)
-                archive_edit(config, edit)
+                url = prepare_url(config, edit["item"], other_node_url)
+                sent = send_edit(edit, url)
+                if sent:
+                    archive_edit(config, edit)
+                    delete_edit(config, edit_rowid)
                 config.db.end_transaction()
                 queue_limit -= 1
     if result:
@@ -132,12 +109,6 @@ def process_out_queue(lock, node_id):
 
 if __name__ == '__main__':
     node_id_ = "node_1"
-    # url_base = "http://localhost:5002"
-    # url_route = "users/user_1/nodes/{}/items/{}".format(config_.node_id, config_.item_id, ) # FIXME don't trust node_id from url
-    # url = "{}/{}".format(url_base, url_route, )
-    # urls = {'node_2': url,}
-    # config_.urls = urls
-
     while True:
         lock = multiprocessing.Lock()
         p = multiprocessing.Process(target=process_out_queue, args=(lock, node_id_, ))

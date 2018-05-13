@@ -11,7 +11,7 @@ import grpc
 import google
 from flask import Flask, request, abort, jsonify, Response
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
-from node import get_log, prepare_data, AbrimConfig
+from util import get_log, AbrimConfig
 log = get_log(full_debug=False)
 
 app = Flask(__name__)
@@ -28,7 +28,6 @@ app = Flask(__name__)
 #             return False  # it shouldn't be there
 #         except google.api.core.exceptions.NotFound:
 #             transaction.set(item_ref, {
-#                 'create_date': firestore.SERVER_TIMESTAMP,
 #                 'other_node_create_date': item_create_date,
 #                 'client_rev': item_rev,
 #             })
@@ -39,6 +38,7 @@ app = Flask(__name__)
 #         log.error("Connection error to Firestore")
 #         return False
 #     log.debug("creation enqueued correctly")
+#                 'create_date': firestore.SERVER_TIMESTAMP,
 #     return True
 
 
@@ -341,6 +341,31 @@ def before_request():
 @app.teardown_request
 def teardown_request(exception):
     __end()
+
+
+def prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shadow_client_rev, shadow_server_rev,
+                 text_patches):
+    base_data = {
+        'create_date': firestore.SERVER_TIMESTAMP,
+        'shadow_client_rev': shadow_client_rev,
+        'shadow_server_rev': shadow_server_rev
+    }
+    shadow_data = dict(base_data)
+    queue_data = dict(base_data)
+    item_data = dict(base_data)
+    shadow_data.update({
+        'shadow': new_text,
+        'old_shadow': old_shadow,  # FIXME check if this is really needed
+    })
+    queue_data.update({
+        'text_patches': text_patches,
+        'old_shadow_adler32': old_shadow_adler32,
+        'shadow_adler32': shadow_adler32,
+    })
+    item_data.update({
+        'text': new_text,
+    })
+    return item_data, queue_data, shadow_data
 
 
 if __name__ == "__main__":  # pragma: no cover

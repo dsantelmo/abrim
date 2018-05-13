@@ -225,21 +225,13 @@ class Db(object):
                  WHERE
                  other_node = ?
                  ORDER BY rev ASC LIMIT 1""", (other_node_id,))
-        edit = self.cur.fetchone()
-        if not edit:
+        edit_row = self.cur.fetchone()
+        if not edit_row:
             self._log_debug_trans("no edits")
         else:
-            edit_txt = "{} {} {} {} {} {} {}".format(edit["rowid"],
-                                                      edit["item"],
-                                                      edit["other_node"],
-                                                      edit["rev"],
-                                                      edit["other_node_rev"],
-                                                      edit["old_shadow_adler32"],
-                                                      edit["shadow_adler32"],
-                                                      )
-            self._log_debug_trans("get_first_queued_edit: " + edit_txt)
-
-        return edit
+            edit_rowid = edit_row["rowid"]
+            edit = dict(edit_row)
+        return edit_rowid, edit
 
     def _get_trans_prefix(self):
         if self.con.in_transaction:
