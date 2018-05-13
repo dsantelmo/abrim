@@ -97,7 +97,8 @@ class Db(object):
             );
             
            CREATE TABLE IF NOT EXISTS edits
-           (item TEXT NOT NULL,
+           (
+            item TEXT NOT NULL,
             other_node TEXT NOT NULL,
             rev INTEGER NOT NULL,
             other_node_rev INTEGER NOT NULL,
@@ -219,7 +220,7 @@ class Db(object):
         self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, rev))
 
     def get_first_queued_edit(self, other_node_id):
-        self.cur.execute("""SELECT edits, old_shadow_adler32, shadow_adler32, rev, other_node_rev
+        self.cur.execute("""SELECT rowid, *
                  FROM edits
                  WHERE
                  other_node = ?
@@ -227,6 +228,17 @@ class Db(object):
         edit = self.cur.fetchone()
         if not edit:
             self._log_debug_trans("no edits")
+        else:
+            edit_txt = "{} {} {} {} {} {} {}".format(edit["rowid"],
+                                                      edit["item"],
+                                                      edit["other_node"],
+                                                      edit["rev"],
+                                                      edit["other_node_rev"],
+                                                      edit["old_shadow_adler32"],
+                                                      edit["shadow_adler32"],
+                                                      )
+            self._log_debug_trans("get_first_queued_edit: " + edit_txt)
+
         return edit
 
     def _get_trans_prefix(self):
@@ -236,7 +248,7 @@ class Db(object):
             return ""
 
     def _log_debug_trans(self, msg):  # FIXME maybe use extra or add a filter in logger
-        debug_msg = "{}" + msg
+        debug_msg = "{}" + str(msg)
         log.debug(debug_msg.format(self._get_trans_prefix()))
 
     def start_transaction(self, msg=""):

@@ -106,6 +106,7 @@ def process_out_queue(lock, node_id):
     log.debug("db_path: {}".format(config.db.db_path))
     lock.release()
 
+    result = None
     for other_node_id, other_node_url in config.db.get_known_nodes():
         if other_node_url:
             queue_limit = config.edit_queue_limit
