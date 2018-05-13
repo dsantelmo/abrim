@@ -218,6 +218,17 @@ class Db(object):
                            VALUES (?,?,?,?,?,?,?)""", insert)
         self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, rev))
 
+    def get_first_queued_edit(self, other_node_id):
+        self.cur.execute("""SELECT edits, old_shadow_adler32, shadow_adler32, rev, other_node_rev
+                 FROM edits
+                 WHERE
+                 other_node = ?
+                 ORDER BY rev ASC LIMIT 1""", (other_node_id,))
+        edit = self.cur.fetchone()
+        if not edit:
+            self._log_debug_trans("no edits")
+        return edit
+
     def _get_trans_prefix(self):
         if self.con.in_transaction:
             return "[trans-" + str(self._transaction_code) + "] "
@@ -305,6 +316,7 @@ class AbrimConfig(object):
         else:
             self.node_id = node_id
         self.db = Db(self.node_id, db_prefix, drop_db)
+        self.edit_queue_limit = 50
 
 
 def create_diff_edits(text, shadow):

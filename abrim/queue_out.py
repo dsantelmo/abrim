@@ -2,10 +2,7 @@
 
 import multiprocessing
 import time
-from random import randint
 import sys
-import grpc
-import google
 import requests
 import json
 import os
@@ -13,8 +10,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathl
 from node import get_log, AbrimConfig
 log = get_log(full_debug=False)
 
-#for key in logging.Logger.manager.loggerDict:
-#    print(key)
+# for key in logging.Logger.manager.loggerDict:
+#     print(key)
 def date_handler(obj):
     return obj.isoformat() if hasattr(obj, 'isoformat') else obj
 
@@ -33,7 +30,7 @@ def __requests_post(url, payload):
       )
 
 
-def send_queue(config):
+def send_edit(config):
 
     return None
     try:
@@ -93,28 +90,42 @@ def send_queue(config):
     return True
 
 
-def process_out_queue(node_id):
-    config = AbrimConfig(node_id)
-    config.db.add_known_node('node_2', "http://localhost:5002")
+def get_first_queued_edit(config, other_node_id):
+    return config.db.get_first_queued_edit(other_node_id)
 
+
+def archive_edit(config, edit):
+    pass
+
+
+def process_out_queue(lock, node_id):
+    config = AbrimConfig(node_id)
+
+    lock.acquire()
     log.debug("NODE ID: {}".format(config.node_id,))
     log.debug("db_path: {}".format(config.db.db_path))
-
-    config.db.start_transaction("process_out_queue")
+    lock.release()
 
     for other_node_id, other_node_url in config.db.get_known_nodes():
         if other_node_url:
-            log.error(other_node_url)
-            result = send_queue(config)
-
-    sys.exit(0)
-    config.db.end_transaction()
+            queue_limit = config.edit_queue_limit
+            while queue_limit > 0:
+                config.db.start_transaction("process_out_queue")
+                edit = get_first_queued_edit(config, other_node_id)
+                if not edit:
+                    break
+                result = send_edit(edit)
+                archive_edit(config, edit)
+                config.db.end_transaction()
+                queue_limit -= 1
     if result:
-        #lock.acquire()
+        lock.acquire()
         log.info("one entry from queue 1 was correctly processed")
-        #lock.release()
+        lock.release()
     else:
+        lock.acquire()
         log.info("Nothing done! waiting 15 additional seconds")
+        lock.release()
         time.sleep(15)
 
 
@@ -127,8 +138,8 @@ if __name__ == '__main__':
     # config_.urls = urls
 
     while True:
-        #lock = multiprocessing.Lock()
-        p = multiprocessing.Process(target=process_out_queue, args=(node_id_, ))
+        lock = multiprocessing.Lock()
+        p = multiprocessing.Process(target=process_out_queue, args=(lock, node_id_, ))
         p_name = p.name
         # log.debug(p_name + " starting up")
         p.start()
