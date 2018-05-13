@@ -110,6 +110,19 @@ class Db(object):
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
             
+           CREATE TABLE IF NOT EXISTS edits_archive
+           (
+            item TEXT NOT NULL,
+            other_node TEXT NOT NULL,
+            rev INTEGER NOT NULL,
+            other_node_rev INTEGER NOT NULL,
+            edits TEXT,
+            old_shadow_adler32 TEXT,
+            shadow_adler32 TEXT,
+            PRIMARY KEY(item, other_node, rev),
+            FOREIGN KEY(item) REFERENCES items(id),
+            FOREIGN KEY(other_node) REFERENCES nodes(id)
+            );
             """)
 
         self.con.commit()
@@ -228,10 +241,22 @@ class Db(object):
         edit_row = self.cur.fetchone()
         if not edit_row:
             self._log_debug_trans("no edits")
+            return None, None
         else:
             edit_rowid = edit_row["rowid"]
             edit = dict(edit_row)
-        return edit_rowid, edit
+            return edit_rowid, edit
+
+    def archive_edit(self, edit_rowid):
+        self.cur.execute("""INSERT OR IGNORE INTO edits_archive
+                           SELECT * FROM edits
+                           WHERE rowid=?""", (edit_rowid,))
+        self._log_debug_trans("edit rowid {} archived".format(edit_rowid))
+
+    def delete_edit(self, edit_rowid):
+        self.cur.execute("""DELETE FROM edits
+                           WHERE rowid=?""", (edit_rowid,))
+        self._log_debug_trans("edit rowid {} deleted".format(edit_rowid))
 
     def _get_trans_prefix(self):
         if self.con.in_transaction:
