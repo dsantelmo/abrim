@@ -7,7 +7,7 @@ import requests
 import json
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
-from node import get_log, AbrimConfig
+from util import get_log, AbrimConfig
 log = get_log(full_debug=False)
 
 # for key in logging.Logger.manager.loggerDict:
@@ -90,6 +90,7 @@ def process_out_queue(lock, node_id):
                     delete_edit(config, edit_rowid)
                     config.db.end_transaction()
                 except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError) as err:
+                    config.db.rollback_transaction()
                     log.debug(err)
                     time.sleep(15)
                 finally:

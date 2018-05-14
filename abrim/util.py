@@ -269,6 +269,11 @@ class Db(object):
         log.debug(debug_msg.format(self._get_trans_prefix()))
 
     def start_transaction(self, msg=""):
+        if self.con.in_transaction:
+            log.error("cannot start a transaction within a transaction. Rolling back!!")
+            self.cur.execute("rollback")
+            raise Exception
+
         self.cur.execute("begin")
         if self.con.in_transaction:
             self._transaction_code = random.randint(0, 1000000)
@@ -289,6 +294,19 @@ class Db(object):
         if self.con.in_transaction:
             self._log_debug_trans("transaction NOT ended")
             raise Exception
+
+    def rollback_transaction(self, msg=""):
+        if self.con.in_transaction:
+            self._log_debug_trans("explicitly rolling back this transaction.")
+            self.cur.execute("rollback")
+        else:
+            log.warning("tried to rollback a transaction but there was none!!")
+        if self.con.in_transaction:
+            self._log_debug_trans("still in transaction...")
+            log.error("rollback failed!")
+            raise Exception
+        else:
+            log.debug("transaction rolled back OK")
 
     def __init__(self, node_id, db_prefix="", drop_db=False):
         if not node_id:
