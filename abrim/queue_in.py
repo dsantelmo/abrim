@@ -235,9 +235,9 @@ def errorhandler405(e):
 def parse_req(req_json):
     log.debug("parse_req: {}".format(req_json))
     try:
-        shadow_client_rev = req_json['shadow_client_rev']
-        shadow_server_rev = req_json['shadow_server_rev']
-        client_create_date = req_json['create_date']
+        shadow_client_rev = req_json['rev']
+        shadow_server_rev = req_json['other_node_rev']
+        client_create_date = "0"
     except KeyError:
         log.error("rev or create_date")
         log.error("HTTP 400 Bad Request")
@@ -298,7 +298,7 @@ def _parse_args_helper():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
     parser.add_argument("-l", "--logginglevel", help="Logging level")
-    #parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
+    # parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
     args = parser.parse_args()
     if not args.port or int(args.port) <= 0:
         return None, None
