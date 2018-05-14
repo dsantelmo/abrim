@@ -106,6 +106,7 @@ def process_out_queue(lock, node_id):
 
 
 if __name__ == '__main__':
+    log.info("queue_out started")
     node_id_ = "node_1"
     while True:
         lock = multiprocessing.Lock()

@@ -21,13 +21,13 @@ def get_log(full_debug=False):
         #    print(key)
         logging.getLogger('requests').setLevel(logging.CRITICAL)
         logging.getLogger('urllib3').setLevel(logging.CRITICAL)
-        logging.getLogger('google').setLevel(logging.CRITICAL)
+        logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
 
     # FIXME http://docs.python-guide.org/en/latest/writing/logging/
     # It is strongly advised that you do not add any handlers other
     # than NullHandler to your library's loggers.
     logging.basicConfig(level=logging.DEBUG,
-                        format='%(levelname)-5s %(asctime)s - %(module)-10s %(funcName)-25s %(lineno)-5d: %(message)s',
+                        format='%(levelname)-5s %(asctime)s - PID:%(process)d/%(filename)-15s: %(module)10s.%(funcName)-25s %(lineno)-5d: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')  # ,
     # disable_existing_loggers=False)
     logging.StreamHandler(sys.stdout)

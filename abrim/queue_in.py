@@ -307,7 +307,7 @@ def _parse_args_helper():
 
 def _init():
     #import pdb; pdb.set_trace()
-    log.info("Hajime!")
+    log.info("queue_in started")
     args_port, args_logginglevel = _parse_args_helper()
     if args_port and int(args_port) > 0:
         client_port = int(args_port)
@@ -319,10 +319,6 @@ def _init():
     else:
         print("use -p to specify a port")
         abort(500)
-    if args_logginglevel:
-        logging_level = LOGGING_LEVELS.get(args_logginglevel, logging.NOTSET)
-        log.setLevel(logging_level)
-    log.debug("DEBUG logging enabled")
     # before_request()
     return client_port
 
