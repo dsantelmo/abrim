@@ -42,8 +42,7 @@ def send_edit(edit, other_node_url):
         log.info("ConnectionError!! Sleep 15 secs")
         raise
     except requests.exceptions.HTTPError as err:
-        log.error(err)
-        log.info("Sleep 15 secs")
+        log.info("HTTPError!! Sleep 15 secs")
         raise
 
 
