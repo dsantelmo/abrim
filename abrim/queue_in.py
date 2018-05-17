@@ -162,11 +162,11 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
             log.error("shadows adler32s don't match {} {}".format(config.old_shadow_adler32, test_shadow,))
             return False
 
-        if config.item_patches == "" and shadow == "":
+        if config.edits == "" and shadow == "":
             log.debug("no shadow or patches, nothing to patch...")
             new_item_shadow = ""
         else:
-            new_item_shadow, success = patch_text(config.item_patches, shadow)
+            new_item_shadow, success = patch_text(config.edits, shadow)
             if not success:
                 log.debug("patching failed")
                 return False
@@ -187,7 +187,7 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
         transaction.set(patches_ref, {
             'create_date': firestore.SERVER_TIMESTAMP,
             'client_rev': item_rev,
-            'patches': config.item_patches,
+            'patches': config.edits,
         })
         log.debug("updating client_rev to: {}".format(item_rev))
 
@@ -232,50 +232,56 @@ def errorhandler405(e):
     return Response('405', 405, {'Allow':'POST'})
 
 
-def parse_req(req_json):
+def parse_req(config, req_json):
+    shadow_client_rev = None
+    shadow_server_rev = None
+    client_create_date = None
     log.debug("parse_req: {}".format(req_json))
     try:
-        shadow_client_rev = req_json['rev']
-        shadow_server_rev = req_json['other_node_rev']
-        client_create_date = "0"
+        config.shadow_client_rev = req_json['rev']
+        config.shadow_server_rev = req_json['other_node_rev']
+        config.client_create_date = "0"
     except KeyError:
         log.error("rev or create_date")
         log.error("HTTP 400 Bad Request")
         abort(400)
 
     try:
-        item_patches = req_json['text_patches']
+        config.edits = req_json['edits']
     except KeyError:
-        log.debug("no patches")
-        item_patches = None
+        log.debug("no edits")
 
     try:
-        old_shadow_adler32 = req_json['old_shadow_adler32']
-        shadow_adler32 = req_json['shadow_adler32']
+        config.old_shadow_adler32 = req_json['old_shadow_adler32']
+        config.shadow_adler32 = req_json['shadow_adler32']
     except KeyError:
         log.debug("missing old_shadow_adler32 or shadow_adler32")
-        old_shadow_adler32 = None
-        shadow_adler32 = None
-        #log.error("HTTP 400 Bad Request")
-        #abort(400)
-    return shadow_client_rev, shadow_server_rev, client_create_date, item_patches, old_shadow_adler32, shadow_adler32
+        log.error("HTTP 400 Bad Request")
+        abort(400)
 
+
+def _check_request_ok(config, request):
+    if request.method == 'POST':
+        parse_req(config, request.get_json())
+        x = 0
+        for item in vars(config).items():
+            x += 1
+            log.debug("{}. {}: {} ({})".format(x, item[0],item[1],type(item[1])))
+        return True
+    else:
+        return False
 
 
 @app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(item_user_id, item_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}".format(item_user_id, item_node_id, item_id, ))
-    if request.method == 'POST':
-        config = AbrimConfig(node_id="node_2")
-        config.item_user_id = item_user_id
-        config.item_node_id = item_node_id
-        config.item_id = item_id
-        config.shadow_client_rev, config.shadow_server_rev, config.client_create_date, config.item_patches, config.old_shadow_adler32, config.shadow_adler32 = parse_req(request.get_json())
+    config = AbrimConfig(node_id="node_2")
+    config.item_user_id = item_user_id
+    config.item_node_id = item_node_id
+    config.item_id = item_id
 
-        x = 0
-        for item in vars(config).items():
-            x += 1
-            log.debug("{}. {}: {} ({})".format(x, item[0],item[1],type(item[1])))
+    if _check_request_ok(config, request):
+        return '', 201
 
         try:
             if server_update_item(config):
