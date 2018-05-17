@@ -275,7 +275,6 @@ def _check_request_ok(config, request):
 @app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(item_user_id, item_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}".format(item_user_id, item_node_id, item_id, ))
-    config = AbrimConfig(node_id="node_2")
     config.item_user_id = item_user_id
     config.item_node_id = item_node_id
     config.item_id = item_id
@@ -313,7 +312,6 @@ def _parse_args_helper():
 
 def _init():
     #import pdb; pdb.set_trace()
-    log.info("queue_in started")
     args_port, args_logginglevel = _parse_args_helper()
     if args_port and int(args_port) > 0:
         client_port = int(args_port)
@@ -371,7 +369,7 @@ def prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shado
 
 
 if __name__ == "__main__":  # pragma: no cover
-    #
+    log.info("queue_in started")
     config = AbrimConfig(node_id="node_2")
     #
     # config.item_user_id = "user_1"
