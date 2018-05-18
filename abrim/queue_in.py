@@ -139,15 +139,6 @@ def _get_shadow_and_revs(transaction, item_ref, item_node_id):
 # to avoid race conditions existence of the item and creation should be done in a transaction
 @firestore.transactional
 def enqueue_update_in_transaction(transaction, item_ref, config):
-    # item_node_id = config.item_node_id
-    # item_id = config.item_id
-    # shadow_client_rev = config.shadow_client_rev
-    # shadow_server_rev = config.shadow_server_rev
-    # item_create_date = config.item_create_date
-    # item_patches = config.item_patches
-    # old_shadow_adler32 = config.old_shadow_adler32
-    # shadow_adler32 = config.shadow_adler32
-
     try:
         shadow, stored_server_rev, stored_client_rev = _get_shadow_and_revs(transaction, item_ref, config.item_node_id)
 
@@ -212,6 +203,7 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
 
 def server_update_item(config):
     log.debug("item_ref: /nodes/{}/items/{}".format(config.node_id,config.item_id,))
+    return True
     db = firestore.Client()
     server_node_ref = db.collection('nodes').document(config.node_id)
     item_ref = server_node_ref.collection('items').document(config.item_id)
@@ -255,7 +247,7 @@ def parse_req(config, req_json):
         config.old_shadow_adler32 = req_json['old_shadow_adler32']
         config.shadow_adler32 = req_json['shadow_adler32']
     except KeyError:
-        log.debug("missing old_shadow_adler32 or shadow_adler32")
+        log.error("missing old_shadow_adler32 or shadow_adler32")
         log.error("HTTP 400 Bad Request")
         abort(400)
 
@@ -272,6 +264,12 @@ def _check_request_ok(config, request):
         return False
 
 
+def _check_revs(config):
+    log.debug(config.shadow_client_rev)
+    log.debug(config.shadow_server_rev)
+    return False
+    # if stored_client_rev != config.shadow_client_rev:
+
 @app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(item_user_id, item_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}".format(item_user_id, item_node_id, item_id, ))
@@ -280,18 +278,19 @@ def _get_sync(item_user_id, item_node_id, item_id):
     config.item_id = item_id
 
     if _check_request_ok(config, request):
-        return '', 201
-
         try:
+            config.db.start_transaction("process_out_queue")
+            if not _check_revs(config):
+                abort(404)  # 404 Not Found
             if server_update_item(config):
+                config.db.end_transaction()
                 log.debug("HTTP 201: Created")
                 return '', 201  # HTTP 201: Created
             else:
-                log.error("HTTP 404 Not Found")
                 abort(404)  # 404 Not Found
         except Exception as err:
+            config.db.rollback_transaction()
             log.error(err)
-            log.error("Unknown error")
             abort(500)  # 500 Internal Server Error
 
     else:
