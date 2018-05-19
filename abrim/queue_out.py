@@ -71,7 +71,6 @@ def process_out_queue(lock, node_id):
 
     lock.acquire()
     log.debug("NODE ID: {}".format(config.node_id,))
-    log.debug("db_path: {}".format(config.db.db_path))
     lock.release()
 
     result = None

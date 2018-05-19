@@ -56,6 +56,7 @@ class Db(object):
             except AttributeError:
                 db_path = filename + '_error.sqlite'
         self.db_path = db_path
+        log.debug(self.db_path)
 
     def drop_db(self):
         self.cur.executescript("""
