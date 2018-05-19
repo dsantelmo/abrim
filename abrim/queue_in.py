@@ -5,6 +5,7 @@ import logging
 import sys
 import os
 import zlib
+import traceback
 import diff_match_patch
 from google.cloud import firestore
 import grpc
@@ -140,14 +141,6 @@ def _get_shadow_and_revs(transaction, item_ref, item_node_id):
 @firestore.transactional
 def enqueue_update_in_transaction(transaction, item_ref, config):
     try:
-        shadow, stored_server_rev, stored_client_rev = _get_shadow_and_revs(transaction, item_ref, config.item_node_id)
-
-        if stored_client_rev != config.shadow_client_rev:
-            log.error("shadow_client_revs don't match {} {}".format(stored_client_rev != config, config.shadow_client_rev,))
-            return False
-        else:
-            log.debug("shadow_client_revs match")
-
         test_shadow = zlib.adler32(shadow.encode())
         if config.old_shadow_adler32 != test_shadow:
             log.error("shadows adler32s don't match {} {}".format(config.old_shadow_adler32, test_shadow,))
@@ -201,22 +194,10 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
     return True
 
 
-def server_update_item(config):
-    log.debug("item_ref: /nodes/{}/items/{}".format(config.node_id,config.item_id,))
+def _patch_server_shadow(config):
+    log.debug("item_ref: /nodes/{}/items/{}".format(config.node_id, config.item_id))
+
     return True
-    db = firestore.Client()
-    server_node_ref = db.collection('nodes').document(config.node_id)
-    item_ref = server_node_ref.collection('items').document(config.item_id)
-
-    transaction = db.transaction()
-
-    result = enqueue_update_in_transaction(transaction, item_ref, config)
-    if result:
-        log.debug('transaction ended OK')
-        return True
-    else:
-        log.error('ERROR updating item')
-        return False
 
 
 @app.errorhandler(405)
@@ -225,9 +206,6 @@ def errorhandler405(e):
 
 
 def parse_req(config, req_json):
-    shadow_client_rev = None
-    shadow_server_rev = None
-    client_create_date = None
     log.debug("parse_req: {}".format(req_json))
     try:
         config.shadow_client_rev = req_json['rev']
@@ -265,10 +243,22 @@ def _check_request_ok(config, request):
 
 
 def _check_revs(config):
-    log.debug(config.shadow_client_rev)
-    log.debug(config.shadow_server_rev)
-    return False
-    # if stored_client_rev != config.shadow_client_rev:
+    saved_rev, saved_other_node_rev = config.db.get_revs(config.item_id, config.item_node_id)
+
+    if config.shadow_client_rev == saved_other_node_rev:
+        log.debug("client revs match")
+    else:
+        log.error("client revs DON'T match")
+        return False
+
+    if config.shadow_server_rev == saved_rev:
+        log.debug("server revs match")
+    else:
+        log.error("server revs DON'T match")
+        return False
+
+    return saved_rev, saved_other_node_rev
+
 
 @app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(item_user_id, item_node_id, item_id):
@@ -279,19 +269,19 @@ def _get_sync(item_user_id, item_node_id, item_id):
 
     if _check_request_ok(config, request):
         try:
-            config.db.start_transaction("process_out_queue")
-            if not _check_revs(config):
-                abort(404)  # 404 Not Found
-            if server_update_item(config):
-                config.db.end_transaction()
-                log.debug("HTTP 201: Created")
-                return '', 201  # HTTP 201: Created
-            else:
+            config.db.start_transaction("_get_sync")
+            if not _check_revs(config) or not _patch_server_shadow(config):
                 abort(404)  # 404 Not Found
         except Exception as err:
             config.db.rollback_transaction()
             log.error(err)
+            traceback.print_exc()
             abort(500)  # 500 Internal Server Error
+        else:
+            config.db.end_transaction()
+            log.debug("HTTP 201: Created")
+            return '', 201  # HTTP 201: Created
+
 
     else:
         log.debug("HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
