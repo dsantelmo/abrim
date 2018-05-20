@@ -195,7 +195,8 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
 
 
 def _patch_server_shadow(config):
-    log.debug("item_ref: /nodes/{}/items/{}".format(config.node_id, config.item_id))
+    shadow = config.db.get_shadow(config.item_id, config.item_node_id, config.shadow_server_rev, config.shadow_client_rev)
+    log.debug("shadow: {}".format(shadow))
 
     return True
 

@@ -271,10 +271,26 @@ class Db(object):
             self._log_debug_trans("no revs")
             return 0, 0
         else:
-            rev = revs_row["rev"]
-            other_node_rev = revs_row["other_node"]
-            return rev, other_node_rev
+            return revs_row["rev"], revs_row["other_node"]
 
+    def get_shadow(self, item, other_node_id, rev, other_node_rev):
+        if rev == 0 and other_node_rev == 0:
+            self._log_debug_trans("revs == 0, so no shadow")
+            return None
+        self.cur.execute("""SELECT shadow
+                 FROM shadows
+                 WHERE
+                 item = ? AND
+                 other_node = ? AND
+                 rev = ? AND
+                 other_node_rev = ?
+                 LIMIT 1""", (item, other_node_id, rev, other_node_rev))
+        shadow_row = self.cur.fetchone()
+        if not shadow_row:
+            self._log_debug_trans("no shadow")
+            return None
+        else:
+            return shadow_row["shadow"]
 
     def _get_trans_prefix(self):
         if self.con.in_transaction:
