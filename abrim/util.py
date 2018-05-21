@@ -268,14 +268,14 @@ class Db(object):
                  ORDER BY rev ASC LIMIT 1""", (item, other_node_id,))
         revs_row = self.cur.fetchone()
         if not revs_row:
-            self._log_debug_trans("no revs")
+            self._log_debug_trans("no revs, defaulting to 0 - 0")
             return 0, 0
         else:
             return revs_row["rev"], revs_row["other_node"]
 
     def get_shadow(self, item, other_node_id, rev, other_node_rev):
         if rev == 0 and other_node_rev == 0:
-            self._log_debug_trans("revs == 0, so no shadow")
+            self._log_debug_trans("revs 0 - 0, assuming there is no shadow")
             return None
         self.cur.execute("""SELECT shadow
                  FROM shadows

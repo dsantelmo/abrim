@@ -195,8 +195,13 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
 
 
 def _patch_server_shadow(config):
-    shadow = config.db.get_shadow(config.item_id, config.item_node_id, config.shadow_server_rev, config.shadow_client_rev)
-    log.debug("shadow: {}".format(shadow))
+    i_e = config.item_edit
+    shadow = config.db.get_shadow(i_e['item_id'],
+                                  i_e['item_node_id'],
+                                  i_e['shadow_server_rev'],
+                                  i_e['shadow_client_rev'])
+    if shadow:
+        log.debug("shadow: {}".format(shadow))
 
     return True
 
@@ -206,69 +211,93 @@ def errorhandler405(e):
     return Response('405', 405, {'Allow':'POST'})
 
 
-def parse_req(config, req_json):
-    log.debug("parse_req: {}".format(req_json))
+def parse_req(i_e, r_j):
+    log.debug("parse_req: {}".format(r_j))
     try:
-        config.shadow_client_rev = req_json['rev']
-        config.shadow_server_rev = req_json['other_node_rev']
-        config.client_create_date = "0"
+        i_e['shadow_client_rev'] = r_j['rev']
+        i_e['shadow_server_rev'] = r_j['other_node_rev']
     except KeyError:
         log.error("rev or create_date")
         log.error("HTTP 400 Bad Request")
         abort(400)
 
     try:
-        config.edits = req_json['edits']
+        edits = r_j['edits']
+        if edits:
+            i_e['edits'] = r_j['edits']
     except KeyError:
         log.debug("no edits")
 
     try:
-        config.old_shadow_adler32 = req_json['old_shadow_adler32']
-        config.shadow_adler32 = req_json['shadow_adler32']
+        i_e['old_shadow_adler32'] = r_j['old_shadow_adler32']
+        i_e['shadow_adler32'] = r_j['shadow_adler32']
     except KeyError:
         log.error("missing old_shadow_adler32 or shadow_adler32")
         log.error("HTTP 400 Bad Request")
         abort(400)
 
 
-def _check_request_ok(config, request):
+def _check_request_ok(i_e, request):
     if request.method == 'POST':
-        parse_req(config, request.get_json())
-        x = 0
-        for item in vars(config).items():
-            x += 1
-            log.debug("{}. {}: {} ({})".format(x, item[0],item[1],type(item[1])))
+        parse_req(i_e, request.get_json())
+
+        log.info("edit request: {}/{}/{}".format(i_e['item_user_id'],
+                                                 i_e['item_node_id'],
+                                                 i_e['item_id']
+                                                 ))
+        try:
+            log.info("edit request revs: {} - {}, has edits: {:.30}...".format(i_e['shadow_client_rev'],
+                                                                               i_e['shadow_server_rev'],
+                                                                               i_e['edits'].replace('\n', ' ')
+                                                                               ))
+        except KeyError:
+            log.info("edit request revs: {} - {}, no edits".format(i_e['shadow_client_rev'],
+                                                                   i_e['shadow_server_rev'],
+                                                                   ))
+        # x = 0
+        # for item in config.item_edit.items():
+        #     x += 1
+        #     log.debug("{}. {}: {} ({})".format(x, item[0],item[1],type(item[1])))
+        # x = 0
+        # for item in vars(config).items():
+        #     x += 1
+        #     log.debug("{}. {}: {} ({})".format(x, item[0],item[1],type(item[1])))
         return True
     else:
         return False
 
 
 def _check_revs(config):
-    saved_rev, saved_other_node_rev = config.db.get_revs(config.item_id, config.item_node_id)
+    i_e = config.item_edit
+    saved_rev, saved_other_node_rev = config.db.get_revs(i_e['item_id'], i_e['item_node_id'])
 
-    if config.shadow_client_rev == saved_other_node_rev:
+    if i_e['shadow_client_rev'] == saved_other_node_rev:
         log.debug("client revs match")
     else:
         log.error("client revs DON'T match")
+        log.error("{} - {}".format(i_e['shadow_client_rev'], saved_other_node_rev))
         return False
 
-    if config.shadow_server_rev == saved_rev:
+    if config.item_edit['shadow_server_rev'] == saved_rev:
         log.debug("server revs match")
     else:
         log.error("server revs DON'T match")
+        log.error("{} - {}".format(i_e['shadow_server_rev'], saved_other_node_rev))
         return False
 
     return saved_rev, saved_other_node_rev
 
 
-@app.route('/users/<string:item_user_id>/nodes/<string:item_node_id>/items/<string:item_id>', methods=['POST'])
-def _get_sync(item_user_id, item_node_id, item_id):
-    log.debug("got a request at /users/{}/nodes/{}/items/{}".format(item_user_id, item_node_id, item_id, ))
-    config.item_user_id = item_user_id
-    config.item_node_id = item_node_id
-    config.item_id = item_id
+@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
+def _get_sync(user_id, client_node_id, item_id):
+    log.debug("got a request at /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
 
-    if _check_request_ok(config, request):
+    config.item_edit = {"item_user_id": user_id,
+                        "item_node_id": client_node_id,
+                        "item_id": item_id
+                        }
+
+    if _check_request_ok(config.item_edit, request):
         try:
             config.db.start_transaction("_get_sync")
             if not _check_revs(config) or not _patch_server_shadow(config):
@@ -280,6 +309,8 @@ def _get_sync(item_user_id, item_node_id, item_id):
             abort(500)  # 500 Internal Server Error
         else:
             config.db.end_transaction()
+            # FIXME: delete me:
+            abort(404)
             log.debug("HTTP 201: Created")
             return '', 201  # HTTP 201: Created
 
