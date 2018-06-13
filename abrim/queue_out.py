@@ -2,16 +2,12 @@
 
 import multiprocessing
 import time
-import sys
 import requests
 import json
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
-from util import get_log, AbrimConfig
+from abrim.util import get_log
 log = get_log(full_debug=False)
 
-# for key in logging.Logger.manager.loggerDict:
-#     print(key)
+
 def date_handler(obj):
     return obj.isoformat() if hasattr(obj, 'isoformat') else obj
 

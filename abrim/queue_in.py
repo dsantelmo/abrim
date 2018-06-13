@@ -10,9 +10,8 @@ import diff_match_patch
 from google.cloud import firestore
 import grpc
 import google
-from flask import Flask, request, abort, jsonify, Response
-sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
-from util import get_log, AbrimConfig
+from flask import Flask, request, abort, Response
+from abrim.util import get_log
 log = get_log(full_debug=False)
 
 app = Flask(__name__)

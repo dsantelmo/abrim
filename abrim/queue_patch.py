@@ -1,19 +1,13 @@
 #!/usr/bin/env python
 
-import logging
 import multiprocessing
-import os
-import sys
 import time
 import zlib
-
 import diff_match_patch
 import google
 import grpc
 from google.cloud import firestore
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '.'))  # FIXME use pathlib
-from node import get_log, AbrimConfig, create_item, create_diff_edits
+from abrim.util import get_log, create_diff_edits
 log = get_log(full_debug=False)
 
 
