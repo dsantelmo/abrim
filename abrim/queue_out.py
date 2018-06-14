@@ -43,18 +43,6 @@ def send_edit(edit, other_node_url):
         raise
 
 
-def get_first_queued_edit(config, other_node_id):
-    return config.db.get_first_queued_edit(other_node_id)
-
-
-def archive_edit(config, edit_rowid):
-    return config.db.archive_edit(edit_rowid)
-
-
-def delete_edit(config, edit_rowid):
-    return config.db.delete_edit(edit_rowid)
-
-
 def prepare_url(config_, item_id, other_node_url):
     url_route = "{}/users/user_1/nodes/{}/items/{}".format(
         other_node_url,
@@ -76,14 +64,16 @@ def process_out_queue(lock, node_id):
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
                 config.db.start_transaction("process_out_queue")
-                edit_rowid, edit = get_first_queued_edit(config, other_node_id)
+                edit_rowid, edit = config.db.get_first_queued_edit(other_node_id)
                 if not edit or not edit_rowid:
                     break
                 url = prepare_url(config, edit["item"], other_node_url)
                 try:
                     send_edit(edit, url)
-                    archive_edit(config, edit_rowid)
-                    delete_edit(config, edit_rowid)
+
+                    config.db.archive_edit(edit_rowid)
+                    config.db.delete_edit(edit_rowid)
+
                     config.db.end_transaction()
                 except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError) as err:
                     config.db.rollback_transaction()
