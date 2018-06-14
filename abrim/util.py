@@ -4,6 +4,7 @@ import sys
 import diff_match_patch
 import logging
 import zlib
+from flask import jsonify
 
 
 def get_log(full_debug=False):
@@ -65,6 +66,18 @@ def create_hash(text):
     adler32 = zlib.adler32(text.encode())
     log.debug("new hash {}".format(adler32))
     return adler32
+
+
+def resp(http_code, api_code, api_code_unique, message):
+    response = jsonify({
+        'http_code': http_code,
+        'api_code': api_code,
+        'api_code_unique': api_code_unique,
+        'message': message
+    })
+    log.debug("HTTP {} - {} - {} - {}".format(http_code, api_code, api_code_unique, message))
+    response.status_code = http_code
+    return response
 
 
 if __name__ == "__main__":

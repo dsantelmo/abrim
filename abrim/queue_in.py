@@ -9,7 +9,7 @@ import grpc
 import google
 from flask import Flask, request, abort, Response
 from abrim.config import Config
-from abrim.util import get_log, patch_text
+from abrim.util import get_log, patch_text, resp
 
 
 log = get_log(full_debug=False)
@@ -182,7 +182,7 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
     return True
 
 
-def _patch_server_shadow(config):
+def _get_server_shadow(config):
     i_e = config.item_edit
     shadow = config.db.get_shadow(i_e['item_id'],
                                   i_e['item_node_id'],
@@ -190,8 +190,19 @@ def _patch_server_shadow(config):
                                   i_e['shadow_client_rev'])
     if shadow:
         log.debug("shadow: {}".format(shadow))
+    else:
+        return False
 
-    return True
+
+def _patch_server_shadow(config, shadow):
+    # config.db.save_new_shadow(i_e['item_node_id'],
+    #                           i_e['item_id'],
+    #                           shadow,
+    #                           i_e['shadow_server_rev'],
+    #                           i_e['shadow_client_rev']
+    #                           )
+    log.error("unknown error")
+    return False
 
 
 @app.errorhandler(405)
@@ -288,19 +299,26 @@ def _get_sync(user_id, client_node_id, item_id):
     if _check_request_ok(config.item_edit, request):
         try:
             config.db.start_transaction("_get_sync")
-            if not _check_revs(config) or not _patch_server_shadow(config):
-                abort(404)  # 404 Not Found
+            if not _check_revs(config):
+                return resp(404, 'ERR_PROCESS', "queue_in-_get_sync-not_check_revs", "Revs don't check")
+
+            shadow = _get_server_shadow(config)
+            if not shadow:
+                return resp(404, 'ERR_SHADOW', "queue_in-_get_sync-not_shadow", "Shadow not found. Please send the full item")
+
+            if not _patch_server_shadow(config, shadow):
+                abort(500)  # 500 Internal Server Error
+
         except Exception as err:
             config.db.rollback_transaction()
             log.error(err)
             traceback.print_exc()
-            abort(500)  # 500 Internal Server Error
+            return resp(500, 'ERR_UNKNOWN', "queue_in-_get_sync-exception", "Unknown error. Please report this")
         else:
             config.db.end_transaction()
             # FIXME: delete me:
             abort(404)
-            log.debug("HTTP 201: Created")
-            return '', 201  # HTTP 201: Created
+            return resp(201, 'OK_SYNC', "queue_in-_get_sync-ok", "Sync acknowledged")
 
 
     else:
