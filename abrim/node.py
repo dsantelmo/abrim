@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from abrim.util import get_log
+from abrim.util import get_log, create_diff_edits, create_hash
 from abrim.config import Config
 log = get_log(full_debug=False)
 
@@ -19,7 +19,12 @@ def update_item(config, item_id, new_text=""):
         rev += 1
         other_node_rev += 1
         config.db.save_new_shadow(other_node_id, item_id, new_text, rev, other_node_rev)
-        config.db.enqueue_client_edits(other_node_id, item_id, new_text, old_shadow, rev, other_node_rev)
+
+        diffs = create_diff_edits(new_text, old_shadow),  # maybe doing a slow blocking diff in a transaction is wrong
+        old_hash = create_hash(old_shadow),
+        new_hash = create_hash(new_text),
+
+        config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, rev, other_node_rev)
 
     config.db.end_transaction()
 

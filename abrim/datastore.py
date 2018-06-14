@@ -189,15 +189,15 @@ class DataStore(object):
                            VALUES (?,?,?,?,?)""", insert)
         self._log_debug_trans("shadow {} {} {} saved".format(item_id, other_node_id, rev))
 
-    def enqueue_client_edits(self, other_node_id, item_id, new_text, old_shadow, rev, other_node_rev):
+    def enqueue_client_edits(self, other_node_id, item_id, diffs, old_hash, new_hash, rev, other_node_rev):
         insert = (
             item_id,
             other_node_id,
             rev,
             other_node_rev,
-            create_diff_edits(new_text, old_shadow),  # maybe doing a slow blocking diff inside a transaction is wrong
-            create_hash(old_shadow),
-            create_hash(new_text),
+            diffs,
+            old_hash,
+            new_hash,
         )
         self.cur.execute("""INSERT OR IGNORE INTO edits
                            (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
