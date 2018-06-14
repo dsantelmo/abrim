@@ -5,6 +5,7 @@ import time
 import requests
 import json
 from abrim.util import get_log
+from abrim.config import Config
 log = get_log(full_debug=False)
 
 
@@ -63,7 +64,7 @@ def prepare_url(config_, item_id, other_node_url):
 
 
 def process_out_queue(lock, node_id):
-    config = AbrimConfig(node_id)
+    config = Config(node_id)
 
     lock.acquire()
     log.debug("NODE ID: {}".format(config.node_id,))

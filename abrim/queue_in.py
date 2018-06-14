@@ -11,6 +11,7 @@ from google.cloud import firestore
 import grpc
 import google
 from flask import Flask, request, abort, Response
+from abrim.config import Config
 from abrim.util import get_log
 log = get_log(full_debug=False)
 
@@ -390,7 +391,7 @@ def prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shado
 
 if __name__ == "__main__":  # pragma: no cover
     log.info("queue_in started")
-    config = AbrimConfig(node_id="node_2")
+    config = Config(node_id="node_2")
     #
     # config.item_user_id = "user_1"
     # config.node_id = "test_node2"

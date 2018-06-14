@@ -7,6 +7,7 @@ import diff_match_patch
 import google
 import grpc
 from google.cloud import firestore
+from abrim.config import Config
 from abrim.util import get_log, create_diff_edits
 log = get_log(full_debug=False)
 
@@ -133,7 +134,7 @@ def server_patch_queue():
                 except google.api.core.exceptions.NotFound:
                     log.debug("node {} item {} doesn't exist".format(node_id, item.id))
 
-                    config = AbrimConfig("node_2")
+                    config = Config("node_2")
                     create_item(config, str(item.id))
                     old_text_before = ""
 
