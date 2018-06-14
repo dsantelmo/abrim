@@ -304,7 +304,7 @@ def _get_sync(user_id, client_node_id, item_id):
 
             shadow = _get_server_shadow(config)
             if not shadow:
-                return resp(404, 'ERR_SHADOW', "queue_in-_get_sync-not_shadow", "Shadow not found. Please send the full item")
+                return resp(404, 'ERR_NO_SHADOW', "queue_in-_get_sync-not_shadow", "Shadow not found. Please send the full item")
 
             if not _patch_server_shadow(config, shadow):
                 abort(500)  # 500 Internal Server Error
