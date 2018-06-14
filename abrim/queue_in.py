@@ -253,18 +253,31 @@ def _check_request_ok(i_e, request):
             log.info("edit request revs: {} - {}, no edits".format(i_e['shadow_client_rev'],
                                                                    i_e['shadow_server_rev'],
                                                                    ))
-        # x = 0
-        # for item in config.item_edit.items():
-        #     x += 1
-        #     log.debug("{}. {}: {} ({})".format(x, item[0],item[1],type(item[1])))
-        # x = 0
-        # for item in vars(config).items():
-        #     x += 1
-        #     log.debug("{}. {}: {} ({})".format(x, item[0],item[1],type(item[1])))
         return True
     else:
         return False
 
+
+def _check_shadow_request_ok(i_e, request):
+    if request.method == 'PUT':
+        parse_req(i_e, request.get_json())
+
+        log.info("edit request: {}/{}/{}".format(i_e['item_user_id'],
+                                                 i_e['item_node_id'],
+                                                 i_e['item_id']
+                                                 ))
+        try:
+            log.info("edit request revs: {} - {}, has edits: {:.30}...".format(i_e['shadow_client_rev'],
+                                                                               i_e['shadow_server_rev'],
+                                                                               i_e['edits'].replace('\n', ' ')
+                                                                               ))
+        except KeyError:
+            log.info("edit request revs: {} - {}, no edits".format(i_e['shadow_client_rev'],
+                                                                   i_e['shadow_server_rev'],
+                                                                   ))
+        return True
+    else:
+        return False
 
 def _check_revs(config):
     i_e = config.item_edit
@@ -290,40 +303,77 @@ def _check_revs(config):
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(user_id, client_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
-
     config.item_edit = {"item_user_id": user_id,
                         "item_node_id": client_node_id,
                         "item_id": item_id
                         }
+    try:
+        if not _check_request_ok(config.item_edit, request):
+            # log.debug(
+            # "HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(
+            #  sys._getframe().f_lineno))
+            return resp(405, 'ERR_REQUEST',
+                        "queue_in-_get_sync-check_req_405",
+                        "Use POST at this URL")
+    except Exception as err:
+        log.error(err)
+        traceback.print_exc()
+        return resp(500, 'ERR_UNKNOWN',
+                    "queue_in-_get_sync-check_req_exception",
+                    "Unknown error. Please report this")
 
-    if _check_request_ok(config.item_edit, request):
-        try:
-            config.db.start_transaction("_get_sync")
-            if not _check_revs(config):
-                return resp(404, 'ERR_PROCESS', "queue_in-_get_sync-not_check_revs", "Revs don't check")
+    try:
+        config.db.start_transaction("_get_sync")
+        if not _check_revs(config):
+            return resp(404, 'ERR_PROCESS',
+                        "queue_in-_get_sync-not_check_revs",
+                        "Revs don't check")
 
-            shadow = _get_server_shadow(config)
-            if not shadow:
-                return resp(404, 'ERR_NO_SHADOW', "queue_in-_get_sync-not_shadow", "Shadow not found. Please send the full item")
+        shadow = _get_server_shadow(config)
+        if not shadow:
+            return resp(404, 'ERR_NO_SHADOW',
+                        "queue_in-_get_sync-not_shadow",
+                        "Shadow not found. PUT the full shadow to /users/{}/nodes/{}/items/{}/shadow".format(
+                            user_id, client_node_id, item_id, ))
 
-            if not _patch_server_shadow(config, shadow):
-                abort(500)  # 500 Internal Server Error
+        if not _patch_server_shadow(config, shadow):
+            abort(500)  # 500 Internal Server Error
 
-        except Exception as err:
-            config.db.rollback_transaction()
-            log.error(err)
-            traceback.print_exc()
-            return resp(500, 'ERR_UNKNOWN', "queue_in-_get_sync-exception", "Unknown error. Please report this")
-        else:
-            config.db.end_transaction()
-            # FIXME: delete me:
-            abort(404)
-            return resp(201, 'OK_SYNC', "queue_in-_get_sync-ok", "Sync acknowledged")
-
-
+    except Exception as err:
+        config.db.rollback_transaction()
+        log.error(err)
+        traceback.print_exc()
+        return resp(500, 'ERR_UNKNOWN',
+                    "queue_in-_get_sync-transaction_exception",
+                    "Unknown error. Please report this")
     else:
-        log.debug("HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(sys._getframe().f_lineno))
-        abort(405)  # 405 Method Not Allowed
+        config.db.end_transaction()
+        # FIXME: delete me:
+        abort(404)
+        return resp(201, 'OK_SYNC',
+                    "queue_in-_get_sync-ok",
+                    "Sync acknowledged")
+
+
+@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['POST'])
+def _get_shadow(user_id, client_node_id, item_id):
+    log.debug("got a request at /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
+    config.item_edit = {"item_user_id": user_id,
+                        "item_node_id": client_node_id,
+                        "item_id": item_id
+                        }
+    try:
+        if not _check_shadow_request_ok(config.item_edit, request):
+            return resp(405, 'ERR_REQUEST',
+                        "queue_in-_get_shadow-check_req_405",
+                        "Use PUT at this URL")
+    except Exception as err:
+        log.error(err)
+        traceback.print_exc()
+        return resp(500, 'ERR_UNKNOWN',
+                    "queue_in-_get_shadow-check_req_exception",
+                    "Unknown error. Please report this")
+
 
 
 def _parse_args_helper():
