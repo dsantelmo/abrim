@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 
 import argparse
-import logging
 import sys
-import os
 import zlib
 import traceback
-import diff_match_patch
 from google.cloud import firestore
 import grpc
 import google
 from flask import Flask, request, abort, Response
 from abrim.config import Config
-from abrim.util import get_log
+from abrim.util import get_log, patch_text
+
+
 log = get_log(full_debug=False)
 
 app = Flask(__name__)
@@ -68,17 +67,6 @@ app = Flask(__name__)
 #     else:
 #         log.error('ERROR saving new item')
 #         return False
-
-
-def patch_text(item_patches, text):
-    log.debug("patching: {}\nwith: {}".format(item_patches, text))
-    diff_obj = diff_match_patch.diff_match_patch()
-    # these are FRAGILE patches and must match perfectly
-    diff_match_patch.Match_Threshold = 0
-    diff_match_patch.Match_Distance = 0
-    patches =  diff_obj.patch_fromText(item_patches)
-    patched_text, success = diff_obj.patch_apply(patches, text)
-    return patched_text, success
 
 
 # def _check_item_patch_exist(transaction, item_ref, item_rev):

@@ -50,6 +50,17 @@ def create_diff_edits(text, shadow):
         return None
 
 
+def patch_text(item_patches, text):
+    log.debug("patching: {}\nwith: {}".format(item_patches, text))
+    diff_obj = diff_match_patch.diff_match_patch()
+    # these are FRAGILE patches and must match perfectly
+    diff_match_patch.Match_Threshold = 0
+    diff_match_patch.Match_Distance = 0
+    patches =  diff_obj.patch_fromText(item_patches)
+    patched_text, success = diff_obj.patch_apply(patches, text)
+    return patched_text, success
+
+
 def create_hash(text):
     adler32 = zlib.adler32(text.encode())
     log.debug("new hash {}".format(adler32))
