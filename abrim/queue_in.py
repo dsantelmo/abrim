@@ -312,7 +312,7 @@ def _get_sync(user_id, client_node_id, item_id):
             # log.debug(
             # "HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(
             #  sys._getframe().f_lineno))
-            return resp(405, 'ERR_REQUEST',
+            return resp(405, err_codes.REQUEST,
                         "queue_in-_get_sync-check_req_405",
                         "Use POST at this URL")
     except Exception as err:
@@ -325,13 +325,13 @@ def _get_sync(user_id, client_node_id, item_id):
     try:
         config.db.start_transaction("_get_sync")
         if not _check_revs(config):
-            return resp(404, 'ERR_PROCESS',
+            return resp(404, err_codes.CHECK_REVS,
                         "queue_in-_get_sync-not_check_revs",
                         "Revs don't check")
 
         shadow = _get_server_shadow(config)
         if not shadow:
-            return resp(404, 'ERR_NO_SHADOW',
+            return resp(404, err_codes.NO_SHADOW,
                         "queue_in-_get_sync-not_shadow",
                         "Shadow not found. PUT the full shadow to /users/{}/nodes/{}/items/{}/shadow".format(
                             user_id, client_node_id, item_id, ))
@@ -343,14 +343,14 @@ def _get_sync(user_id, client_node_id, item_id):
         config.db.rollback_transaction()
         log.error(err)
         traceback.print_exc()
-        return resp(500, 'ERR_UNKNOWN',
+        return resp(500, err_codes.UNKNOWN,
                     "queue_in-_get_sync-transaction_exception",
                     "Unknown error. Please report this")
     else:
         config.db.end_transaction()
         # FIXME: delete me:
         abort(404)
-        return resp(201, 'OK_SYNC',
+        return resp(201, 'OK',
                     "queue_in-_get_sync-ok",
                     "Sync acknowledged")
 

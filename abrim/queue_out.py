@@ -4,7 +4,7 @@ import multiprocessing
 import time
 import requests
 import json
-from abrim.util import get_log
+from abrim.util import get_log, err_codes
 from abrim.config import Config
 log = get_log(full_debug=False)
 
@@ -39,7 +39,22 @@ def send_edit(edit, other_node_url):
         log.info("ConnectionError!! Sleep 15 secs")
         raise
     except requests.exceptions.HTTPError as err:
-        log.info("HTTPError!! Sleep 15 secs")
+        http_code = err.response.status_code
+        temp_dict = json.loads(err.response.text)
+        api_code = temp_dict['api_code']
+        print(http_code)
+        print(api_code)
+        if http_code == 404 and api_code == err_codes.NO_SHADOW:
+            log.debug(err_codes.NO_SHADOW)
+            pass
+        elif http_code == 404 and api_code == err_codes.CHECK_REVS:
+            log.debug(err_codes.CHECK_REVS)
+            pass
+        else:
+            log.info("HTTPError!! Sleep 15 secs")
+            raise
+    except AttributeError:
+        log.error("AttributeError in the response payload. Sleep 15 secs")
         raise
 
 
