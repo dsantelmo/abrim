@@ -38,6 +38,7 @@ def send_sync(edit, other_node_url, use_put=False):
             p_response = __requests_put(other_node_url, edit)
         else:
             p_response = __requests_post(other_node_url, edit)
+        log.debug("Response: {}".format(p_response.text))
         response_http = p_response.status_code
         response_dict = json.loads(p_response.text)
         api_code = response_dict['api_code']
@@ -50,8 +51,11 @@ def send_sync(edit, other_node_url, use_put=False):
         post_response = err.response.status_code
         log.info("HTTPError!! code: {} Sleep 15 secs".format(post_response))
         raise
-    except AttributeError:
-        log.error("AttributeError in the response payload. Sleep 15 secs")
+    except json.decoder.JSONDecodeError as err:
+        log.info("JSONDecodeError!! code: {} Sleep 15 secs".format(err))
+        raise
+    except (AttributeError, TypeError):
+        log.error("Error in the response payload. Sleep 15 secs")
         raise
 
 
@@ -94,8 +98,17 @@ def process_out_queue(lock, node_id):
                                                       other_node_id,
                                                       edit["other_node_rev"],
                                                       edit["rev"])
-                        send_sync(shadow, url + "/shadow")
                         config.db.rollback_transaction()
+
+                        shadow_json = {'rev': edit["rev"],
+                                       'other_node_rev': edit["other_node_rev"],
+                                       'shadow': ""}
+
+                        if shadow:
+                            shadow_json['shadow'] = shadow
+                            send_sync(shadow_json, url + "/shadow", use_put=True)
+                        else:
+                            send_sync(shadow_json, url + "/shadow", use_put=True)
                     elif response_http == 404 and api_code == err_codes['CHECK_REVS']:
                         log.debug(err_codes['CHECK_REVS'])
                         config.db.rollback_transaction()
@@ -104,7 +117,7 @@ def process_out_queue(lock, node_id):
                         # raise for the rest of the codes
                         config.db.rollback_transaction()
                         raise ("Undefined HTTP response")  # fail for the rest of HTTP codes
-                except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError, KeyError) as err:
+                except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError, KeyError, json.decoder.JSONDecodeError) as err:
                     config.db.rollback_transaction()
                     log.debug(err)
                     time.sleep(15)

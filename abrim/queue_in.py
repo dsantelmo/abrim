@@ -205,20 +205,19 @@ def _patch_server_shadow(config, shadow):
     return False
 
 
-@app.errorhandler(405)
-def errorhandler405(e):
-    return Response('405', 405, {'Allow':'POST'})
+# @app.errorhandler(405)
+# def errorhandler405(e):
+#     return Response('405', 405, {'Allow':'POST'})
 
 
-def parse_req(i_e, r_j):
-    log.debug("parse_req: {}".format(r_j))
+def parse_sync_req(i_e, r_j):
+    log.debug("parse_sync_req: {}".format(r_j))
     try:
         i_e['shadow_client_rev'] = r_j['rev']
         i_e['shadow_server_rev'] = r_j['other_node_rev']
     except KeyError:
-        log.error("rev or create_date")
-        log.error("HTTP 400 Bad Request")
-        abort(400)
+        log.error("missing rev or create_date")
+        return False
 
     try:
         edits = r_j['edits']
@@ -232,13 +231,32 @@ def parse_req(i_e, r_j):
         i_e['shadow_adler32'] = r_j['shadow_adler32']
     except KeyError:
         log.error("missing old_shadow_adler32 or shadow_adler32")
-        log.error("HTTP 400 Bad Request")
-        abort(400)
+        return False
+    return True
+
+
+def parse_shadow_req(i_e, r_j):
+    log.debug("parse_shadow_req: {}".format(r_j))
+    try:
+        i_e['shadow_client_rev'] = r_j['rev']
+        i_e['shadow_server_rev'] = r_j['other_node_rev']
+    except KeyError:
+        log.error("missing rev or create_date")
+        return False
+
+    try:
+        shadow = r_j['shadow']
+        if shadow:
+            i_e['shadow'] = r_j['shadow']
+    except KeyError:
+        log.debug("no shadow")
+    return True
 
 
 def _check_request_ok(i_e, request):
     if request.method == 'POST':
-        parse_req(i_e, request.get_json())
+        if not parse_sync_req(i_e, request.get_json()):
+            return False
 
         log.info("edit request: {}/{}/{}".format(i_e['item_user_id'],
                                                  i_e['item_node_id'],
@@ -260,24 +278,25 @@ def _check_request_ok(i_e, request):
 
 def _check_shadow_request_ok(i_e, request):
     if request.method == 'PUT':
-        parse_req(i_e, request.get_json())
-
-        log.info("edit request: {}/{}/{}".format(i_e['item_user_id'],
+        if not parse_shadow_req(i_e, request.get_json()):
+            return False
+        log.info("shadow request: {}/{}/{}/shadow".format(i_e['item_user_id'],
                                                  i_e['item_node_id'],
                                                  i_e['item_id']
                                                  ))
         try:
-            log.info("edit request revs: {} - {}, has edits: {:.30}...".format(i_e['shadow_client_rev'],
+            log.info("shadow request revs: {} - {}, has shadow: {:.30}...".format(i_e['shadow_client_rev'],
                                                                                i_e['shadow_server_rev'],
-                                                                               i_e['edits'].replace('\n', ' ')
+                                                                               i_e['shadow'].replace('\n', ' ')
                                                                                ))
         except KeyError:
-            log.info("edit request revs: {} - {}, no edits".format(i_e['shadow_client_rev'],
+            log.info("shadow request revs: {} - {}, no shadow".format(i_e['shadow_client_rev'],
                                                                    i_e['shadow_server_rev'],
                                                                    ))
         return True
     else:
         return False
+
 
 def _check_revs(config):
     i_e = config.item_edit
@@ -360,7 +379,7 @@ def _get_sync(user_id, client_node_id, item_id):
                     "Sync acknowledged")
 
 
-@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['POST'])
+@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
 def _get_shadow(user_id, client_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
     config.item_edit = {"item_user_id": user_id,
@@ -369,13 +388,16 @@ def _get_shadow(user_id, client_node_id, item_id):
                         }
     try:
         if not _check_shadow_request_ok(config.item_edit, request):
-            return resp(405, err_codes['ERR_REQUEST'],
+            return resp(405, err_codes['REQUEST'],
                         "queue_in-_get_shadow-check_req_405",
                         "Use PUT at this URL")
+        else:
+            raise Exception("save the new shadow to db")
+            return 'ok', 200
     except Exception as err:
         log.error(err)
         traceback.print_exc()
-        return resp(500, err_codes['ERR_UNKNOWN'],
+        return resp(500, err_codes['UNKNOWN'],
                     "queue_in-_get_shadow-check_req_exception",
                     "Unknown error. Please report this")
 
