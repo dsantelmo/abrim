@@ -39,10 +39,10 @@ def send_edit(edit, other_node_url):
             log.debug("POST successful, archiving this item to queue_2_sent")
             raise("implement me!")
         elif response_http == 404 and api_code == err_codes['NO_SHADOW']:
-            log.debug(err_codes.NO_SHADOW)
+            log.debug(err_codes['NO_SHADOW'])
             raise("implement me!")
         elif response_http == 404 and api_code == err_codes['CHECK_REVS']:
-            log.debug(err_codes.CHECK_REVS)
+            log.debug(err_codes['CHECK_REVS'])
             raise("implement me!")
         else:
             # raise for the rest of the codes
