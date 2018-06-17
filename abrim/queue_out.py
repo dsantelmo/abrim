@@ -13,41 +13,36 @@ def date_handler(obj):
     return obj.isoformat() if hasattr(obj, 'isoformat') else obj
 
 
-def __requests_post(url, payload):
-    log.debug("about to POST: {}".format(payload))
+def __prepare_request(url, payload):
+    log.debug("about to POST/PUT: {}".format(payload))
     log.debug("to URL: {}".format(url))
-    #prepare payload
     temp_str = json.dumps(payload, default=date_handler)
-    temp_dict = json.loads(temp_str)
-    return requests.post(
-      url,
-      headers={'Content-Type': 'application/json'},
-      # json=json.dumps(payload, default=date_handler)
-      json=temp_dict
-      )
+    json_dict = json.loads(temp_str)
+    headers = {'Content-Type': 'application/json'}
+    return headers, json_dict
 
 
-def send_edit(edit, other_node_url):
-    #log.debug("/nodes/{}/items/{}/queue_1_to_process/{}/revs/{}".format(config.node_id, config.item_id, remote_node_id, rev_ref.id, ))
-    # NOW SENT THE QUEUE ITEM TO THE SERVER
+def __requests_post(url, payload):
+    headers, json_dict = __prepare_request(url, payload)
+    return requests.post(url, headers = headers, json = json_dict)
+
+
+def __requests_put(url, payload):
+    headers, json_dict = __prepare_request(url, payload)
+    return requests.put(url, headers = headers, json = json_dict)
+
+
+def send_sync(edit, other_node_url, use_put=False):
     try:
-        post_response = __requests_post(other_node_url, edit)
-        response_http = post_response.status_code
-        response_dict = json.loads(post_response.text)
-        api_code = response_dict['api_code']
-        if response_http == 201 and api_code == err_codes['SYNC_OK']:
-            log.debug("POST successful, archiving this item to queue_2_sent")
-            raise Exception("implement me!")
-        elif response_http == 404 and api_code == err_codes['NO_SHADOW']:
-            log.debug(err_codes['NO_SHADOW'])
-            raise Exception("implement me!")
-        elif response_http == 404 and api_code == err_codes['CHECK_REVS']:
-            log.debug(err_codes['CHECK_REVS'])
-            raise Exception("implement me!")
+        if use_put:
+            p_response = __requests_put(other_node_url, edit)
         else:
-            # raise for the rest of the codes
-            post_response.raise_for_status()  # fail if not 2xx
-            raise("Undefined HTTP response")  # fail for the rest of HTTP codes
+            p_response = __requests_post(other_node_url, edit)
+        response_http = p_response.status_code
+        response_dict = json.loads(p_response.text)
+        api_code = response_dict['api_code']
+        log.debug("API response: {} HTTP response: {} Dict: {}".format(api_code, response_http, response_dict))
+        return response_http, api_code
     except requests.exceptions.ConnectionError:
         log.info("ConnectionError!! Sleep 15 secs")
         raise
@@ -86,13 +81,30 @@ def process_out_queue(lock, node_id):
                     break
                 url = prepare_url(config, edit["item"], other_node_url)
                 try:
-                    send_edit(edit, url)
+                    response_http, api_code = send_sync(edit, url)
 
-                    config.db.archive_edit(edit_rowid)
-                    config.db.delete_edit(edit_rowid)
-
-                    config.db.end_transaction()
-                except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError) as err:
+                    if response_http == 201 and api_code == err_codes['SYNC_OK']:
+                        log.debug("POST successful, archiving this item to queue_2_sent")
+                        config.db.archive_edit(edit_rowid)
+                        config.db.delete_edit(edit_rowid)
+                        config.db.end_transaction()
+                    elif response_http == 404 and api_code == err_codes['NO_SHADOW']:
+                        log.info(err_codes['NO_SHADOW'])
+                        shadow = config.db.get_shadow(edit["item"],
+                                                      other_node_id,
+                                                      edit["other_node_rev"],
+                                                      edit["rev"])
+                        send_sync(shadow, url + "/shadow")
+                        config.db.rollback_transaction()
+                    elif response_http == 404 and api_code == err_codes['CHECK_REVS']:
+                        log.debug(err_codes['CHECK_REVS'])
+                        config.db.rollback_transaction()
+                        raise Exception("implement me!")
+                    else:
+                        # raise for the rest of the codes
+                        config.db.rollback_transaction()
+                        raise ("Undefined HTTP response")  # fail for the rest of HTTP codes
+                except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError, KeyError) as err:
                     config.db.rollback_transaction()
                     log.debug(err)
                     time.sleep(15)
