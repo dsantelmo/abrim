@@ -369,13 +369,13 @@ def _get_shadow(user_id, client_node_id, item_id):
                         }
     try:
         if not _check_shadow_request_ok(config.item_edit, request):
-            return resp(405, 'ERR_REQUEST',
+            return resp(405, err_codes['ERR_REQUEST'],
                         "queue_in-_get_shadow-check_req_405",
                         "Use PUT at this URL")
     except Exception as err:
         log.error(err)
         traceback.print_exc()
-        return resp(500, 'ERR_UNKNOWN',
+        return resp(500, err_codes['ERR_UNKNOWN'],
                     "queue_in-_get_shadow-check_req_exception",
                     "Unknown error. Please report this")
 
