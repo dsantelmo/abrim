@@ -6,11 +6,13 @@ import logging
 import zlib
 from flask import jsonify
 
-err_codes = {'REQUEST': 'ERR_REQUEST',
-             'CHECK_REVS':'ERR_CHECK_REVS',
-             'NO_SHADOW': 'ERR_NO_SHADOW',
-             'UNKNOWN': 'ERR_UNKNOWN'
-             }
+err_codes = {
+    'SYNC_OK': 'SYNC_OK',
+    'REQUEST': 'ERR_REQUEST',
+    'CHECK_REVS': 'ERR_CHECK_REVS',
+    'NO_SHADOW': 'ERR_NO_SHADOW',
+    'UNKNOWN': 'ERR_UNKNOWN'
+    }
 
 def get_log(full_debug=False):
     if full_debug:

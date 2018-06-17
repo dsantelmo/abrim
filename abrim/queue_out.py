@@ -31,28 +31,30 @@ def send_edit(edit, other_node_url):
     #log.debug("/nodes/{}/items/{}/queue_1_to_process/{}/revs/{}".format(config.node_id, config.item_id, remote_node_id, rev_ref.id, ))
     # NOW SENT THE QUEUE ITEM TO THE SERVER
     try:
-        post_result = __requests_post(other_node_url, edit)
-        log.info("HTTP Status code is: {}".format(post_result.status_code,))
-        post_result.raise_for_status()  # fail if not 2xx
-        log.debug("POST successful, archiving this item to queue_2_sent")
+        post_response = __requests_post(other_node_url, edit)
+        response_http = post_response.status_code
+        response_dict = json.loads(post_response.text)
+        api_code = response_dict['api_code']
+        if response_http == 201 and api_code == err_codes['SYNC_OK']:
+            log.debug("POST successful, archiving this item to queue_2_sent")
+            raise("implement me!")
+        elif response_http == 404 and api_code == err_codes['NO_SHADOW']:
+            log.debug(err_codes.NO_SHADOW)
+            raise("implement me!")
+        elif response_http == 404 and api_code == err_codes['CHECK_REVS']:
+            log.debug(err_codes.CHECK_REVS)
+            raise("implement me!")
+        else:
+            # raise for the rest of the codes
+            post_response.raise_for_status()  # fail if not 2xx
+            raise("Undefined HTTP response")  # fail for the rest of HTTP codes
     except requests.exceptions.ConnectionError:
         log.info("ConnectionError!! Sleep 15 secs")
         raise
     except requests.exceptions.HTTPError as err:
-        http_code = err.response.status_code
-        temp_dict = json.loads(err.response.text)
-        api_code = temp_dict['api_code']
-        print(http_code)
-        print(api_code)
-        if http_code == 404 and api_code == err_codes.NO_SHADOW:
-            log.debug(err_codes.NO_SHADOW)
-            pass
-        elif http_code == 404 and api_code == err_codes.CHECK_REVS:
-            log.debug(err_codes.CHECK_REVS)
-            pass
-        else:
-            log.info("HTTPError!! Sleep 15 secs")
-            raise
+        post_response = err.response.status_code
+        log.info("HTTPError!! code: {} Sleep 15 secs".format(post_response))
+        raise
     except AttributeError:
         log.error("AttributeError in the response payload. Sleep 15 secs")
         raise
