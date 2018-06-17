@@ -339,4 +339,5 @@ class DataStore(object):
         with sqlite3.connect(self.db_path) as con:
             con.isolation_level = None
             con.row_factory = sqlite3.Row
+            con.set_trace_callback(log.debug)
             self._init_db(con, drop_db)
