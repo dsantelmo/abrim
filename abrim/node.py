@@ -20,9 +20,10 @@ def update_item(config, item_id, new_text=""):
         other_node_rev += 1
         config.db.save_new_shadow(other_node_id, item_id, new_text, rev, other_node_rev)
 
-        diffs = create_diff_edits(new_text, old_shadow),  # maybe doing a slow blocking diff in a transaction is wrong
-        old_hash = create_hash(old_shadow),
-        new_hash = create_hash(new_text),
+        diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
+        old_hash = create_hash(old_shadow)
+        new_hash = create_hash(new_text)
+        log.debug("old_hash: {}, new_hash: {}, diffs: {}".format(old_hash, new_hash, diffs))
 
         config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, rev, other_node_rev)
 
