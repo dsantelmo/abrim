@@ -199,9 +199,22 @@ class DataStore(object):
             old_hash,
             new_hash,
         )
-        self.cur.execute("""INSERT OR IGNORE INTO edits
-                           (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
-                           VALUES (?,?,?,?,?,?,?)""", insert)
+        try:
+            self.cur.execute("""INSERT OR IGNORE INTO edits
+                               (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
+                               VALUES (?,?,?,?,?,?,?)""", insert)
+        except sqlite3.InterfaceError as err:
+            self._log_debug_trans("ERROR AT INSERT VALUES: {}, {}, {}, {}, {}, {}, {}".format(
+                item_id,
+                other_node_id,
+                rev,
+                other_node_rev,
+                diffs,
+                old_hash,
+                new_hash,
+            ))
+            raise
+
         self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, rev))
 
     def get_first_queued_edit(self, other_node_id):
