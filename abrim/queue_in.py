@@ -9,7 +9,7 @@ import grpc
 import google
 from flask import Flask, request, abort, Response
 from abrim.config import Config
-from abrim.util import get_log, patch_text, resp, err_codes
+from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method
 
 
 log = get_log(full_debug=False)
@@ -182,12 +182,12 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
     return True
 
 
-def _get_server_shadow(config):
+def _get_server_shadow(config, r_json):
     i_e = config.item_edit
     shadow = config.db.get_shadow(i_e['item_id'],
                                   i_e['item_node_id'],
-                                  i_e['shadow_server_rev'],
-                                  i_e['shadow_client_rev'])
+                                  r_json['other_node_rev'],
+                                  r_json['rev'])
     if shadow:
         log.debug("shadow: {}".format(shadow))
     else:
@@ -203,32 +203,6 @@ def _patch_server_shadow(config, shadow):
     #                           )
     log.error("unknown error")
     return False
-
-
-# @app.errorhandler(405)
-# def errorhandler405(e):
-#     return Response('405', 405, {'Allow':'POST'})
-
-
-def parse_sync_req(i_e, r_j):
-    log.debug("parse_sync_req: {}".format(r_j))
-    try:
-        i_e['shadow_client_rev'] = r_j['rev']
-        i_e['shadow_server_rev'] = r_j['other_node_rev']
-    except KeyError:
-        log.error("missing rev or other_node_rev")
-        return False
-    try:
-        i_e['edits'] = r_j['edits']
-    except KeyError:
-        log.debug("no edits")
-    try:
-        i_e['old_shadow_adler32'] = r_j['old_shadow_adler32']
-        i_e['shadow_adler32'] = r_j['shadow_adler32']
-    except KeyError:
-        log.error("missing old_shadow_adler32 or shadow_adler32")
-        return False
-    return True
 
 
 def parse_shadow_req(i_e, r_j):
@@ -247,20 +221,18 @@ def parse_shadow_req(i_e, r_j):
     return True
 
 
-def _check_request_ok(i_e, request):
-    if request.method != 'POST':
-        log.error("method wan't POST")
+def _check_request_ok(r_json):
+    if not check_fields_in_dict(r_json, ('edits',)):
+        log.debug("no edits")
+    if not check_fields_in_dict(r_json, ('rev', 'other_node_rev', 'old_shadow_adler32', 'shadow_adler32')):
         return False
-    else:
-        if not parse_sync_req(i_e, request.get_json()):
-            return False
-        log.info("edit request: {}/{}/{}".format(i_e['item_user_id'], i_e['item_node_id'], i_e['item_id']))
-        try:
-            log.info("revs: {} - {}".format(i_e['shadow_client_rev'], i_e['shadow_server_rev']))
-            log.info("has edits: {:.30}...".format(i_e['edits'].replace('\n', ' ')))
-        except KeyError:
-            log.info("edit request revs: {} - {}, no edits".format(i_e['shadow_client_rev'],i_e['shadow_server_rev']))
-        return True
+    try:
+        log.info("revs: {} - {}".format(r_json['rev'], r_json['other_node_rev']))
+        log.info("has edits: {:.30}...".format(r_json['edits'].replace('\n', ' ')))
+    except KeyError:
+        log.info("edit request revs: {} - {}, no edits".format(r_json['shadow_client_rev'],
+                                                               r_json['shadow_server_rev']))
+    return True
 
 
 def _check_shadow_request_ok(i_e, request):
@@ -280,67 +252,52 @@ def _check_shadow_request_ok(i_e, request):
         return True
 
 
-def _check_revs(config):
-    i_e = config.item_edit
-    saved_rev, saved_other_node_rev = config.db.get_revs(i_e['item_id'], i_e['item_node_id'])
-
-    if i_e['shadow_client_rev'] == saved_other_node_rev:
-        log.debug("client revs match")
-    else:
-        log.error("client revs DON'T match")
-        log.error("{} - {}".format(i_e['shadow_client_rev'], saved_other_node_rev))
+def _check_revs(config, r_json):
+    saved_rev, saved_other_node_rev = config.db.get_revs(config.item_edit['item_id'], config.item_edit['item_node_id'])
+    if r_json['rev'] != saved_other_node_rev:
+        log.error("rev DOESN'T match: {} - {}".format(r_json['rev'], saved_other_node_rev))
         return False
-
-    if config.item_edit['shadow_server_rev'] == saved_rev:
-        log.debug("server revs match")
-    else:
-        log.error("server revs DON'T match")
-        log.error("{} - {}".format(i_e['shadow_server_rev'], saved_other_node_rev))
+    if r_json['other_node_rev'] != saved_rev:
+        log.error("other_node_rev DOESN'T match: {} - {}".format(r_json['other_node_rev'], saved_other_node_rev))
         return False
-
     return saved_rev, saved_other_node_rev
+
+
+def _check_permissions(dummy):  # TODO: implement me
+    return True
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(user_id, client_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
-    config.item_edit = {"item_user_id": user_id,
-                        "item_node_id": client_node_id,
-                        "item_id": item_id
-                        }
-    try:
-        if not _check_request_ok(config.item_edit, request):
-            # log.debug(
-            # "HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(
-            #  sys._getframe().f_lineno))
-            config.db.rollback_transaction()
-            return resp(405, err_codes['REQUEST'],
-                        "queue_in-_get_sync-check_req_405",
-                        "Use POST at this URL")
-    except Exception as err:
-        log.error(err)
-        traceback.print_exc()
-        config.db.rollback_transaction()
-        return resp(500, err_codes['UNKNOWN'],
-                    "queue_in-_get_sync-check_req_exception",
-                    "Unknown error. Please report this")
+
+    config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
 
     try:
+        if not _check_permissions(config.item_edit):
+            return resp("queue_in/get_sync/403/check_permissions", "you have no permissions for that")
+
+        if not check_request_method(request, 'POST'):
+            return resp("queue_in/get_sync/405/check_request_post", "Use POST at this URL")
+
+        r_json = request.get_json()
+
+        if not _check_request_ok(r_json):
+            return resp("queue_in/get_sync/405/check_req", "Malformed JSON request")
+
         config.db.start_transaction("_get_sync")
-        if not _check_revs(config):
-            config.db.rollback_transaction()
-            return resp(404, err_codes['CHECK_REVS'],
-                        "queue_in-_get_sync-not_check_revs",
-                        "Revs don't check")
 
-        shadow = _get_server_shadow(config)
+        if not _check_revs(config, r_json):
+            config.db.rollback_transaction()
+            return resp("queue_in/get_sync/404/no_match_revs", "Revs don't match")
+
+        shadow = _get_server_shadow(config, r_json)
         if not shadow:
             config.db.rollback_transaction()
-            return resp(404, err_codes['NO_SHADOW'],
-                        "queue_in-_get_sync-not_shadow",
-                        "Shadow not found. PUT the full shadow to /users/{}/nodes/{}/items/{}/shadow".format(
-                            user_id, client_node_id, item_id, ))
+            return resp("queue_in/get_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
 
+        # all checks done, finally start patching:
+        abort(500)  # 500 Internal Server Error
         if not _patch_server_shadow(config, shadow):
             config.db.rollback_transaction()
             abort(500)  # 500 Internal Server Error
@@ -349,30 +306,30 @@ def _get_sync(user_id, client_node_id, item_id):
         config.db.rollback_transaction()
         log.error(err)
         traceback.print_exc()
-        return resp(500, err_codes['UNKNOWN'],
-                    "queue_in-_get_sync-transaction_exception",
-                    "Unknown error. Please report this")
+        return resp("queue_in/get_sync/500/transaction_exception", "Unknown error. Please report this")
     else:
-        config.db.end_transaction()
+        #####
         # FIXME: delete me:
+        config.db.rollback_transaction()
         abort(404)
-        return resp(201, err_codes['SYNC_OK'],
-                    "queue_in-_get_sync-ok",
-                    "Sync acknowledged")
+        ####
+        config.db.end_transaction()
+        return resp("queue_in/get_sync/201/ack", "Sync acknowledged")
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
 def _get_shadow(user_id, client_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
-    config.item_edit = {"item_user_id": user_id,
-                        "item_node_id": client_node_id,
-                        "item_id": item_id
-                        }
+    config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
+
+    if not check_request_method(request, 'PUT'):
+        return resp("queue_in/get_shadow/405/check_request_put", "Use PUT at this URL")
+
     try:
         if not _check_shadow_request_ok(config.item_edit, request):
             return resp(405, err_codes['REQUEST'],
                         "queue_in-_get_shadow-check_req_405",
-                        "Use PUT at this URL and fill the required fields")
+                        "fill in the required fields")
         else:
             raise Exception("save the new shadow to db")
             return 'ok', 200
@@ -384,7 +341,6 @@ def _get_shadow(user_id, client_node_id, item_id):
                     "Unknown error. Please report this")
 
 
-
 def _parse_args_helper():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="Port")
@@ -393,11 +349,12 @@ def _parse_args_helper():
     args = parser.parse_args()
     if not args.port or int(args.port) <= 0:
         return None, None
-    return args.port, args.logginglevel #, args.initdb
+    return args.port, args.logginglevel
 
 
 def _init():
-    #import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
+    client_port = 0
     args_port, args_logginglevel = _parse_args_helper()
     if args_port and int(args_port) > 0:
         client_port = int(args_port)
