@@ -6,13 +6,20 @@ import logging
 import zlib
 from flask import jsonify
 
-err_codes = {
-    'SYNC_OK': 'SYNC_OK',
-    'REQUEST': 'ERR_REQUEST',
-    'CHECK_REVS': 'ERR_CHECK_REVS',
-    'NO_SHADOW': 'ERR_NO_SHADOW',
-    'UNKNOWN': 'ERR_UNKNOWN'
-    }
+
+def resp(api_unique_code, msg):
+    log.debug("about to send back this response: {} :: {}".format(api_unique_code, msg))
+    response = jsonify({
+        'api_unique_code': api_unique_code,
+        'message': msg
+    })
+    try:
+        # get HTTP code:
+        response.status_code = int(api_unique_code.split('/')[2])
+    except IndexError:
+        response.status_code = 500
+    return response
+
 
 def get_log(full_debug=False):
     if full_debug:
@@ -35,6 +42,9 @@ def get_log(full_debug=False):
                         datefmt='%Y-%m-%d %H:%M:%S')  # ,
     # disable_existing_loggers=False)
     logging.StreamHandler(sys.stdout)
+    # log.debug(
+    # "HTTP 405 - " + sys._getframe().f_code.co_name + " :: " + sys._getframe().f_code.co_filename + ":" + str(
+    #  sys._getframe().f_lineno))
     return logging.getLogger(__name__)
 
 
@@ -75,16 +85,22 @@ def create_hash(text):
     return adler32
 
 
-def resp(http_code, api_code, api_code_unique, message):
-    response = jsonify({
-        'http_code': http_code,
-        'api_code': api_code,
-        'api_code_unique': api_code_unique,
-        'message': message
-    })
-    log.debug("HTTP {} - {} - {} - {}".format(http_code, api_code, api_code_unique, message))
-    response.status_code = http_code
-    return response
+def check_fields_in_dict(my_dict, fields):
+    log.debug("checking {} for {}".format(my_dict,fields))
+    is_ok = True
+    for field in fields:
+        try:
+            _ = my_dict[field]
+        except KeyError:
+            log.error("missing '{}' in dict".format(field))
+            is_ok = False
+    return is_ok
+
+
+def check_request_method(request, method):
+    if request.method == method:
+        return True
+    return False
 
 
 if __name__ == "__main__":

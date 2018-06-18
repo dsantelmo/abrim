@@ -195,36 +195,14 @@ def _get_server_shadow(config, r_json):
 
 
 def _patch_server_shadow(config, shadow):
-    # config.db.save_new_shadow(i_e['item_node_id'],
-    #                           i_e['item_id'],
-    #                           shadow,
-    #                           i_e['shadow_server_rev'],
-    #                           i_e['shadow_client_rev']
-    #                           )
-    log.error("unknown error")
+    log.error("IMPLEMENT ME")
     return False
-
-
-def parse_shadow_req(i_e, r_j):
-    log.debug("parse_shadow_req: {}".format(r_j))
-    try:
-        i_e['shadow_client_rev'] = r_j['rev']
-        i_e['shadow_server_rev'] = r_j['other_node_rev']
-    except KeyError:
-        log.error("missing rev or other_node_rev")
-        return False
-    try:
-        i_e['shadow'] = r_j['shadow']
-    except KeyError:
-        log.debug("no shadow in the JSON request")
-        return False
-    return True
 
 
 def _check_request_ok(r_json):
     if not check_fields_in_dict(r_json, ('edits',)):
         log.debug("no edits")
-    if not check_fields_in_dict(r_json, ('rev', 'other_node_rev', 'old_shadow_adler32', 'shadow_adler32')):
+    if not check_fields_in_dict(r_json, ('rev', 'other_node_rev', 'old_shadow_adler32', 'shadow_adler32',)):
         return False
     try:
         log.info("revs: {} - {}".format(r_json['rev'], r_json['other_node_rev']))
@@ -235,21 +213,16 @@ def _check_request_ok(r_json):
     return True
 
 
-def _check_shadow_request_ok(i_e, request):
-    if request.method != 'PUT':
-        log.error("method wan't PUT")
+def _check_shadow_request_ok(r_json):
+    if not check_fields_in_dict(r_json, ('rev', 'other_node_rev', 'shadow',)):
         return False
-    else:
-        if not parse_shadow_req(i_e, request.get_json()):
-            return False
-        log.info("shadow request: {}/{}/{}/shadow".format(i_e['item_user_id'], i_e['item_node_id'], i_e['item_id'] ))
-        try:
-            log.info("revs: {} - {}".format(i_e['shadow_client_rev'], i_e['shadow_server_rev']))
-            log.info("has shadow: {:.30}...".format(i_e['shadow'].replace('\n', ' ')))
-        except KeyError:
-            log.error("no shadow in request")
-            return False
-        return True
+    try:
+        log.info("revs: {} - {}".format(r_json['rev'], r_json['other_node_rev']))
+        log.info("has shadow: {:.30}...".format(r_json['shadow'].replace('\n', ' ')))
+    except KeyError:
+        log.error("no shadow in request")
+        return False
+    return True
 
 
 def _check_revs(config, r_json):
@@ -322,23 +295,33 @@ def _get_shadow(user_id, client_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
     config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
 
-    if not check_request_method(request, 'PUT'):
-        return resp("queue_in/get_shadow/405/check_request_put", "Use PUT at this URL")
-
     try:
-        if not _check_shadow_request_ok(config.item_edit, request):
-            return resp(405, err_codes['REQUEST'],
-                        "queue_in-_get_shadow-check_req_405",
-                        "fill in the required fields")
-        else:
-            raise Exception("save the new shadow to db")
-            return 'ok', 200
+        if not _check_permissions(config.item_edit):
+            return resp("queue_in/get_shadow/403/check_permissions", "you have no permissions for that")
+
+        if not check_request_method(request, 'PUT'):
+            return resp("queue_in/get_shadow/405/check_request_put", "Use PUT at this URL")
+
+        r_json = request.get_json()
+
+        if not _check_shadow_request_ok(r_json):
+            return resp("queue_in/get_shadow/405/check_req", "Malformed JSON request")
+
+        raise Exception("continue here!")
+
     except Exception as err:
+        config.db.rollback_transaction()
         log.error(err)
         traceback.print_exc()
-        return resp(500, err_codes['UNKNOWN'],
-                    "queue_in-_get_shadow-check_req_exception",
-                    "Unknown error. Please report this")
+        return resp("queue_in/get_shadow/500/transaction_exception", "Unknown error. Please report this")
+    else:
+        #####
+        # FIXME: delete me:
+        config.db.rollback_transaction()
+        abort(404)
+        ####
+        config.db.end_transaction()
+        return resp("queue_in/get_sync/201/ack", "Sync acknowledged")
 
 
 def _parse_args_helper():
