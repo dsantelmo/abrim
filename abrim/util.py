@@ -103,5 +103,15 @@ def check_request_method(request, method):
     return False
 
 
+def check_crc(text, crc):
+    text_crc = zlib.adler32(text.encode())
+    if crc != text_crc:
+        log.error("CRCs don't match {} {}".format(crc, text_crc, ))
+        return False
+    else:
+        return True
+    # TODO: think in maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
+
+
 if __name__ == "__main__":
     pass

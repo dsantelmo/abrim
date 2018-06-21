@@ -9,7 +9,7 @@ import grpc
 import google
 from flask import Flask, request, abort, Response
 from abrim.config import Config
-from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method
+from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc
 
 
 log = get_log(full_debug=False)
@@ -17,139 +17,10 @@ log = get_log(full_debug=False)
 app = Flask(__name__)
 
 
-# # to avoid race conditions existence of the item and creation should be done in a transaction
-# @firestore.transactional
-# def create_in_transaction(transaction, item_ref, item_rev, item_create_date):
-#     try:
-#         try:
-#             item_exist = item_ref.get(transaction=transaction)
-#
-#             log.error("Tried to create the item but it's already been created")
-#             return False  # it shouldn't be there
-#         except google.api.core.exceptions.NotFound:
-#             transaction.set(item_ref, {
-#                 'other_node_create_date': item_create_date,
-#                 'client_rev': item_rev,
-#             })
-#     except (grpc._channel._Rendezvous,
-#             google.auth.exceptions.TransportError,
-#             google.gax.errors.GaxError,
-#             ):
-#         log.error("Connection error to Firestore")
-#         return False
-#     log.debug("creation enqueued correctly")
-#                 'create_date': firestore.SERVER_TIMESTAMP,
-#     return True
-
-
-# def server_create_item(config):
-#     log.debug("server_create_item transaction")
-#
-#     node_id = config.node_id
-#     item_node_id = config.item_node_id
-#     item_id = config.item_id
-#     item_rev = config.item_rev
-#     item_create_date = config.item_create_date
-#
-#     db = firestore.Client()
-#     server_node_ref = db.collection('nodes').document(node_id)
-#     other_node_ref = server_node_ref.collection('other_nodes').document(item_node_id)
-#     item_ref = other_node_ref.collection('items').document(item_id)
-#
-#     transaction = db.transaction()
-#
-#     log.debug("trying to create /nodes/{}/other_nodes/{}/items/{}".format(node_id,item_node_id,item_id,))
-#
-#     result = create_in_transaction(transaction, item_ref, item_rev, item_create_date)
-#     if result:
-#         log.debug('transaction ended OK')
-#         return True
-#     else:
-#         log.error('ERROR saving new item')
-#         return False
-
-
-# def _check_item_patch_exist(transaction, item_ref, item_rev):
-#     try:
-#         _ = item_ref.get(transaction=transaction)
-#         # exists so we can continue
-#     except google.api.core.exceptions.NotFound:
-#         log.error("ERROR item to patch doesn't exist")
-#         return False  # it doesn't exists
-#     try:
-#         patches_ref = item_ref.collection('patches').document(str(item_rev))
-#         _ = patches_ref.get(transaction=transaction)
-#         log.error("ERROR patch already exists")
-#         return False  # it shouldn't be there
-#     except google.api.core.exceptions.NotFound:
-#         return True
-
-
-def _get_shadow_dict(transaction, item_ref, item_node_id):
-    log.debug("shadow_ref: (item_ref)/shadows/{}".format(item_node_id,))
-    shadow_ref = item_ref.collection('shadows').document(item_node_id)
-    try:
-        try:
-            item = shadow_ref.get(transaction=transaction).to_dict()
-            log.debug("shadow exists: {}".format(item))
-            return item
-        except google.api.core.exceptions.NotFound:
-            log.debug("creating new empty shadow")
-            _, _, shadow_data = prepare_data("", "", None, None, 0, 0, None)
-            transaction.set(shadow_ref, shadow_data)
-            return shadow_data
-    except (grpc._channel._Rendezvous,
-            google.auth.exceptions.TransportError,
-            google.gax.errors.GaxError,
-            ):
-        log.error("Connection error to Firestore")
-        raise
-
-
-def _get_shadow_and_revs(transaction, item_ref, item_node_id):
-    # /nodes/node_1/items/item_1/shadows/node_2/revs
-    log.debug("getting shadow for {}".format(item_node_id))
-    shadow_dict = _get_shadow_dict(transaction, item_ref, item_node_id)
-    log.debug("item: {}".format(shadow_dict))
-
-    try:
-        shadow = shadow_dict['shadow']
-    except KeyError:
-        shadow = ''
-    try:
-        stored_server_rev = shadow_dict['shadow_server_rev']
-        stored_client_rev = shadow_dict['shadow_client_rev']
-    except KeyError:
-        log.error("KeyError with client_rev")
-        return False
-    return shadow, stored_server_rev, stored_client_rev
-
-
 # to avoid race conditions existence of the item and creation should be done in a transaction
 @firestore.transactional
 def enqueue_update_in_transaction(transaction, item_ref, config):
     try:
-        test_shadow = zlib.adler32(shadow.encode())
-        if config.old_shadow_adler32 != test_shadow:
-            log.error("shadows adler32s don't match {} {}".format(config.old_shadow_adler32, test_shadow,))
-            return False
-
-        if config.edits == "" and shadow == "":
-            log.debug("no shadow or patches, nothing to patch...")
-            new_item_shadow = ""
-        else:
-            new_item_shadow, success = patch_text(config.edits, shadow)
-            if not success:
-                log.debug("patching failed")
-                return False
-
-        test_shadow = zlib.adler32(new_item_shadow.encode())
-        if config.shadow_adler32 != test_shadow:
-            log.error("new shadows adler32s don't match {} {}".format(config.shadow_adler32, test_shadow,))
-            return False
-
-        # TODO: think in maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
-
         item_rev = stored_server_rev + 1
 
         log.debug("updating patches_ref to: {}".format(item_rev))
@@ -194,6 +65,14 @@ def _get_server_shadow(config, r_json):
 
 
 def _patch_server_shadow(config, shadow):
+    if config.edits == "" and shadow == "":
+        log.debug("no shadow or patches, nothing to patch...")
+        new_item_shadow = ""
+    else:
+        new_item_shadow, success = patch_text(config.edits, shadow)
+        if not success:
+            log.debug("patching failed")
+            return False
     log.error("IMPLEMENT ME")
     return False
 
@@ -273,17 +152,27 @@ def _get_sync(user_id, client_node_id, item_id):
 
         if not _check_revs(config, r_json):
             config.db.rollback_transaction()
-            return resp("queue_in/get_sync/404/no_match_revs", "Revs don't match")
+            return resp("queue_in/get_sync/403/no_match_revs", "Revs don't match")
 
         got_shadow, shadow = _get_server_shadow(config, r_json)
         if not got_shadow:
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
 
-        # all checks done, finally start patching:
-        if not _patch_server_shadow(config, shadow):
+        if not check_crc(shadow, r_json['old_shadow_adler32']):
             config.db.rollback_transaction()
-            abort(500)  # 500 Internal Server Error
+            return resp("queue_in/get_sync/403/check_crc_old", "CRC of old shadow doesn't match")
+
+        # finally start patching:
+        patch_ok, new_shadow = _patch_server_shadow(config, shadow)
+
+        if not check_crc(new_shadow, r_json['shadow_adler32']):
+            config.db.rollback_transaction()
+            return resp("queue_in/get_sync/403/check_crc_new", "CRC of new shadow doesn't match")
+
+        # if final check is done save shadow
+        config.db.rollback_transaction()
+        abort(500)  # 500 Internal Server Error
 
     except Exception as err:
         config.db.rollback_transaction()
