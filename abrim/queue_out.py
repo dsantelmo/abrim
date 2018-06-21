@@ -94,7 +94,7 @@ def process_out_queue(lock, node_id):
                         config.db.end_transaction()
                     elif response_http == 404 and api_code == err_codes['NO_SHADOW']:
                         log.info(err_codes['NO_SHADOW'])
-                        shadow = config.db.get_shadow(edit["item"],
+                        got_shadow, shadow = config.db.get_shadow(edit["item"],
                                                       other_node_id,
                                                       edit["other_node_rev"],
                                                       edit["rev"])
@@ -104,7 +104,7 @@ def process_out_queue(lock, node_id):
                                        'other_node_rev': edit["other_node_rev"],
                                        'shadow': ""}
 
-                        if shadow:
+                        if got_shadow:
                             shadow_json['shadow'] = shadow
                             send_sync(shadow_json, url + "/shadow", use_put=True)
                         else:

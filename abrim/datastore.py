@@ -245,9 +245,9 @@ class DataStore(object):
         return rev, other_node_rev, shadow
 
     def get_shadow(self, item, other_node_id, rev, other_node_rev):
-        if rev == 0 and other_node_rev == 0:
-            self._log_debug_trans("revs 0 - 0, assuming there is no shadow")
-            return None
+        # if rev == 0 and other_node_rev == 0:
+        #    self._log_debug_trans("revs 0 - 0, assuming there is no shadow")
+        #    return None
         self.cur.execute("""SELECT shadow
                  FROM shadows
                  WHERE
@@ -259,9 +259,9 @@ class DataStore(object):
         shadow_row = self.cur.fetchone()
         if not shadow_row:
             self._log_debug_trans("no shadow")
-            return None
+            return False, None
         else:
-            return shadow_row["shadow"]
+            return True, shadow_row["shadow"]
 
     def get_oldest_revs(self, item, other_node_id):
         self.cur.execute("""SELECT rev, other_node_rev

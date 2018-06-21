@@ -184,14 +184,13 @@ def enqueue_update_in_transaction(transaction, item_ref, config):
 
 def _get_server_shadow(config, r_json):
     i_e = config.item_edit
-    shadow = config.db.get_shadow(i_e['item_id'],
-                                  i_e['item_node_id'],
-                                  r_json['other_node_rev'],
-                                  r_json['rev'])
-    if shadow:
+    got_shadow, shadow = config.db.get_shadow(i_e['item_id'],
+                                              i_e['item_node_id'],
+                                              r_json['other_node_rev'],
+                                              r_json['rev'])
+    if got_shadow:
         log.debug("shadow: {}".format(shadow))
-    else:
-        return False
+    return got_shadow, shadow
 
 
 def _patch_server_shadow(config, shadow):
@@ -276,8 +275,8 @@ def _get_sync(user_id, client_node_id, item_id):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/404/no_match_revs", "Revs don't match")
 
-        shadow = _get_server_shadow(config, r_json)
-        if not shadow:
+        got_shadow, shadow = _get_server_shadow(config, r_json)
+        if not got_shadow:
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
 
