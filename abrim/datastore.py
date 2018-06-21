@@ -275,9 +275,10 @@ class DataStore(object):
             self._log_debug_trans("no revs, defaulting to 0 - 0")
             return 0, 0
         else:
-            return revs_row["rev"], revs_row["other_node"]
+            return revs_row["rev"], revs_row["other_node_rev"]
 
     def save_new_shadow(self, other_node_id, item_id, new_text, rev, other_node_rev):
+        self._log_debug_trans("about to save shadow: {} {} {}".format(item_id, other_node_id, rev))
         insert = (item_id,
                   other_node_id,
                   rev,
@@ -287,11 +288,11 @@ class DataStore(object):
         self.cur.execute("""INSERT OR IGNORE INTO shadows
                            (item, other_node, rev, other_node_rev, shadow)
                            VALUES (?,?,?,?,?)""", insert)
-        self._log_debug_trans("shadow {} {} {} saved".format(item_id, other_node_id, rev))
 
     # ITEM
 
     def save_item(self, item_id, new_text):
+        self._log_debug_trans("about to save item: {}".format(item_id))
         self.cur.execute("""INSERT OR REPLACE INTO items
                        (id,
                         text,

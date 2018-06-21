@@ -248,7 +248,7 @@ def _save_item(item_id, new_text):
     config.db.save_item(item_id, new_text)
 
 
-def _save_shadow(item_id, shadow):
+def _save_shadow(other_node_id, item_id, shadow, rev, other_node_rev):
     config.db.save_new_shadow(other_node_id, item_id, shadow, rev, other_node_rev)
 
 
@@ -282,7 +282,6 @@ def _get_sync(user_id, client_node_id, item_id):
             return resp("queue_in/get_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
 
         # all checks done, finally start patching:
-        abort(500)  # 500 Internal Server Error
         if not _patch_server_shadow(config, shadow):
             config.db.rollback_transaction()
             abort(500)  # 500 Internal Server Error
@@ -327,9 +326,8 @@ def _get_shadow(user_id, client_node_id, item_id):
         if not item_exists:
             _save_item(item_id, shadow)
 
-        if not _save_shadow(item_id, shadow):
-            config.db.rollback_transaction()
-            return resp("queue_in/get_shadow/500/save_shadow", "Undefined error at save_shadow")
+        _save_shadow(client_node_id, item_id, shadow, r_json['rev'], r_json['other_node_rev'])
+
     except Exception as err:
         config.db.rollback_transaction()
         log.error(err)
