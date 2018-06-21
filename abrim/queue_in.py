@@ -215,18 +215,18 @@ def _check_request_ok(r_json):
 
 def _check_shadow_request_ok(r_json):
     if not check_fields_in_dict(r_json, ('rev', 'other_node_rev', 'shadow',)):
-        return False
+        return False, _
     try:
         log.info("revs: {} - {}".format(r_json['rev'], r_json['other_node_rev']))
         log.info("has shadow: {:.30}...".format(r_json['shadow'].replace('\n', ' ')))
     except KeyError:
         log.error("no shadow in request")
-        return False
-    return True
+        return False, _
+    return True, r_json['shadow']
 
 
 def _check_revs(config, r_json):
-    saved_rev, saved_other_node_rev = config.db.get_revs(config.item_edit['item_id'], config.item_edit['item_node_id'])
+    saved_rev, saved_other_node_rev = config.db.get_oldest_revs(config.item_edit['item_id'], config.item_edit['item_node_id'])
     if r_json['rev'] != saved_other_node_rev:
         log.error("rev DOESN'T match: {} - {}".format(r_json['rev'], saved_other_node_rev))
         return False
@@ -238,6 +238,18 @@ def _check_revs(config, r_json):
 
 def _check_permissions(dummy):  # TODO: implement me
     return True
+
+
+def _check_item_exists(item_id):
+    return config.db.get_item(item_id)
+
+
+def _save_item(item_id, new_text):
+    config.db.save_item(item_id, new_text)
+
+
+def _save_shadow(item_id, shadow):
+    config.db.save_new_shadow(other_node_id, item_id, shadow, rev, other_node_rev)
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
@@ -304,22 +316,27 @@ def _get_shadow(user_id, client_node_id, item_id):
 
         r_json = request.get_json()
 
-        if not _check_shadow_request_ok(r_json):
+        check_shadow_ok, shadow = _check_shadow_request_ok(r_json)
+        if not check_shadow_ok:
             return resp("queue_in/get_shadow/405/check_req", "Malformed JSON request")
 
-        raise Exception("continue here!")
+        log.debug("request with the shadow seems ok, trying to save it")
+        config.db.start_transaction("_get_shadow")
 
+        item_exists, item = _check_item_exists(item_id)
+        if not item_exists:
+            _save_item(item_id, shadow)
+
+        if not _save_shadow(item_id, shadow):
+            config.db.rollback_transaction()
+            return resp("queue_in/get_shadow/500/save_shadow", "Undefined error at save_shadow")
     except Exception as err:
         config.db.rollback_transaction()
         log.error(err)
         traceback.print_exc()
         return resp("queue_in/get_shadow/500/transaction_exception", "Unknown error. Please report this")
     else:
-        #####
-        # FIXME: delete me:
-        config.db.rollback_transaction()
-        abort(404)
-        ####
+        log.info("_get_shadow about to finish OK")
         config.db.end_transaction()
         return resp("queue_in/get_sync/201/ack", "Sync acknowledged")
 

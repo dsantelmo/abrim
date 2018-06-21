@@ -9,6 +9,8 @@ log = get_log(full_debug=False)
 
 
 class DataStore(object):
+    
+    # MAINTENANCE
     def get_db_path(self):
         node_id = self.node_id
         filename = 'abrim_' + node_id + '.sqlite'
@@ -121,160 +123,7 @@ class DataStore(object):
             self.cur.execute("rollback")
             raise
 
-    def add_known_node(self, node_id, url):
-        insert = (node_id,
-                  url)
-        self.cur.execute("""INSERT OR IGNORE INTO nodes
-                           (id,
-                            base_url)
-                           VALUES (?,?)""", insert)
-        self.con.commit()
-
-    def get_known_nodes(self):
-        self.cur.execute("""SELECT id, base_url
-                       FROM nodes
-                       WHERE id <> ?
-                       ORDER BY id ASC""", (self.node_id,))
-        return self.cur.fetchall()
-
-    def get_rev_shadow(self, other_node_id, item_id):
-        self.cur.execute("""SELECT shadow, rev, other_node_rev
-                FROM shadows
-                WHERE item = ?
-                AND other_node = ?
-                ORDER BY rev DESC LIMIT 1""", (item_id, other_node_id,))
-        shadow = self.cur.fetchone()
-        if shadow is None:
-            self._log_debug_trans("shadow doesn't exist. Creating...")
-            rev = -1
-            other_node_rev = -1
-            shadow = ""
-            insert = (item_id,
-                      other_node_id,
-                      rev,
-                      other_node_rev,
-                      shadow
-                      )
-            self.cur.execute("""INSERT OR IGNORE INTO shadows
-                               (item, other_node, rev, other_node_rev, shadow)
-                               VALUES (?,?,?,?,?)""", insert)
-        else:
-            self._log_debug_trans("shadow exists")
-            try:
-                rev = shadow['rev']
-                other_node_rev = shadow['other_node_rev']
-                shadow = shadow['shadow']
-            except (TypeError, IndexError) as err:
-                log.error(err)
-                raise
-        return rev, other_node_rev, shadow
-
-    def save_item(self, item_id, new_text):
-        self.cur.execute("""INSERT OR REPLACE INTO items
-                       (id,
-                        text,
-                        node)
-                       VALUES (?,?,?)""", (item_id, new_text, self.node_id))
-        self._log_debug_trans("item {} updated".format(item_id))
-
-    def save_new_shadow(self, other_node_id, item_id, new_text, rev, other_node_rev):
-        insert = (item_id,
-                  other_node_id,
-                  rev,
-                  other_node_rev,
-                  new_text
-                  )
-        self.cur.execute("""INSERT OR IGNORE INTO shadows
-                           (item, other_node, rev, other_node_rev, shadow)
-                           VALUES (?,?,?,?,?)""", insert)
-        self._log_debug_trans("shadow {} {} {} saved".format(item_id, other_node_id, rev))
-
-    def enqueue_client_edits(self, other_node_id, item_id, diffs, old_hash, new_hash, rev, other_node_rev):
-        insert = (
-            item_id,
-            other_node_id,
-            rev,
-            other_node_rev,
-            diffs,
-            old_hash,
-            new_hash,
-        )
-        try:
-            self.cur.execute("""INSERT OR IGNORE INTO edits
-                               (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
-                               VALUES (?,?,?,?,?,?,?)""", insert)
-        except sqlite3.InterfaceError as err:
-            self._log_debug_trans("ERROR AT INSERT VALUES: {}, {}, {}, {}, {}, {}, {}".format(
-                item_id,
-                other_node_id,
-                rev,
-                other_node_rev,
-                diffs,
-                old_hash,
-                new_hash,
-            ))
-            raise
-
-        self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, rev))
-
-    def get_first_queued_edit(self, other_node_id):
-        self.cur.execute("""SELECT rowid, *
-                 FROM edits
-                 WHERE
-                 other_node = ?
-                 ORDER BY rev ASC LIMIT 1""", (other_node_id,))
-        edit_row = self.cur.fetchone()
-        if not edit_row:
-            self._log_debug_trans("no edits")
-            return None, None
-        else:
-            edit_rowid = edit_row["rowid"]
-            edit = dict(edit_row)
-            return edit_rowid, edit
-
-    def archive_edit(self, edit_rowid):
-        self.cur.execute("""INSERT OR IGNORE INTO edits_archive
-                           SELECT * FROM edits
-                           WHERE rowid=?""", (edit_rowid,))
-        self._log_debug_trans("edit rowid {} archived".format(edit_rowid))
-
-    def delete_edit(self, edit_rowid):
-        self.cur.execute("""DELETE FROM edits
-                           WHERE rowid=?""", (edit_rowid,))
-        self._log_debug_trans("edit rowid {} deleted".format(edit_rowid))
-
-    def get_revs(self, item, other_node_id):
-        self.cur.execute("""SELECT rev, other_node_rev
-                 FROM shadows
-                 WHERE
-                 item = ? AND
-                 other_node = ?
-                 ORDER BY rev ASC LIMIT 1""", (item, other_node_id,))
-        revs_row = self.cur.fetchone()
-        if not revs_row:
-            self._log_debug_trans("no revs, defaulting to 0 - 0")
-            return 0, 0
-        else:
-            return revs_row["rev"], revs_row["other_node"]
-
-    def get_shadow(self, item, other_node_id, rev, other_node_rev):
-        if rev == 0 and other_node_rev == 0:
-            self._log_debug_trans("revs 0 - 0, assuming there is no shadow")
-            return None
-        self.cur.execute("""SELECT shadow
-                 FROM shadows
-                 WHERE
-                 item = ? AND
-                 other_node = ? AND
-                 rev = ? AND
-                 other_node_rev = ?
-                 LIMIT 1""", (item, other_node_id, rev, other_node_rev))
-        shadow_row = self.cur.fetchone()
-        if not shadow_row:
-            self._log_debug_trans("no shadow")
-            return None
-        else:
-            return shadow_row["shadow"]
+    # TRANSACTION
 
     def _get_trans_prefix(self):
         if self.con.in_transaction:
@@ -282,7 +131,8 @@ class DataStore(object):
         else:
             return ""
 
-    def _log_debug_trans(self, msg):  # FIXME maybe use extra or add a filter in logger
+    # TODO: add more hints
+    def _log_debug_trans(self, msg: str):  # FIXME maybe use extra or add a filter in logger
         debug_msg = "{}" + str(msg)
         log.debug(debug_msg.format(self._get_trans_prefix()))
 
@@ -341,3 +191,181 @@ class DataStore(object):
             con.row_factory = sqlite3.Row
             con.set_trace_callback(log.debug)
             self._init_db(con, drop_db)
+            
+    # NODES
+
+    def add_known_node(self, node_id, url):
+        insert = (node_id,
+                  url)
+        self.cur.execute("""INSERT OR IGNORE INTO nodes
+                           (id,
+                            base_url)
+                           VALUES (?,?)""", insert)
+        self.con.commit()
+
+    def get_known_nodes(self):
+        self.cur.execute("""SELECT id, base_url
+                       FROM nodes
+                       WHERE id <> ?
+                       ORDER BY id ASC""", (self.node_id,))
+        return self.cur.fetchall()
+
+    # REV AND SHADOW
+
+    def get_lastest_rev_shadow(self, other_node_id, item_id):
+        self.cur.execute("""SELECT shadow, rev, other_node_rev
+                FROM shadows
+                WHERE item = ?
+                AND other_node = ?
+                ORDER BY rev DESC LIMIT 1""", (item_id, other_node_id,))
+        shadow = self.cur.fetchone()
+        if shadow is None:
+            self._log_debug_trans("shadow doesn't exist. Creating...")
+            rev = -1
+            other_node_rev = -1
+            shadow = ""
+            insert = (item_id,
+                      other_node_id,
+                      rev,
+                      other_node_rev,
+                      shadow
+                      )
+            self.cur.execute("""INSERT OR IGNORE INTO shadows
+                               (item, other_node, rev, other_node_rev, shadow)
+                               VALUES (?,?,?,?,?)""", insert)
+        else:
+            self._log_debug_trans("shadow exists")
+            try:
+                rev = shadow['rev']
+                other_node_rev = shadow['other_node_rev']
+                shadow = shadow['shadow']
+            except (TypeError, IndexError) as err:
+                log.error(err)
+                raise
+        return rev, other_node_rev, shadow
+
+    def get_shadow(self, item, other_node_id, rev, other_node_rev):
+        if rev == 0 and other_node_rev == 0:
+            self._log_debug_trans("revs 0 - 0, assuming there is no shadow")
+            return None
+        self.cur.execute("""SELECT shadow
+                 FROM shadows
+                 WHERE
+                 item = ? AND
+                 other_node = ? AND
+                 rev = ? AND
+                 other_node_rev = ?
+                 LIMIT 1""", (item, other_node_id, rev, other_node_rev))
+        shadow_row = self.cur.fetchone()
+        if not shadow_row:
+            self._log_debug_trans("no shadow")
+            return None
+        else:
+            return shadow_row["shadow"]
+
+    def get_oldest_revs(self, item, other_node_id):
+        self.cur.execute("""SELECT rev, other_node_rev
+                 FROM shadows
+                 WHERE
+                 item = ? AND
+                 other_node = ?
+                 ORDER BY rev ASC LIMIT 1""", (item, other_node_id,))
+        revs_row = self.cur.fetchone()
+        if not revs_row:
+            self._log_debug_trans("no revs, defaulting to 0 - 0")
+            return 0, 0
+        else:
+            return revs_row["rev"], revs_row["other_node"]
+
+    def save_new_shadow(self, other_node_id, item_id, new_text, rev, other_node_rev):
+        insert = (item_id,
+                  other_node_id,
+                  rev,
+                  other_node_rev,
+                  new_text
+                  )
+        self.cur.execute("""INSERT OR IGNORE INTO shadows
+                           (item, other_node, rev, other_node_rev, shadow)
+                           VALUES (?,?,?,?,?)""", insert)
+        self._log_debug_trans("shadow {} {} {} saved".format(item_id, other_node_id, rev))
+
+    # ITEM
+
+    def save_item(self, item_id, new_text):
+        self.cur.execute("""INSERT OR REPLACE INTO items
+                       (id,
+                        text,
+                        node)
+                       VALUES (?,?,?)""", (item_id, new_text, self.node_id))
+        self._log_debug_trans("item {} updated".format(item_id))
+
+    def get_item(self, item_id):
+        self.cur.execute("""SELECT id, text
+                  FROM items
+                  WHERE
+                  id = ? AND
+                  node = ?
+                  LIMIT 1""", (item_id, self.node_id))
+        item_row = self.cur.fetchone()
+        if not item_row:
+            self._log_debug_trans("no item found for {}".format(item_id,))
+            return False, _
+        else:
+            self._log_debug_trans("{} found".format(item_id,))
+            return True, item_row["text"]
+        
+    # EDITS
+
+    def enqueue_client_edits(self, other_node_id, item_id, diffs, old_hash, new_hash, rev, other_node_rev):
+        insert = (
+            item_id,
+            other_node_id,
+            rev,
+            other_node_rev,
+            diffs,
+            old_hash,
+            new_hash,
+        )
+        try:
+            self.cur.execute("""INSERT OR IGNORE INTO edits
+                               (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
+                               VALUES (?,?,?,?,?,?,?)""", insert)
+        except sqlite3.InterfaceError as err:
+            self._log_debug_trans("ERROR AT INSERT VALUES: {}, {}, {}, {}, {}, {}, {}".format(
+                item_id,
+                other_node_id,
+                rev,
+                other_node_rev,
+                diffs,
+                old_hash,
+                new_hash,
+            ))
+            raise
+
+        self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, rev))
+
+    def get_first_queued_edit(self, other_node_id):
+        self.cur.execute("""SELECT rowid, *
+                 FROM edits
+                 WHERE
+                 other_node = ?
+                 ORDER BY rev ASC LIMIT 1""", (other_node_id,))
+        edit_row = self.cur.fetchone()
+        if not edit_row:
+            self._log_debug_trans("no edits")
+            return None, None
+        else:
+            edit_rowid = edit_row["rowid"]
+            edit = dict(edit_row)
+            return edit_rowid, edit
+
+    def archive_edit(self, edit_rowid):
+        self.cur.execute("""INSERT OR IGNORE INTO edits_archive
+                           SELECT * FROM edits
+                           WHERE rowid=?""", (edit_rowid,))
+        self._log_debug_trans("edit rowid {} archived".format(edit_rowid))
+
+    def delete_edit(self, edit_rowid):
+        self.cur.execute("""DELETE FROM edits
+                           WHERE rowid=?""", (edit_rowid,))
+        self._log_debug_trans("edit rowid {} deleted".format(edit_rowid))
