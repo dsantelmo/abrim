@@ -142,7 +142,7 @@ class DataStore(object):
             self.cur.execute("rollback")
             raise Exception
 
-        self.cur.execute("begin transaction")
+        self.cur.execute("begin")
         if self.con.in_transaction:
             self._transaction_code = random.randint(0, 1000000)
             edited_msg = ""
