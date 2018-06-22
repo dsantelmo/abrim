@@ -65,7 +65,7 @@ class DataStore(object):
             rev INTEGER NOT NULL,
             other_node_rev INTEGER NOT NULL,
             shadow TEXT,
-            PRIMARY KEY(item, other_node, rev),
+            PRIMARY KEY(item, other_node, rev, other_node_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
@@ -197,7 +197,7 @@ class DataStore(object):
     def add_known_node(self, node_id, url):
         insert = (node_id,
                   url)
-        self.cur.execute("""INSERT OR IGNORE INTO nodes
+        self.cur.execute("""INSERT INTO nodes
                            (id,
                             base_url)
                            VALUES (?,?)""", insert)
@@ -230,7 +230,7 @@ class DataStore(object):
                       other_node_rev,
                       shadow
                       )
-            self.cur.execute("""INSERT OR IGNORE INTO shadows
+            self.cur.execute("""INSERT INTO shadows
                                (item, other_node, rev, other_node_rev, shadow)
                                VALUES (?,?,?,?,?)""", insert)
         else:
@@ -263,13 +263,13 @@ class DataStore(object):
         else:
             return True, shadow_row["shadow"]
 
-    def get_oldest_revs(self, item, other_node_id):
+    def get_latest_revs(self, item, other_node_id):
         self.cur.execute("""SELECT rev, other_node_rev
                  FROM shadows
                  WHERE
                  item = ? AND
                  other_node = ?
-                 ORDER BY rev ASC LIMIT 1""", (item, other_node_id,))
+                 ORDER BY rev DESC LIMIT 1""", (item, other_node_id,))
         revs_row = self.cur.fetchone()
         if not revs_row:
             self._log_debug_trans("no revs, defaulting to 0 - 0")
@@ -285,7 +285,7 @@ class DataStore(object):
                   other_node_rev,
                   new_text
                   )
-        self.cur.execute("""INSERT OR IGNORE INTO shadows
+        self.cur.execute("""INSERT INTO shadows
                            (item, other_node, rev, other_node_rev, shadow)
                            VALUES (?,?,?,?,?)""", insert)
 
@@ -328,7 +328,7 @@ class DataStore(object):
             new_hash,
         )
         try:
-            self.cur.execute("""INSERT OR IGNORE INTO edits
+            self.cur.execute("""INSERT INTO edits
                                (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
                                VALUES (?,?,?,?,?,?,?)""", insert)
         except sqlite3.InterfaceError as err:
@@ -361,7 +361,7 @@ class DataStore(object):
             return edit_rowid, edit
 
     def archive_edit(self, edit_rowid):
-        self.cur.execute("""INSERT OR IGNORE INTO edits_archive
+        self.cur.execute("""INSERT INTO edits_archive
                            SELECT * FROM edits
                            WHERE rowid=?""", (edit_rowid,))
         self._log_debug_trans("edit rowid {} archived".format(edit_rowid))

@@ -59,7 +59,7 @@ def _check_shadow_request_ok(r_json):
 
 
 def _check_revs(item_id, client_node_id, rev, other_node_rev):
-    saved_rev, saved_other_node_rev = config.db.get_oldest_revs(item_id, client_node_id)
+    saved_rev, saved_other_node_rev = config.db.get_latest_revs(item_id, client_node_id)
     if rev != saved_other_node_rev:
         log.error("rev DOESN'T match: {} - {}".format(rev, saved_other_node_rev))
         return False
