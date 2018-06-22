@@ -1,13 +1,8 @@
 #!/usr/bin/env python
 
 import argparse
-import sys
-import zlib
 import traceback
-from google.cloud import firestore
-import grpc
-import google
-from flask import Flask, request, abort, Response
+from flask import Flask, request, abort
 from abrim.config import Config
 from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc
 
@@ -17,78 +12,38 @@ log = get_log(full_debug=False)
 app = Flask(__name__)
 
 
-# to avoid race conditions existence of the item and creation should be done in a transaction
-@firestore.transactional
-def enqueue_update_in_transaction(transaction, item_ref, config):
-    try:
-        item_rev = stored_server_rev + 1
-
-        log.debug("updating patches_ref to: {}".format(item_rev))
-
-        # /nodes/node_2/items/item_1/patches/node_1/revs/0
-        patches_ref = item_ref.collection('patches').document(config.item_node_id).collection('revs').document(str(item_rev))
-        transaction.set(patches_ref, {
-            'create_date': firestore.SERVER_TIMESTAMP,
-            'client_rev': item_rev,
-            'patches': config.edits,
-        })
-        log.debug("updating client_rev to: {}".format(item_rev))
-
-        shadow_ref = item_ref.collection('shadows').document(config.item_node_id).collection('revs').document(str(item_rev))
-        transaction.set(shadow_ref, {
-            'create_date': firestore.SERVER_TIMESTAMP,
-            'shadow_client_rev': config.shadow_client_rev,
-            'shadow_server_rev': item_rev,
-            'shadow': new_item_shadow,
-            'old_shadow': shadow  # FIXME check if this is really needed
-        })
-
-    except (grpc._channel._Rendezvous,
-            google.auth.exceptions.TransportError,
-            google.gax.errors.GaxError,
-            ):
-        log.error("Connection error to Firestore")
-        return False
-    log.debug("update enqueued correctly")
-    return True
-
-
-def _get_server_shadow(config, r_json):
-    i_e = config.item_edit
-    got_shadow, shadow = config.db.get_shadow(i_e['item_id'],
-                                              i_e['item_node_id'],
-                                              r_json['other_node_rev'],
-                                              r_json['rev'])
+def _get_server_shadow(item_id, client_node_id, other_node_rev, rev):
+    got_shadow, shadow = config.db.get_shadow(item_id, client_node_id, other_node_rev, rev)
     if got_shadow:
         log.debug("shadow: {}".format(shadow))
     return got_shadow, shadow
 
 
-def _patch_server_shadow(config, shadow):
-    if config.edits == "" and shadow == "":
+def _patch_server_shadow(edits, shadow):
+    if edits == "" and shadow == "":
         log.debug("no shadow or patches, nothing to patch...")
-        new_item_shadow = ""
+        return "", True
     else:
-        new_item_shadow, success = patch_text(config.edits, shadow)
-        if not success:
+        new_shadow, patch_success = patch_text(edits, shadow)
+        if not patch_success:
             log.debug("patching failed")
-            return False
-    log.error("IMPLEMENT ME")
-    return False
+            return "", False
+        else:
+            return new_shadow, patch_success
 
 
-def _check_request_ok(r_json):
-    if not check_fields_in_dict(r_json, ('edits',)):
+def _check_request_ok(r_js):
+    if not check_fields_in_dict(r_js, ('edits',)):
         log.debug("no edits")
-    if not check_fields_in_dict(r_json, ('rev', 'other_node_rev', 'old_shadow_adler32', 'shadow_adler32',)):
-        return False
+    if not check_fields_in_dict(r_js, ('rev', 'other_node_rev', 'old_shadow_adler32', 'shadow_adler32',)):
+        return None
     try:
-        log.info("revs: {} - {}".format(r_json['rev'], r_json['other_node_rev']))
-        log.info("has edits: {:.30}...".format(r_json['edits'].replace('\n', ' ')))
+        log.debug("revs: {} - {}".format(r_js['rev'], r_js['other_node_rev']))
+        log.debug("has edits: {:.30}...".format(r_js['edits'].replace('\n', ' ')))
     except KeyError:
-        log.info("edit request revs: {} - {}, no edits".format(r_json['shadow_client_rev'],
-                                                               r_json['shadow_server_rev']))
-    return True
+        log.debug("edit request revs: {} - {}, no edits".format(r_js['shadow_client_rev'],
+                                                               r_js['shadow_server_rev']))
+    return r_js['rev'], r_js['other_node_rev'], r_js['old_shadow_adler32'], r_js['shadow_adler32'], r_js['edits']
 
 
 def _check_shadow_request_ok(r_json):
@@ -103,13 +58,13 @@ def _check_shadow_request_ok(r_json):
     return True, r_json['shadow']
 
 
-def _check_revs(config, r_json):
-    saved_rev, saved_other_node_rev = config.db.get_oldest_revs(config.item_edit['item_id'], config.item_edit['item_node_id'])
-    if r_json['rev'] != saved_other_node_rev:
-        log.error("rev DOESN'T match: {} - {}".format(r_json['rev'], saved_other_node_rev))
+def _check_revs(item_id, client_node_id, rev, other_node_rev):
+    saved_rev, saved_other_node_rev = config.db.get_oldest_revs(item_id, client_node_id)
+    if rev != saved_other_node_rev:
+        log.error("rev DOESN'T match: {} - {}".format(rev, saved_other_node_rev))
         return False
-    if r_json['other_node_rev'] != saved_rev:
-        log.error("other_node_rev DOESN'T match: {} - {}".format(r_json['other_node_rev'], saved_other_node_rev))
+    if other_node_rev != saved_rev:
+        log.error("other_node_rev DOESN'T match: {} - {}".format(other_node_rev, saved_other_node_rev))
         return False
     return saved_rev, saved_other_node_rev
 
@@ -134,10 +89,8 @@ def _save_shadow(other_node_id, item_id, shadow, rev, other_node_rev):
 def _get_sync(user_id, client_node_id, item_id):
     log.debug("got a request at /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
 
-    config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
-
     try:
-        if not _check_permissions(config.item_edit):
+        if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_sync/403/check_permissions", "you have no permissions for that")
 
         if not check_request_method(request, 'POST'):
@@ -145,34 +98,39 @@ def _get_sync(user_id, client_node_id, item_id):
 
         r_json = request.get_json()
 
-        if not _check_request_ok(r_json):
+        try:
+            rev, other_node_rev, old_shadow_adler32, shadow_adler32, edits = _check_request_ok(r_json)
+        except TypeError:
             return resp("queue_in/get_sync/405/check_req", "Malformed JSON request")
 
         config.db.start_transaction("_get_sync")
 
-        if not _check_revs(config, r_json):
+        if not _check_revs(item_id, client_node_id, rev, other_node_rev):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/403/no_match_revs", "Revs don't match")
 
-        got_shadow, shadow = _get_server_shadow(config, r_json)
+        got_shadow, shadow = _get_server_shadow(item_id, client_node_id, other_node_rev, rev)
         if not got_shadow:
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
 
-        if not check_crc(shadow, r_json['old_shadow_adler32']):
+        if not check_crc(shadow, old_shadow_adler32):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/403/check_crc_old", "CRC of old shadow doesn't match")
 
-        # finally start patching:
-        patch_ok, new_shadow = _patch_server_shadow(config, shadow)
+        new_shadow, patch_success = _patch_server_shadow(edits, shadow)
 
-        if not check_crc(new_shadow, r_json['shadow_adler32']):
+        if not patch_success:
+            config.db.rollback_transaction()
+            return resp("queue_in/get_sync/500/shadow_patch_unsuccessful", "Failed to patch shadow")
+
+        if not check_crc(new_shadow, shadow_adler32):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/403/check_crc_new", "CRC of new shadow doesn't match")
 
-        # if final check is done save shadow
-        config.db.rollback_transaction()
-        abort(500)  # 500 Internal Server Error
+        other_node_rev = int(other_node_rev) + 1
+
+        _save_shadow(client_node_id, item_id, new_shadow, rev, other_node_rev)
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -180,11 +138,6 @@ def _get_sync(user_id, client_node_id, item_id):
         traceback.print_exc()
         return resp("queue_in/get_sync/500/transaction_exception", "Unknown error. Please report this")
     else:
-        #####
-        # FIXME: delete me:
-        config.db.rollback_transaction()
-        abort(404)
-        ####
         config.db.end_transaction()
         return resp("queue_in/get_sync/201/ack", "Sync acknowledged")
 
@@ -272,128 +225,9 @@ def teardown_request(exception):
     __end()
 
 
-def prepare_data(new_text, old_shadow, old_shadow_adler32, shadow_adler32, shadow_client_rev, shadow_server_rev,
-                 text_patches):
-    base_data = {
-        'create_date': firestore.SERVER_TIMESTAMP,
-        'shadow_client_rev': shadow_client_rev,
-        'shadow_server_rev': shadow_server_rev
-    }
-    shadow_data = dict(base_data)
-    queue_data = dict(base_data)
-    item_data = dict(base_data)
-    shadow_data.update({
-        'shadow': new_text,
-        'old_shadow': old_shadow,  # FIXME check if this is really needed
-    })
-    queue_data.update({
-        'text_patches': text_patches,
-        'old_shadow_adler32': old_shadow_adler32,
-        'shadow_adler32': shadow_adler32,
-    })
-    item_data.update({
-        'text': new_text,
-    })
-    return item_data, queue_data, shadow_data
-
-
 if __name__ == "__main__":  # pragma: no cover
     log.info("queue_in started")
     config = Config(node_id="node_2")
-    #
-    # config.item_user_id = "user_1"
-    # config.node_id = "test_node2"
-    # config.item_id = "item_1"
-    # config.item_create_date = "2018 - 01 - 29T21: 35:15.785000 + 00: 00"
-    # config.item_action = "create_item"
-    # config.item_node_id = "node_1"
-    # config.item_rev = 0
-    #
-    # server_create_item(config)
-    #
-    #
-    # config.item_user_id = "user_1"
-    # config.node_id = "test_node2"
-    # config.item_id = "item_1"
-    # config.item_create_date = "2018-02-03T21:46:32.785000+00:00"
-    # config.item_action = "edit_item"
-    # config.item_node_id = "node_1"
-    # config.item_rev = 1
-    # config.item_patches = '@@ -0,0 +1,10 @@\n+a new text\n'
-    #
-    # server_update_item(config)
-
-    # config.item_patches = "@@ -1,10 +1,12 @@\n a new\n+er\n  text\n"
-    # config.node_id = "node_2"
-    # config.item_create_date = "2018-03-11T17:08:25.774000+00:00"
-    # config.item_user_id = "user_1"
-    # config.item_rev = 2
-    # config.item_id = "item_1"
-    # config.item_node_id = "node_1"
-    # config.item_action = "edit_item"
-    #
-    # server_update_item(config)
-    #
-    # sys.exit(0)
-
-
-
-
-
-
-
-
-
-
-
-    # db = firestore.Client()
-    # server_node_ref = db.collection('nodes').document('node_2')
-    # other_node_ref = server_node_ref.collection('other_nodes').document('node_1')
-    # item_ref = other_node_ref.collection('items').document('item_1')
-    #
-    # item_ref.set({
-    #     'last_update_date': firestore.SERVER_TIMESTAMP,
-    #     'client_rev': 2,
-    #     'shadow': "a newer text",
-    # })
-    #
-    # patches_ref = item_ref.collection('patches').document("1")
-    # patches_ref.set({
-    #     'create_date': firestore.SERVER_TIMESTAMP,
-    #     'other_node_create_date': "2018-03-11T17:36:42.672000+00:00",
-    #     'client_rev': 1,
-    #     'patches': "@@ -0,0 +1,10 @@ +a new text",
-    # })
-    #
-    # patches_ref2 = item_ref.collection('patches').document("2")
-    # patches_ref2.set({
-    #     'create_date': firestore.SERVER_TIMESTAMP,
-    #     'other_node_create_date': "2018-03-11T17:36:47.798000+00:00",
-    #     'client_rev': 2,
-    #     'patches': "@@ -1,10 +1,12 @@ a new +er text ",
-    # })
-    #
-    #
-    #
-    #
-    # sys.exit(0)
-
-
-
-    # previous to test update 1
-    # db = firestore.Client()
-    # server_node_ref = db.collection('nodes').document('node_2')
-    # other_node_ref = server_node_ref.collection('other_nodes').document('node_1')
-    # item_ref = other_node_ref.collection('items').document('item_1')
-    #
-    # item_ref.set({
-    #     'last_update_date': firestore.SERVER_TIMESTAMP,
-    #     'client_rev': 0,
-    # })
-    #
-    # patches_ref = item_ref.collection('patches').document("1")
-    # patches_ref.delete()
-
     client_port = _init()
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
