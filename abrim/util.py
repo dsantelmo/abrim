@@ -104,9 +104,17 @@ def check_request_method(request, method):
 
 
 def check_crc(text, crc):
+    log.debug("checking CRC of {} to {}".format(text, crc))
     text_crc = zlib.adler32(text.encode())
-    if crc != text_crc:
-        log.error("CRCs don't match {} {}".format(crc, text_crc, ))
+
+    try:
+        int_crc = int(crc)
+    except ValueError:
+        log.error("request CRC isn't int: {} {}".format(crc, type(crc), ))
+        return False
+
+    if int_crc != text_crc:
+        log.error("CRCs don't match {} {}".format(int_crc, text_crc, ))
         return False
     else:
         return True
