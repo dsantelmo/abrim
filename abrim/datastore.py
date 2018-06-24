@@ -9,7 +9,7 @@ log = get_log(full_debug=False)
 
 
 class DataStore(object):
-    
+
     # MAINTENANCE
     def get_db_path(self):
         node_id = self.node_id
@@ -62,10 +62,10 @@ class DataStore(object):
            CREATE TABLE IF NOT EXISTS shadows
            (item TEXT NOT NULL,
             other_node TEXT NOT NULL,
-            rev INTEGER NOT NULL,
-            other_node_rev INTEGER NOT NULL,
+            n_rev INTEGER NOT NULL,
+            m_rev INTEGER NOT NULL,
             shadow TEXT,
-            PRIMARY KEY(item, other_node, rev, other_node_rev),
+            PRIMARY KEY(item, other_node, n_rev, m_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
@@ -74,12 +74,12 @@ class DataStore(object):
            (
             item TEXT NOT NULL,
             other_node TEXT NOT NULL,
-            rev INTEGER NOT NULL,
-            other_node_rev INTEGER NOT NULL,
+            n_rev INTEGER NOT NULL,
+            m_rev INTEGER NOT NULL,
             edits TEXT,
             old_shadow_adler32 TEXT,
             shadow_adler32 TEXT,
-            PRIMARY KEY(item, other_node, rev),
+            PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
@@ -88,12 +88,12 @@ class DataStore(object):
            (
             item TEXT NOT NULL,
             other_node TEXT NOT NULL,
-            rev INTEGER NOT NULL,
-            other_node_rev INTEGER NOT NULL,
+            n_rev INTEGER NOT NULL,
+            m_rev INTEGER NOT NULL,
             edits TEXT,
             old_shadow_adler32 TEXT,
             shadow_adler32 TEXT,
-            PRIMARY KEY(item, other_node, rev),
+            PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
@@ -191,7 +191,7 @@ class DataStore(object):
             con.row_factory = sqlite3.Row
             con.set_trace_callback(log.debug)
             self._init_db(con, drop_db)
-            
+
     # NODES
 
     def add_known_node(self, node_id, url):
@@ -212,50 +212,50 @@ class DataStore(object):
 
     # REV AND SHADOW
 
-    def get_lastest_rev_shadow(self, other_node_id, item_id):
-        self.cur.execute("""SELECT shadow, rev, other_node_rev
+    def get_lastest_n_rev_shadow(self, other_node_id, item_id):
+        self.cur.execute("""SELECT shadow, n_rev, m_rev
                 FROM shadows
                 WHERE item = ?
                 AND other_node = ?
-                ORDER BY rev DESC LIMIT 1""", (item_id, other_node_id,))
+                ORDER BY n_rev DESC LIMIT 1""", (item_id, other_node_id,))
         shadow = self.cur.fetchone()
         if shadow is None:
             self._log_debug_trans("shadow doesn't exist. Creating...")
-            rev = -1
-            other_node_rev = -1
+            n_rev = -1
+            m_rev = -1
             shadow = ""
             insert = (item_id,
                       other_node_id,
-                      rev,
-                      other_node_rev,
+                      n_rev,
+                      m_rev,
                       shadow
                       )
             self.cur.execute("""INSERT INTO shadows
-                               (item, other_node, rev, other_node_rev, shadow)
+                               (item, other_node, n_rev, m_rev, shadow)
                                VALUES (?,?,?,?,?)""", insert)
         else:
             self._log_debug_trans("shadow exists")
             try:
-                rev = shadow['rev']
-                other_node_rev = shadow['other_node_rev']
+                n_rev = shadow['n_rev']
+                m_rev = shadow['m_rev']
                 shadow = shadow['shadow']
             except (TypeError, IndexError) as err:
                 log.error(err)
                 raise
-        return rev, other_node_rev, shadow
+        return n_rev, m_rev, shadow
 
-    def get_shadow(self, item, other_node_id, rev, other_node_rev):
-        # if rev == 0 and other_node_rev == 0:
-        #    self._log_debug_trans("revs 0 - 0, assuming there is no shadow")
+    def get_shadow(self, item, other_node_id, n_rev, m_rev):
+        # if n_rev == 0 and m_rev == 0:
+        #    self._log_debug_trans("n_revs 0 - 0, assuming there is no shadow")
         #    return None
         self.cur.execute("""SELECT shadow
                  FROM shadows
                  WHERE
                  item = ? AND
                  other_node = ? AND
-                 rev = ? AND
-                 other_node_rev = ?
-                 LIMIT 1""", (item, other_node_id, rev, other_node_rev))
+                 n_rev = ? AND
+                 m_rev = ?
+                 LIMIT 1""", (item, other_node_id, n_rev, m_rev))
         shadow_row = self.cur.fetchone()
         if not shadow_row:
             self._log_debug_trans("no shadow")
@@ -263,30 +263,30 @@ class DataStore(object):
         else:
             return True, shadow_row["shadow"]
 
-    def get_latest_revs(self, item, other_node_id):
-        self.cur.execute("""SELECT rev, other_node_rev
+    def get_latest_n_revs(self, item, other_node_id):
+        self.cur.execute("""SELECT n_rev, m_rev
                  FROM shadows
                  WHERE
                  item = ? AND
                  other_node = ?
-                 ORDER BY rev DESC LIMIT 1""", (item, other_node_id,))
-        revs_row = self.cur.fetchone()
-        if not revs_row:
-            self._log_debug_trans("no revs, defaulting to 0 - 0")
+                 ORDER BY n_rev DESC LIMIT 1""", (item, other_node_id,))
+        n_revs_row = self.cur.fetchone()
+        if not n_revs_row:
+            self._log_debug_trans("no n_revs, defaulting to 0 - 0")
             return 0, 0
         else:
-            return revs_row["rev"], revs_row["other_node_rev"]
+            return n_revs_row["n_rev"], n_revs_row["m_rev"]
 
-    def save_new_shadow(self, other_node_id, item_id, new_text, rev, other_node_rev):
-        self._log_debug_trans("about to save shadow: {} {} {}".format(item_id, other_node_id, rev))
+    def save_new_shadow(self, other_node_id, item_id, new_text, n_rev, m_rev):
+        self._log_debug_trans("about to save shadow: {} {} {}".format(item_id, other_node_id, n_rev))
         insert = (item_id,
                   other_node_id,
-                  rev,
-                  other_node_rev,
+                  n_rev,
+                  m_rev,
                   new_text
                   )
         self.cur.execute("""INSERT INTO shadows
-                           (item, other_node, rev, other_node_rev, shadow)
+                           (item, other_node, n_rev, m_rev, shadow)
                            VALUES (?,?,?,?,?)""", insert)
 
     # ITEM
@@ -309,48 +309,48 @@ class DataStore(object):
                   LIMIT 1""", (item_id, self.node_id))
         item_row = self.cur.fetchone()
         if not item_row:
-            self._log_debug_trans("no item found for {}".format(item_id,))
+            self._log_debug_trans("no item found for {}".format(item_id, ))
             return False, None
         else:
-            self._log_debug_trans("{} found".format(item_id,))
+            self._log_debug_trans("{} found".format(item_id, ))
             return True, item_row["text"]
-        
+
     # EDITS
 
-    def enqueue_client_edits(self, other_node_id, item_id, diffs, old_hash, new_hash, rev, other_node_rev):
+    def enqueue_client_edits(self, other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev):
         insert = (
             item_id,
             other_node_id,
-            rev,
-            other_node_rev,
+            n_rev,
+            m_rev,
             diffs,
             old_hash,
             new_hash,
         )
         try:
             self.cur.execute("""INSERT INTO edits
-                               (item, other_node, rev, other_node_rev, edits, old_shadow_adler32, shadow_adler32)
+                               (item, other_node, n_rev, m_rev, edits, old_shadow_adler32, shadow_adler32)
                                VALUES (?,?,?,?,?,?,?)""", insert)
         except sqlite3.InterfaceError as err:
             self._log_debug_trans("ERROR AT INSERT VALUES: {}, {}, {}, {}, {}, {}, {}".format(
                 item_id,
                 other_node_id,
-                rev,
-                other_node_rev,
+                n_rev,
+                m_rev,
                 diffs,
                 old_hash,
                 new_hash,
             ))
             raise
 
-        self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, rev))
+        self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, n_rev))
 
     def get_first_queued_edit(self, other_node_id):
         self.cur.execute("""SELECT rowid, *
                  FROM edits
                  WHERE
                  other_node = ?
-                 ORDER BY rev ASC LIMIT 1""", (other_node_id,))
+                 ORDER BY n_rev ASC LIMIT 1""", (other_node_id,))
         edit_row = self.cur.fetchone()
         if not edit_row:
             self._log_debug_trans("no edits")

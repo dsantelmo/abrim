@@ -12,8 +12,8 @@ log = get_log(full_debug=False)
 app = Flask(__name__)
 
 
-def _get_server_shadow(item_id, client_node_id, other_node_rev, rev):
-    got_shadow, shadow = config.db.get_shadow(item_id, client_node_id, other_node_rev, rev)
+def _get_server_shadow(item_id, client_node_id, m_rev, n_rev):
+    got_shadow, shadow = config.db.get_shadow(item_id, client_node_id, m_rev, n_rev)
     if got_shadow:
         log.debug("shadow: {}".format(shadow))
     return got_shadow, shadow
@@ -35,22 +35,22 @@ def _patch_server_shadow(edits, shadow):
 def _check_request_ok(r_js):
     if not check_fields_in_dict(r_js, ('edits',)):
         log.debug("no edits")
-    if not check_fields_in_dict(r_js, ('rev', 'other_node_rev', 'old_shadow_adler32', 'shadow_adler32',)):
+    if not check_fields_in_dict(r_js, ('n_rev', 'm_rev', 'old_shadow_adler32', 'shadow_adler32',)):
         return None
     try:
-        log.debug("revs: {} - {}".format(r_js['rev'], r_js['other_node_rev']))
+        log.debug("n_rev: {} - m_rev: {}".format(r_js['n_rev'], r_js['m_rev']))
         log.debug("has edits: {:.30}...".format(r_js['edits'].replace('\n', ' ')))
     except KeyError:
         log.debug("edit request revs: {} - {}, no edits".format(r_js['shadow_client_rev'],
                                                                r_js['shadow_server_rev']))
-    return r_js['rev'], r_js['other_node_rev'], r_js['old_shadow_adler32'], r_js['shadow_adler32'], r_js['edits']
+    return r_js['n_rev'], r_js['m_rev'], r_js['old_shadow_adler32'], r_js['shadow_adler32'], r_js['edits']
 
 
 def _check_shadow_request_ok(r_json):
-    if not check_fields_in_dict(r_json, ('rev', 'other_node_rev', 'shadow',)):
+    if not check_fields_in_dict(r_json, ('n_rev', 'm_rev', 'shadow',)):
         return False, _
     try:
-        log.info("revs: {} - {}".format(r_json['rev'], r_json['other_node_rev']))
+        log.info("revs: {} - {}".format(r_json['n_rev'], r_json['m_rev']))
         log.info("has shadow: {:.30}...".format(r_json['shadow'].replace('\n', ' ')))
     except KeyError:
         log.error("no shadow in request")
@@ -58,15 +58,15 @@ def _check_shadow_request_ok(r_json):
     return True, r_json['shadow']
 
 
-def _check_revs(item_id, client_node_id, rev, other_node_rev):
-    saved_rev, saved_other_node_rev = config.db.get_latest_revs(item_id, client_node_id)
-    if rev != saved_other_node_rev:
-        log.error("rev DOESN'T match: {} - {}".format(rev, saved_other_node_rev))
+def _check_revs(item_id, client_node_id, n_rev, m_rev):
+    saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
+    if n_rev != saved_n_rev:
+        log.error("n_rev DOESN'T match: {} - {}".format(n_rev, saved_n_rev))
         return False
-    if other_node_rev != saved_rev:
-        log.error("other_node_rev DOESN'T match: {} - {}".format(other_node_rev, saved_other_node_rev))
+    if m_rev != saved_m_rev:
+        log.error("m_rev DOESN'T match: {} - {}".format(m_rev, saved_m_rev))
         return False
-    return saved_rev, saved_other_node_rev
+    return saved_n_rev, saved_m_rev
 
 
 def _check_permissions(dummy):  # TODO: implement me
@@ -81,8 +81,8 @@ def _save_item(item_id, new_text):
     config.db.save_item(item_id, new_text)
 
 
-def _save_shadow(other_node_id, item_id, shadow, rev, other_node_rev):
-    config.db.save_new_shadow(other_node_id, item_id, shadow, rev, other_node_rev)
+def _save_shadow(other_node_id, item_id, shadow, n_rev, m_rev):
+    config.db.save_new_shadow(other_node_id, item_id, shadow, n_rev, m_rev)
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
@@ -99,17 +99,17 @@ def _get_sync(user_id, client_node_id, item_id):
         r_json = request.get_json()
 
         try:
-            rev, other_node_rev, old_shadow_adler32, shadow_adler32, edits = _check_request_ok(r_json)
+            n_rev, m_rev, old_shadow_adler32, shadow_adler32, edits = _check_request_ok(r_json)
         except TypeError:
             return resp("queue_in/get_sync/405/check_req", "Malformed JSON request")
 
         config.db.start_transaction("_get_sync")
 
-        if not _check_revs(item_id, client_node_id, rev, other_node_rev):
+        if not _check_revs(item_id, client_node_id, n_rev, m_rev):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/403/no_match_revs", "Revs don't match")
 
-        got_shadow, shadow = _get_server_shadow(item_id, client_node_id, other_node_rev, rev)
+        got_shadow, shadow = _get_server_shadow(item_id, client_node_id, m_rev, n_rev)
         if not got_shadow:
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
@@ -128,9 +128,9 @@ def _get_sync(user_id, client_node_id, item_id):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/403/check_crc_new", "CRC of new shadow doesn't match")
 
-        other_node_rev = int(other_node_rev) + 1
+        m_rev = int(m_rev) + 1
 
-        _save_shadow(client_node_id, item_id, new_shadow, rev, other_node_rev)
+        _save_shadow(client_node_id, item_id, new_shadow, n_rev, m_rev)
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -167,7 +167,7 @@ def _get_shadow(user_id, client_node_id, item_id):
         if not item_exists:
             _save_item(item_id, shadow)
 
-        _save_shadow(client_node_id, item_id, shadow, r_json['rev'], r_json['other_node_rev'])
+        _save_shadow(client_node_id, item_id, shadow, r_json['n_rev'], r_json['m_rev'])
 
     except Exception as err:
         config.db.rollback_transaction()
