@@ -12,8 +12,8 @@ log = get_log(full_debug=False)
 app = Flask(__name__)
 
 
-def _get_server_shadow(item_id, client_node_id, m_rev, n_rev):
-    got_shadow, shadow = config.db.get_shadow(item_id, client_node_id, m_rev, n_rev)
+def _get_server_shadow(item_id, client_node_id, n_rev, m_rev):
+    got_shadow, shadow = config.db.get_shadow(item_id, client_node_id, n_rev, m_rev)
     if got_shadow:
         log.debug("shadow: {}".format(shadow))
     return got_shadow, shadow
@@ -60,6 +60,7 @@ def _check_shadow_request_ok(r_json):
 
 def _check_revs(item_id, client_node_id, n_rev, m_rev):
     saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
+    saved_n_rev += 1
     if n_rev != saved_n_rev:
         log.error("n_rev DOESN'T match: {} - {}".format(n_rev, saved_n_rev))
         return False
@@ -109,7 +110,7 @@ def _get_sync(user_id, client_node_id, item_id):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/403/no_match_revs", "Revs don't match")
 
-        got_shadow, shadow = _get_server_shadow(item_id, client_node_id, m_rev, n_rev)
+        got_shadow, shadow = _get_server_shadow(item_id, client_node_id, n_rev, m_rev)
         if not got_shadow:
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
@@ -127,8 +128,6 @@ def _get_sync(user_id, client_node_id, item_id):
         if not check_crc(new_shadow, shadow_adler32):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/403/check_crc_new", "CRC of new shadow doesn't match")
-
-        m_rev = int(m_rev) + 1
 
         _save_shadow(client_node_id, item_id, new_shadow, n_rev, m_rev)
 

@@ -212,7 +212,7 @@ class DataStore(object):
 
     # REV AND SHADOW
 
-    def get_lastest_n_rev_shadow(self, other_node_id, item_id):
+    def get_lastest_rev_shadow(self, other_node_id, item_id):
         self.cur.execute("""SELECT shadow, n_rev, m_rev
                 FROM shadows
                 WHERE item = ?
@@ -221,8 +221,8 @@ class DataStore(object):
         shadow = self.cur.fetchone()
         if shadow is None:
             self._log_debug_trans("shadow doesn't exist. Creating...")
-            n_rev = -1
-            m_rev = -1
+            n_rev = 0
+            m_rev = 0
             shadow = ""
             insert = (item_id,
                       other_node_id,
@@ -263,19 +263,19 @@ class DataStore(object):
         else:
             return True, shadow_row["shadow"]
 
-    def get_latest_n_revs(self, item, other_node_id):
+    def get_latest_revs(self, item, other_node_id):
         self.cur.execute("""SELECT n_rev, m_rev
                  FROM shadows
                  WHERE
                  item = ? AND
                  other_node = ?
                  ORDER BY n_rev DESC LIMIT 1""", (item, other_node_id,))
-        n_revs_row = self.cur.fetchone()
-        if not n_revs_row:
-            self._log_debug_trans("no n_revs, defaulting to 0 - 0")
+        revs_row = self.cur.fetchone()
+        if not revs_row:
+            self._log_debug_trans("no revs, defaulting to 0 - 0")
             return 0, 0
         else:
-            return n_revs_row["n_rev"], n_revs_row["m_rev"]
+            return revs_row["n_rev"], revs_row["m_rev"]
 
     def save_new_shadow(self, other_node_id, item_id, new_text, n_rev, m_rev):
         self._log_debug_trans("about to save shadow: {} {} {}".format(item_id, other_node_id, n_rev))
@@ -285,7 +285,7 @@ class DataStore(object):
                   m_rev,
                   new_text
                   )
-        self.cur.execute("""INSERT INTO shadows
+        self.cur.execute("""INSERT OR REPLACE INTO shadows
                            (item, other_node, n_rev, m_rev, shadow)
                            VALUES (?,?,?,?,?)""", insert)
 
