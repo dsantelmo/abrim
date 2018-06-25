@@ -60,7 +60,7 @@ def _check_shadow_request_ok(r_json):
 
 def _check_revs(item_id, client_node_id, n_rev, m_rev):
     saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
-    saved_n_rev += 1
+
     if n_rev != saved_n_rev:
         log.error("n_rev DOESN'T match: {} - {}".format(n_rev, saved_n_rev))
         return False
@@ -128,6 +128,8 @@ def _get_sync(user_id, client_node_id, item_id):
         if not check_crc(new_shadow, shadow_adler32):
             config.db.rollback_transaction()
             return resp("queue_in/get_sync/403/check_crc_new", "CRC of new shadow doesn't match")
+
+        n_rev += 1
 
         _save_shadow(client_node_id, item_id, new_shadow, n_rev, m_rev)
 
