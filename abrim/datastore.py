@@ -209,8 +209,6 @@ class DataStore(object):
             callb = log.debug
         self.con.set_trace_callback(callb)
 
-    def sql_debug_trace_disable(self):
-
     def __init__(self, node_id, db_prefix="", drop_db=False):
         if not node_id:
             raise Exception
