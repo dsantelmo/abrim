@@ -22,6 +22,14 @@ def resp(api_unique_code, msg):
     return response
 
 
+def resp_json(status_code , resp_json):
+    log.debug("RESPONSE: {}".format(resp_json))
+    log.debug("-----------------------------------------------")
+    response = jsonify(resp_json)
+    response.status_code = status_code
+    return response
+
+
 def get_log(full_debug=False):
     if full_debug:
         # enable debug for HTTP requests

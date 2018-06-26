@@ -417,3 +417,20 @@ class DataStore(object):
         self.cur.execute("""INSERT OR REPLACE INTO patches
                            (item, other_node, n_rev, m_rev, patches)
                            VALUES (?,?,?,?,?)""", insert)
+
+    def check_if_patch_done(self, other_node_id, item_id, n_rev, m_rev):
+        self.cur.execute("""SELECT n_rev, m_rev
+                 FROM patches_archive
+                 WHERE
+                 item = ? AND
+                 other_node = ? AND
+                 n_rev = ? AND
+                 m_rev = ? 
+                 LIMIT 1""", (item_id, other_node_id, n_rev, m_rev))
+        patch_row = self.cur.fetchone()
+        if not patch_row:
+            self._log_debug_trans("server has still not applied the patch")
+            return False
+        else:
+            self._log_debug_trans("server has correctly applied the patch")
+            return True

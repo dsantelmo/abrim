@@ -2,9 +2,10 @@
 
 import argparse
 import traceback
+import time
 from flask import Flask, request, abort
 from abrim.config import Config
-from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc
+from abrim.util import get_log, patch_text, resp, resp_json, check_fields_in_dict, check_request_method, check_crc
 
 
 log = get_log(full_debug=False)
@@ -90,6 +91,11 @@ def _enqueue_patches(other_node_id, item_id, patches, n_rev, m_rev):
     config.db.save_new_patches(other_node_id, item_id, patches, n_rev, m_rev)
 
 
+def _check_if_patch_done(other_node_id, item_id, n_rev, m_rev):
+    config.db.check_if_patch_done(other_node_id, item_id, n_rev, m_rev)
+
+
+
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(user_id, client_node_id, item_id):
     log.debug("-------------------------------------------------------------------------------")
@@ -147,7 +153,16 @@ def _get_sync(user_id, client_node_id, item_id):
         return resp("queue_in/get_sync/500/transaction_exception", "Unknown error. Please report this")
     else:
         config.db.end_transaction()
-        return resp("queue_in/get_sync/201/ack", "Sync acknowledged")
+
+    # wait a bit for the patching of server text
+    timeout = 5
+    while not _check_if_patch_done(client_node_id, item_id, n_rev, m_rev):
+        time.sleep(1)
+        timeout -= 1
+        if timeout <= 0:
+            log.warn("server didn't processed the patch within the allotted time. Possible server overload")
+            return resp("queue_in/get_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply")
+    return resp_json(201, {'json': 'response_all_ok_and_new_edits_for_client'})
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
