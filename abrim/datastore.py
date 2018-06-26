@@ -203,11 +203,13 @@ class DataStore(object):
         else:
             log.debug("transaction rolled back OK")
 
-    def trace_sql_enable(self):
-        self.con.set_trace_callback(log.debug)
+    def sql_debug_trace(self, enable: bool):
+        callb = None
+        if enable:
+            callb = log.debug
+        self.con.set_trace_callback(callb)
 
-    def trace_sql_disable(self):
-        self.con.set_trace_callback(None)
+    def sql_debug_trace_disable(self):
 
     def __init__(self, node_id, db_prefix="", drop_db=False):
         if not node_id:
