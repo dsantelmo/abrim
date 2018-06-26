@@ -228,7 +228,7 @@ def teardown_request(exception):
 
 if __name__ == "__main__":  # pragma: no cover
     log.info("queue_in started")
-    config = Config(node_id="node_2")
+    config = Config(node_id="node_2", drop_db=True)
     client_port = _init()
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)

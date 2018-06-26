@@ -32,11 +32,16 @@ class DataStore(object):
         log.debug(self.db_path)
 
     def drop_db(self):
-        self.cur.executescript("""
-            DROP TABLE IF EXISTS nodes;
-            DROP TABLE IF EXISTS items;
-            DROP TABLE IF EXISTS shadows;
+        self.cur.execute("""SELECT name FROM sqlite_master WHERE type = 'table';
             """)
+
+        drop_tables = "\nDROP TABLE IF EXISTS "
+        for table in self.cur.fetchall():
+            drop_tables += table['name']
+            drop_tables += ";\nDROP TABLE IF EXISTS "
+        drop_tables += "none;\n";
+
+        self.cur.executescript(drop_tables)
 
         self.con.commit()
 
