@@ -35,11 +35,9 @@ class DataStore(object):
         self.cur.execute("""SELECT name FROM sqlite_master WHERE type = 'table';
             """)
 
-        drop_tables = "\nDROP TABLE IF EXISTS "
+        drop_tables = """"""
         for table in self.cur.fetchall():
-            drop_tables += table['name']
-            drop_tables += ";\nDROP TABLE IF EXISTS "
-        drop_tables += "none;\n";
+            drop_tables = drop_tables + """DROP TABLE IF EXISTS """ + table['name'] + """; """
 
         self.cur.executescript(drop_tables)
 
@@ -205,6 +203,12 @@ class DataStore(object):
         else:
             log.debug("transaction rolled back OK")
 
+    def trace_sql_enable(self):
+        self.con.set_trace_callback(log.debug)
+
+    def trace_sql_disable(self):
+        self.con.set_trace_callback(None)
+
     def __init__(self, node_id, db_prefix="", drop_db=False):
         if not node_id:
             raise Exception
@@ -218,7 +222,6 @@ class DataStore(object):
         with sqlite3.connect(self.db_path) as con:
             con.isolation_level = None
             con.row_factory = sqlite3.Row
-            con.set_trace_callback(log.debug)
             self._init_db(con, drop_db)
 
     # NODES
