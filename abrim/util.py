@@ -8,7 +8,8 @@ from flask import jsonify
 
 
 def resp(api_unique_code, msg):
-    log.debug("about to send back this response: {} :: {}".format(api_unique_code, msg))
+    log.debug("RESPONSE: {} :: {}".format(api_unique_code, msg))
+    log.debug("-----------------------------------------------")
     response = jsonify({
         'api_unique_code': api_unique_code,
         'message': msg

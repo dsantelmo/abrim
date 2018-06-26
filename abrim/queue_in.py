@@ -88,7 +88,8 @@ def _save_shadow(other_node_id, item_id, shadow, n_rev, m_rev):
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(user_id, client_node_id, item_id):
-    log.debug("got a request at /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
+    log.debug("-------------------------------------------------------------------------------")
+    log.debug("REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
 
     try:
         if not _check_permissions("to do"):  # TODO: implement me
@@ -145,7 +146,8 @@ def _get_sync(user_id, client_node_id, item_id):
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
 def _get_shadow(user_id, client_node_id, item_id):
-    log.debug("got a request at /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
+    log.debug("-------------------------------------------------------------------------------")
+    log.debug("REQUEST: /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
     config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
 
     try:
