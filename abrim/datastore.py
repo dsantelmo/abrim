@@ -102,6 +102,30 @@ class DataStore(object):
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
             );
+
+           CREATE TABLE IF NOT EXISTS patches
+           (
+            item TEXT NOT NULL,
+            other_node TEXT NOT NULL,
+            n_rev INTEGER NOT NULL,
+            m_rev INTEGER NOT NULL,
+            patches TEXT,
+            PRIMARY KEY(item, other_node, n_rev),
+            FOREIGN KEY(item) REFERENCES items(id),
+            FOREIGN KEY(other_node) REFERENCES nodes(id)
+            );
+
+           CREATE TABLE IF NOT EXISTS patches_archive
+           (
+            item TEXT NOT NULL,
+            other_node TEXT NOT NULL,
+            n_rev INTEGER NOT NULL,
+            m_rev INTEGER NOT NULL,
+            patches TEXT,
+            PRIMARY KEY(item, other_node, n_rev),
+            FOREIGN KEY(item) REFERENCES items(id),
+            FOREIGN KEY(other_node) REFERENCES nodes(id)
+            );
             """)
 
         self.con.commit()
@@ -375,3 +399,18 @@ class DataStore(object):
         self.cur.execute("""DELETE FROM edits
                            WHERE rowid=?""", (edit_rowid,))
         self._log_debug_trans("edit rowid {} deleted".format(edit_rowid))
+
+
+    # PATCHES
+
+    def save_new_patches(self, other_node_id, item_id, patches, n_rev, m_rev):
+        self._log_debug_trans("about to save patch: {} {} {}".format(item_id, other_node_id, n_rev))
+        insert = (item_id,
+                  other_node_id,
+                  n_rev,
+                  m_rev,
+                  patches
+                  )
+        self.cur.execute("""INSERT OR REPLACE INTO patches
+                           (item, other_node, n_rev, m_rev, patches)
+                           VALUES (?,?,?,?,?)""", insert)

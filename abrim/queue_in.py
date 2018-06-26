@@ -86,6 +86,10 @@ def _save_shadow(other_node_id, item_id, shadow, n_rev, m_rev):
     config.db.save_new_shadow(other_node_id, item_id, shadow, n_rev, m_rev)
 
 
+def _enqueue_patches(other_node_id, item_id, patches, n_rev, m_rev):
+    config.db.save_new_patches(other_node_id, item_id, patches, n_rev, m_rev)
+
+
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 def _get_sync(user_id, client_node_id, item_id):
     log.debug("-------------------------------------------------------------------------------")
@@ -133,6 +137,8 @@ def _get_sync(user_id, client_node_id, item_id):
         n_rev += 1
 
         _save_shadow(client_node_id, item_id, new_shadow, n_rev, m_rev)
+
+        _enqueue_patches(client_node_id, item_id, edits, n_rev, m_rev)
 
     except Exception as err:
         config.db.rollback_transaction()
