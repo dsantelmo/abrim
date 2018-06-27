@@ -91,8 +91,21 @@ def _enqueue_patches(client_node_id, item_id, patches, n_rev, m_rev):
     config.db.save_new_patches(client_node_id, item_id, patches, n_rev, m_rev)
 
 
-def _check_if_patch_done(client_node_id, item_id, n_rev, m_rev):
-    config.db.check_if_patch_done(client_node_id, item_id, n_rev, m_rev)
+def _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev):
+    # wait a bit for the patching of server text
+    while True:
+        patch_done = config.db.check_if_patch_done(client_node_id, item_id, n_rev, m_rev)
+        if patch_done:
+            break
+        else:
+            if timeout < 0:
+                log.warn("server didn't processed the patch within the allotted time. Possible server overload")
+                return None
+            time.sleep(1)
+            timeout -= 1
+
+    patch_done = {'json': 'response_all_ok_and_new_edits_for_client'} # fixme: delete me
+    return patch_done
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
@@ -153,15 +166,13 @@ def _get_sync(user_id, client_node_id, item_id):
     else:
         config.db.end_transaction()
 
-    # wait a bit for the patching of server text
     timeout = 5
-    while not _check_if_patch_done(client_node_id, item_id, n_rev, m_rev):
-        time.sleep(1)
-        timeout -= 1
-        if timeout <= 0:
-            log.warn("server didn't processed the patch within the allotted time. Possible server overload")
-            return resp("queue_in/get_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply")
-    return resp_json(201, {'json': 'response_all_ok_and_new_edits_for_client'})
+
+    patch_done_json = _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev)
+    if not patch_done_json:
+        return resp("queue_in/get_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply")
+    return resp_json(201, patch_done_json)
+
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
