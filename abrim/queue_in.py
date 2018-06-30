@@ -171,8 +171,7 @@ def _get_sync(user_id, client_node_id, item_id):
     patch_done_json = _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev)
     if not patch_done_json:
         return resp("queue_in/get_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply")
-    return resp_json(201, patch_done_json)
-
+    return resp("queue_in/get_sync/201/done", "Sync done", patch_done_json)
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])

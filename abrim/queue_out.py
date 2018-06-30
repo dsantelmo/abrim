@@ -4,7 +4,7 @@ import multiprocessing
 import time
 import requests
 import json
-from abrim.util import get_log, err_codes
+from abrim.util import get_log, resp
 from abrim.config import Config
 log = get_log(full_debug=False)
 
@@ -41,9 +41,9 @@ def send_sync(edit, other_node_url, use_put=False):
         log.debug("Response: {}".format(p_response.text))
         response_http = p_response.status_code
         response_dict = json.loads(p_response.text)
-        api_code = response_dict['api_code']
-        log.debug("API response: {} HTTP response: {} Dict: {}".format(api_code, response_http, response_dict))
-        return response_http, api_code
+        api_unique_code = response_dict['api_unique_code']
+        log.debug("API response: {} HTTP response: {} Dict: {}".format(api_unique_code, response_http, response_dict))
+        return response_http, api_unique_code
     except requests.exceptions.ConnectionError:
         log.info("ConnectionError!! Sleep 15 secs")
         raise
@@ -85,34 +85,45 @@ def process_out_queue(lock, node_id):
                     break
                 url = prepare_url(config, edit["item"], other_node_url)
                 try:
-                    response_http, api_code = send_sync(edit, url)
+                    response_http, api_unique_code = send_sync(edit, url)
 
-                    if response_http == 201 and api_code == err_codes['SYNC_OK']:
-                        log.debug("POST successful, archiving this item to queue_2_sent")
-                        config.db.archive_edit(edit_rowid)
-                        config.db.delete_edit(edit_rowid)
-                        config.db.end_transaction()
-                    elif response_http == 404 and api_code == err_codes['NO_SHADOW']:
-                        log.info(err_codes['NO_SHADOW'])
-                        got_shadow, shadow = config.db.get_shadow(edit["item"],
-                                                      other_node_id,
-                                                      edit["other_node_rev"],
-                                                      edit["rev"])
-                        config.db.rollback_transaction()
+                    if response_http == 201:
+                        if api_unique_code == "queue_in/get_sync/201/done":
+                            log.debug("POST successful, archiving this item to queue_2_sent")
+                            config.db.archive_edit(edit_rowid)
+                            config.db.delete_edit(edit_rowid)
+                            config.db.end_transaction()
+                        elif api_unique_code == "queue_in/get_sync/201/ack":
+                            raise Exception("implement me!")
+                        else:
+                            raise Exception("implement me!")
+                    elif response_http == 404:
+                        if api_unique_code == "queue_in/get_sync/404/not_shadow":
+                            log.info(err_codes['NO_SHADOW'])
+                            got_shadow, shadow = config.db.get_shadow(edit["item"],
+                                                          other_node_id,
+                                                          edit["other_node_rev"],
+                                                          edit["rev"])
+                            config.db.rollback_transaction()
 
-                        shadow_json = {'rev': edit["rev"],
-                                       'other_node_rev': edit["other_node_rev"],
-                                       'shadow': ""}
+                            shadow_json = {'rev': edit["rev"],
+                                           'other_node_rev': edit["other_node_rev"],
+                                           'shadow': ""}
+                            if got_shadow:
+                                shadow_json['shadow'] = shadow
 
-                        if got_shadow:
-                            shadow_json['shadow'] = shadow
                             send_sync(shadow_json, url + "/shadow", use_put=True)
                         else:
-                            send_sync(shadow_json, url + "/shadow", use_put=True)
-                    elif response_http == 404 and api_code == err_codes['CHECK_REVS']:
-                        log.debug(err_codes['CHECK_REVS'])
-                        config.db.rollback_transaction()
-                        raise Exception("implement me!")
+                            raise Exception("implement me!")
+                    if response_http == 403:
+                        if api_unique_code == "queue_in/get_sync/403/no_match_revs":
+                            log.debug("queue_in/get_sync/403/no_match_revs")
+                            config.db.rollback_transaction()
+                            raise Exception("implement me!")
+                        elif api_unique_code == "queue_in/get_sync/403/check_crc_old":
+                            raise Exception("implement me!")
+                        else:
+                            raise Exception("implement me!")
                     else:
                         # raise for the rest of the codes
                         config.db.rollback_transaction()

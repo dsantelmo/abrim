@@ -7,26 +7,26 @@ import zlib
 from flask import jsonify
 
 
-def resp(api_unique_code, msg):
+def resp(api_unique_code, msg, resp_json=None):
     log.debug("RESPONSE: {} :: {}".format(api_unique_code, msg))
     log.debug("-----------------------------------------------")
-    response = jsonify({
-        'api_unique_code': api_unique_code,
-        'message': msg
-    })
+    if resp_json:
+        to_jsonify = {
+            'api_unique_code': api_unique_code,
+            'message': msg
+        }
+    else:
+        to_jsonify = {
+            'api_unique_code': api_unique_code,
+            'message': msg,
+            'resp_json': resp_json
+        }
+    response = jsonify(to_jsonify)
     try:
         # get HTTP code:
         response.status_code = int(api_unique_code.split('/')[2])
     except IndexError:
         response.status_code = 500
-    return response
-
-
-def resp_json(status_code , resp_json):
-    log.debug("RESPONSE: {}".format(resp_json))
-    log.debug("-----------------------------------------------")
-    response = jsonify(resp_json)
-    response.status_code = status_code
     return response
 
 
