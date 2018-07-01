@@ -69,6 +69,7 @@ def prepare_url(config_, item_id, other_node_url):
 
 def process_out_queue(lock, node_id):
     config = Config(node_id)
+    # config.db.sql_debug_trace(True)
 
     lock.acquire()
     log.debug("NODE ID: {}".format(config.node_id,))
@@ -80,18 +81,22 @@ def process_out_queue(lock, node_id):
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
                 config.db.start_transaction("process_out_queue")
-                edit_rowid, edit = config.db.get_first_queued_edit(other_node_id)
-                if not edit or not edit_rowid:
+
+                edit, item, m_rev, n_rev, rowid = get_first_queued_edit(config, other_node_id)
+                if not rowid:
                     break
-                url = prepare_url(config, edit["item"], other_node_url)
+
+                url = prepare_url(config, item, other_node_url)
                 try:
                     response_http, api_unique_code = send_sync(edit, url)
+
+                    response_http = int(response_http)
 
                     if response_http == 201:
                         if api_unique_code == "queue_in/get_sync/201/done":
                             log.debug("POST successful, archiving this item to queue_2_sent")
-                            config.db.archive_edit(edit_rowid)
-                            config.db.delete_edit(edit_rowid)
+                            config.db.archive_edit(rowid)
+                            config.db.delete_edit(rowid)
                             config.db.end_transaction()
                         elif api_unique_code == "queue_in/get_sync/201/ack":
                             raise Exception("implement me!")
@@ -99,23 +104,23 @@ def process_out_queue(lock, node_id):
                             raise Exception("implement me!")
                     elif response_http == 404:
                         if api_unique_code == "queue_in/get_sync/404/not_shadow":
-                            log.info(err_codes['NO_SHADOW'])
-                            got_shadow, shadow = config.db.get_shadow(edit["item"],
-                                                          other_node_id,
-                                                          edit["other_node_rev"],
-                                                          edit["rev"])
+                            log.info("queue_in/get_sync/404/not_shadow")
+                            got_shadow, shadow = config.db.get_shadow(item,
+                                                                      other_node_id,
+                                                                      m_rev,
+                                                                      n_rev)
                             config.db.rollback_transaction()
-
-                            shadow_json = {'rev': edit["rev"],
-                                           'other_node_rev': edit["other_node_rev"],
+                            shadow_json = {'n_rev': n_rev,
+                                           'm_rev': m_rev,
                                            'shadow': ""}
                             if got_shadow:
                                 shadow_json['shadow'] = shadow
+                                shad_http, shad_api_unique_code = send_sync(shadow_json, url + "/shadow", use_put=True)
 
-                            send_sync(shadow_json, url + "/shadow", use_put=True)
+                            log.debug("tried to send the shadow again")
                         else:
                             raise Exception("implement me!")
-                    if response_http == 403:
+                    elif response_http == 403:
                         if api_unique_code == "queue_in/get_sync/403/no_match_revs":
                             log.debug("queue_in/get_sync/403/no_match_revs")
                             config.db.rollback_transaction()
@@ -126,8 +131,9 @@ def process_out_queue(lock, node_id):
                             raise Exception("implement me!")
                     else:
                         # raise for the rest of the codes
+                        log.error("Undefined HTTP response: {} {}".format(response_http, api_unique_code))
                         config.db.rollback_transaction()
-                        raise ("Undefined HTTP response")  # fail for the rest of HTTP codes
+                        raise Exception("Undefined HTTP response")  # fail for the rest of HTTP codes
                 except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError, KeyError, json.decoder.JSONDecodeError) as err:
                     config.db.rollback_transaction()
                     log.debug(err)
@@ -143,6 +149,17 @@ def process_out_queue(lock, node_id):
         log.info("Nothing done! waiting 15 additional seconds")
         lock.release()
         time.sleep(15)
+
+
+def get_first_queued_edit(config, other_node_id):
+    rowid, edit = config.db.get_first_queued_edit(other_node_id)
+    if not edit or not rowid:
+        return None, None, None, None, None
+    else:
+        item = edit["item"]
+        n_rev = edit["n_rev"]
+        m_rev = edit["m_rev"]
+        return edit, item, m_rev, n_rev, rowid
 
 
 if __name__ == '__main__':

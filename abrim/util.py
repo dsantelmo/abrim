@@ -63,7 +63,7 @@ log = get_log(full_debug=False)
 def create_diff_edits(text, shadow):
     if text == shadow:
         log.debug("both texts are the same...")
-        return None
+        return ""
     log.debug("about to diff \"{}\" with \"{}\"".format(shadow, text,))
     diff_obj = diff_match_patch.diff_match_patch()
     diff_obj.Diff_Timeout = 1
