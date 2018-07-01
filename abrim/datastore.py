@@ -3,7 +3,7 @@ import random
 import sqlite3
 import sys
 
-from util import get_log, create_diff_edits, create_hash
+from util import get_log
 
 log = get_log(full_debug=False)
 
@@ -229,7 +229,7 @@ class DataStore(object):
     def add_known_node(self, node_id, url):
         insert = (node_id,
                   url)
-        self.cur.execute("""INSERT INTO nodes
+        self.cur.execute("""INSERT OR IGNORE INTO nodes
                            (id,
                             base_url)
                            VALUES (?,?)""", insert)
