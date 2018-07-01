@@ -5,7 +5,7 @@ import traceback
 import time
 from flask import Flask, request, abort
 from abrim.config import Config
-from abrim.util import get_log, patch_text, resp, resp_json, check_fields_in_dict, check_request_method, check_crc
+from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc
 
 
 log = get_log(full_debug=False)
