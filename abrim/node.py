@@ -13,7 +13,7 @@ def update_local_item(config, item_id, new_text=""):
     config.db.save_item(item_id, new_text)
 
     for other_node_id, _ in config.db.get_known_nodes():
-        n_rev, m_rev, old_shadow = config.db.get_lastest_rev_shadow(other_node_id, item_id)
+        n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
         n_rev += 1
         config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev)
 

@@ -244,38 +244,26 @@ class DataStore(object):
 
     # REV AND SHADOW
 
-    def get_lastest_rev_shadow(self, other_node_id, item_id):
+    def get_latest_rev_shadow(self, other_node_id, item_id):
         self.cur.execute("""SELECT shadow, n_rev, m_rev
                 FROM shadows
                 WHERE item = ?
                 AND other_node = ?
                 ORDER BY n_rev DESC LIMIT 1""", (item_id, other_node_id,))
         shadow = self.cur.fetchone()
-        log.debug("shadow from DB is: {}".format(shadow))
+
         if shadow is None:
-            self._log_debug_trans("shadow doesn't exist. Creating...")
+            self._log_debug_trans("shadow doesn't exist")
             n_rev = -1
             m_rev = 0
             shadow = ""
-            # insert = (item_id,
-            #           other_node_id,
-            #           n_rev,
-            #           m_rev,
-            #           shadow
-            #           )
-            # self.cur.execute("""INSERT INTO shadows
-            #                    (item, other_node, n_rev, m_rev, shadow)
-            #                    VALUES (?,?,?,?,?)""", insert)
-        else:
-            self._log_debug_trans("shadow exists")
-            try:
-                n_rev = shadow['n_rev']
-                m_rev = shadow['m_rev']
-                shadow = shadow['shadow']
-            except (TypeError, IndexError) as err:
-                log.error(err)
-                raise
-        return n_rev, m_rev, shadow
+            return n_rev, m_rev, shadow
+
+        try:
+            return shadow['n_rev'], shadow['m_rev'], shadow['shadow']
+        except (TypeError, IndexError) as err:
+            log.error(err)
+            raise
 
     def get_shadow(self, item, other_node_id, n_rev, m_rev):
         # if n_rev == 0 and m_rev == 0:
