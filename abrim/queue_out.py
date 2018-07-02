@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import multiprocessing
+import traceback
 import time
 import requests
 import json
@@ -93,15 +94,17 @@ def process_out_queue(lock, node_id):
                     response_http = int(response_http)
 
                     if response_http == 201:
-                        if api_unique_code == "queue_in/get_sync/201/done":
+                        if (
+                                api_unique_code == "queue_in/get_sync/201/done" or
+                                api_unique_code == "queue_in/get_sync/201/ack"):
                             log.debug("POST successful, archiving this item to queue_2_sent")
                             config.db.archive_edit(rowid)
                             config.db.delete_edit(rowid)
                             config.db.end_transaction()
-                        elif api_unique_code == "queue_in/get_sync/201/ack":
-                            raise Exception("implement me!")
+                            if api_unique_code == "queue_in/get_sync/201/ack":
+                                log.info("EVENT: remote node seems overloaded") #  TODO: save events
                         else:
-                            raise Exception("implement me!")
+                            raise Exception("implement me! 8")
                     elif response_http == 404:
                         if api_unique_code == "queue_in/get_sync/404/not_shadow":
                             log.info("queue_in/get_sync/404/not_shadow")
@@ -115,20 +118,24 @@ def process_out_queue(lock, node_id):
                                            'shadow': ""}
                             if got_shadow:
                                 shadow_json['shadow'] = shadow
-                                shad_http, shad_api_unique_code = send_sync(shadow_json, url + "/shadow", use_put=True)
 
-                            log.debug("tried to send the shadow again")
+                            log.debug("trying to send the shadow again")
+                            shad_http, shad_api_unique_code = send_sync(shadow_json, url + "/shadow", use_put=True)
+                            if shad_http == 201 and shad_api_unique_code == "queue_in/get_shadow/201/ack":
+                                log.info("EVENT: remote needed the shadow") #  TODO: save events
+                            else:
+                                raise Exception("implement me! 2")
                         else:
-                            raise Exception("implement me!")
+                            raise Exception("implement me! 3")
                     elif response_http == 403:
                         if api_unique_code == "queue_in/get_sync/403/no_match_revs":
                             log.debug("queue_in/get_sync/403/no_match_revs")
                             config.db.rollback_transaction()
-                            raise Exception("implement me!")
+                            raise Exception("implement me! 4")
                         elif api_unique_code == "queue_in/get_sync/403/check_crc_old":
-                            raise Exception("implement me!")
+                            raise Exception("implement me! 5")
                         else:
-                            raise Exception("implement me!")
+                            raise Exception("implement me! 6")
                     else:
                         # raise for the rest of the codes
                         log.error("Undefined HTTP response: {} {}".format(response_http, api_unique_code))
@@ -137,6 +144,14 @@ def process_out_queue(lock, node_id):
                 except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError, KeyError, json.decoder.JSONDecodeError) as err:
                     config.db.rollback_transaction()
                     log.debug(err)
+                    traceback.print_exc()
+                    log.debug("sleep 15 secs")
+                    time.sleep(15)
+                except Exception as err:
+                    config.db.rollback_transaction()
+                    log.error(err)
+                    traceback.print_exc()
+                    log.debug("sleep 15 secs")
                     time.sleep(15)
                 finally:
                     queue_limit -= 1
