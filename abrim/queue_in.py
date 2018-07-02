@@ -210,7 +210,7 @@ def _get_shadow(user_id, client_node_id, item_id):
     else:
         log.info("_get_shadow about to finish OK")
         config.db.end_transaction()
-        return resp("queue_in/get_sync/201/ack", "Sync acknowledged")
+        return resp("queue_in/get_shadow/201/ack", "Sync acknowledged")
 
 
 def _parse_args_helper():
