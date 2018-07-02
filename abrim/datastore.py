@@ -251,11 +251,12 @@ class DataStore(object):
                 AND other_node = ?
                 ORDER BY n_rev DESC LIMIT 1""", (item_id, other_node_id,))
         shadow = self.cur.fetchone()
+        log.debug("shadow from DB is: {}".format(shadow))
         if shadow is None:
-            # self._log_debug_trans("shadow doesn't exist. Creating...")
-            # n_rev = 0
-            # m_rev = 0
-            # shadow = ""
+            self._log_debug_trans("shadow doesn't exist. Creating...")
+            n_rev = -1
+            m_rev = 0
+            shadow = ""
             # insert = (item_id,
             #           other_node_id,
             #           n_rev,
@@ -265,7 +266,6 @@ class DataStore(object):
             # self.cur.execute("""INSERT INTO shadows
             #                    (item, other_node, n_rev, m_rev, shadow)
             #                    VALUES (?,?,?,?,?)""", insert)
-            return None, None, None
         else:
             self._log_debug_trans("shadow exists")
             try:
