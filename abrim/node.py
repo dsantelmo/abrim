@@ -43,8 +43,8 @@ if __name__ == "__main__":
     item_id_ = "item_1"
 
     update_local_item(config, item_id_, "")
-    time.sleep(2)
+    time.sleep(15)
     update_local_item(config, item_id_, "a new text")
-    time.sleep(2)
+    time.sleep(15)
     update_local_item(config, item_id_, "a newer text")
     sys.exit(0)

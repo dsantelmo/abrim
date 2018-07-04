@@ -72,16 +72,16 @@ def process_out_queue(lock, node_id):
     config = Config(node_id)
     # config.db.sql_debug_trace(True)
 
-    lock.acquire()
-    log.debug("NODE ID: {}".format(config.node_id,))
-    lock.release()
+    # lock.acquire()
+    # log.debug("NODE ID: {}".format(config.node_id,))
+    # lock.release()
 
     result = None
     for other_node_id, other_node_url in config.db.get_known_nodes():
         if other_node_url:
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
-                config.db.start_transaction("process_out_queue")
+                config.db.start_transaction()
 
                 edit, item, m_rev, n_rev, rowid = get_first_queued_edit(config, other_node_id)
                 if not rowid:
@@ -103,6 +103,7 @@ def process_out_queue(lock, node_id):
                             config.db.end_transaction()
                             if api_unique_code == "queue_in/get_sync/201/ack":
                                 log.info("EVENT: remote node seems overloaded") #  TODO: save events
+                            log.debug("-----------------------------------------------------------------")
                         else:
                             raise Exception("implement me! 8")
                     elif response_http == 404:
@@ -155,15 +156,17 @@ def process_out_queue(lock, node_id):
                     time.sleep(15)
                 finally:
                     queue_limit -= 1
+
+    config.db.end_transaction(True)
     if result:
         lock.acquire()
         log.info("one entry from queue 1 was correctly processed")
         lock.release()
     else:
         lock.acquire()
-        log.info("Nothing done! waiting 15 additional seconds")
+        # log.info("Nothing done! waiting 1 additional second")
         lock.release()
-        time.sleep(15)
+        time.sleep(1)
 
 
 def get_first_queued_edit(config, other_node_id):

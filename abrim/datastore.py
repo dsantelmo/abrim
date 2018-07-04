@@ -29,7 +29,7 @@ class DataStore(object):
             except AttributeError:
                 db_path = filename + '_error.sqlite'
         self.db_path = db_path
-        log.debug(self.db_path)
+        # log.debug(self.db_path)
 
     def drop_db(self):
         self.cur.execute("""SELECT name FROM sqlite_master WHERE type = 'table';
@@ -128,7 +128,7 @@ class DataStore(object):
 
         self.con.commit()
 
-        self.start_transaction("init the DB")
+        self.start_transaction()  # init the DB
         try:
             self.cur.execute("""SELECT id FROM nodes
                            WHERE base_url IS NULL""")
@@ -142,8 +142,8 @@ class DataStore(object):
                                (id,
                                 base_url)
                                VALUES (?,?)""", insert)
-            self._log_debug_trans("_init_db done")
-            self.end_transaction()
+            # self._log_debug_trans("_init_db done")
+            self.end_transaction(suppress_msg=True)
         except Exception as err:
             self._log_debug_trans("rollback in _init_db")
             log.error(err)
@@ -163,7 +163,7 @@ class DataStore(object):
         debug_msg = "{}" + str(msg)
         log.debug(debug_msg.format(self._get_trans_prefix()))
 
-    def start_transaction(self, msg=""):
+    def start_transaction(self, msg=None):
         if self.con.in_transaction:
             log.error("cannot start a transaction within a transaction. Rolling back!!")
             self.cur.execute("rollback")
@@ -175,15 +175,16 @@ class DataStore(object):
             edited_msg = ""
             if msg:
                 edited_msg = ": " + msg
-            self._log_debug_trans("transaction started{}".format(edited_msg))
+                self._log_debug_trans("transaction started{}".format(edited_msg))
         else:
             log.error("NOT in_transaction")
             raise Exception
 
-    def end_transaction(self):
+    def end_transaction(self, suppress_msg=False):
         if not self.con.in_transaction:
             log.debug("explicit end requested, but transaction already ended")
-        self._log_debug_trans("transaction ending")
+        if not suppress_msg:
+            self._log_debug_trans("transaction ending {}".format(suppress_msg))
         self.cur.execute("commit")
         self.con.commit()
         if self.con.in_transaction:
@@ -374,9 +375,10 @@ class DataStore(object):
                  ORDER BY n_rev ASC LIMIT 1""", (other_node_id,))
         edit_row = self.cur.fetchone()
         if not edit_row:
-            self._log_debug_trans("no edits")
             return None, None
         else:
+            log.debug("----------------------------------------------------------")
+            self._log_debug_trans("got edits")
             edit_rowid = edit_row["rowid"]
             edit = dict(edit_row)
             return edit_rowid, edit
