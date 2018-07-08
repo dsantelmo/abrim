@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # config = Config("node_1")
     config.db.add_known_node('node_2', "http://localhost:5002")
 
-    config.db.sql_debug_trace(True)
+    # config.db.sql_debug_trace(True)
 
     log.debug("NODE ID: {}".format(config.node_id,))
     log.debug("db_path: {}".format(config.db.db_path))
