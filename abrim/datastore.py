@@ -184,7 +184,7 @@ class DataStore(object):
         if not self.con.in_transaction:
             log.debug("explicit end requested, but transaction already ended")
         if not suppress_msg:
-            self._log_debug_trans("transaction ending {}".format(suppress_msg))
+            self._log_debug_trans("transaction ending")
         self.cur.execute("commit")
         self.con.commit()
         if self.con.in_transaction:

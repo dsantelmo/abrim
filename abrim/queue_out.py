@@ -46,7 +46,6 @@ def send_sync(edit, other_node_url, use_put=False):
         log.debug("API response: {} HTTP response: {} Dict: {}".format(api_unique_code, response_http, response_dict))
         return response_http, api_unique_code
     except requests.exceptions.ConnectionError:
-        log.info("ConnectionError!! Sleep 15 secs")
         raise
     except requests.exceptions.HTTPError as err:
         post_response = err.response.status_code
@@ -142,7 +141,11 @@ def process_out_queue(lock, node_id):
                         log.error("Undefined HTTP response: {} {}".format(response_http, api_unique_code))
                         config.db.rollback_transaction()
                         raise Exception("Undefined HTTP response")  # fail for the rest of HTTP codes
-                except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError, KeyError, json.decoder.JSONDecodeError) as err:
+                except (requests.exceptions.ConnectionError) as err:
+                    config.db.rollback_transaction()
+                    log.debug("ConnectionError: sleep 15 secs")
+                    time.sleep(15)
+                except (requests.exceptions.HTTPError, KeyError, json.decoder.JSONDecodeError) as err:
                     config.db.rollback_transaction()
                     log.debug(err)
                     traceback.print_exc()
