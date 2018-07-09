@@ -5,7 +5,7 @@ import traceback
 import time
 from flask import Flask, request, abort
 from abrim.config import Config
-from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc
+from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc, get_crc
 
 
 log = get_log(full_debug=False)
@@ -80,15 +80,15 @@ def _check_item_exists(item_id):
 
 
 def _save_item(item_id, new_text):
-    config.db.save_item(item_id, new_text)
+    config.db.save_item(item_id, new_text, get_crc(new_text))
 
 
-def _save_shadow(client_node_id, item_id, shadow, n_rev, m_rev):
-    config.db.save_new_shadow(client_node_id, item_id, shadow, n_rev, m_rev)
+def _save_shadow(client_node_id, item_id, shadow, n_rev, m_rev, crc):
+    config.db.save_new_shadow(client_node_id, item_id, shadow, n_rev, m_rev, crc)
 
 
-def _enqueue_patches(client_node_id, item_id, patches, n_rev, m_rev):
-    config.db.save_new_patches(client_node_id, item_id, patches, n_rev, m_rev)
+def _enqueue_patches(client_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc):
+    config.db.save_new_patches(client_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc)
 
 
 def _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev):
@@ -154,9 +154,9 @@ def _get_sync(user_id, client_node_id, item_id):
 
         n_rev += 1
 
-        _save_shadow(client_node_id, item_id, new_shadow, n_rev, m_rev)
+        _save_shadow(client_node_id, item_id, new_shadow, n_rev, m_rev, shadow_adler32)
 
-        _enqueue_patches(client_node_id, item_id, edits, n_rev, m_rev)
+        _enqueue_patches(client_node_id, item_id, edits, n_rev, m_rev, old_shadow_adler32, shadow_adler32)
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -167,7 +167,6 @@ def _get_sync(user_id, client_node_id, item_id):
         config.db.end_transaction()
 
     timeout = 5
-
     patch_done_json = _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev)
     if not patch_done_json:
         return resp("queue_in/get_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply")
@@ -200,7 +199,7 @@ def _get_shadow(user_id, client_node_id, item_id):
         if not item_exists:
             _save_item(item_id, shadow)
 
-        _save_shadow(client_node_id, item_id, shadow, r_json['n_rev'], r_json['m_rev'])
+        _save_shadow(client_node_id, item_id, shadow, r_json['n_rev'], r_json['m_rev'], get_crc(shadow))
 
     except Exception as err:
         config.db.rollback_transaction()

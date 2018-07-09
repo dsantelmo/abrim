@@ -76,7 +76,9 @@ def process_out_queue(lock, node_id):
     # lock.release()
 
     result = None
+    there_was_nodes = False
     for other_node_id, other_node_url in config.db.get_known_nodes():
+        there_was_nodes = True
         if other_node_url:
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
@@ -160,7 +162,8 @@ def process_out_queue(lock, node_id):
                 finally:
                     queue_limit -= 1
 
-    config.db.end_transaction(True)
+    if there_was_nodes:
+        config.db.end_transaction(True)
     if result:
         lock.acquire()
         log.info("one entry from queue 1 was correctly processed")

@@ -127,7 +127,12 @@ def check_crc(text, crc):
         return False
     else:
         return True
-    # TODO: think in maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
+
+
+def get_crc(text):
+    # maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
+    # is this premature optimization?
+    return zlib.adler32(text.encode())
 
 
 if __name__ == "__main__":

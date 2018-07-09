@@ -59,6 +59,7 @@ class DataStore(object):
            (id TEXT PRIMARY KEY NOT NULL,
             text TEXT,
             node TEXT NOT NULL,
+            crc INTEGER NOT NULL,
             FOREIGN KEY(node) REFERENCES nodes(id)
             );
 
@@ -68,6 +69,7 @@ class DataStore(object):
             n_rev INTEGER NOT NULL,
             m_rev INTEGER NOT NULL,
             shadow TEXT,
+            crc INTEGER NOT NULL,
             PRIMARY KEY(item, other_node, n_rev, m_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
@@ -108,6 +110,8 @@ class DataStore(object):
             n_rev INTEGER NOT NULL,
             m_rev INTEGER NOT NULL,
             patches TEXT,
+            old_crc INTEGER NOT NULL,
+            new_crc INTEGER NOT NULL,
             PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
@@ -120,6 +124,8 @@ class DataStore(object):
             n_rev INTEGER NOT NULL,
             m_rev INTEGER NOT NULL,
             patches TEXT,
+            old_crc INTEGER NOT NULL,
+            new_crc INTEGER NOT NULL,
             PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
@@ -182,11 +188,12 @@ class DataStore(object):
 
     def end_transaction(self, suppress_msg=False):
         if not self.con.in_transaction:
-            log.debug("explicit end requested, but transaction already ended")
-        if not suppress_msg:
-            self._log_debug_trans("transaction ending")
-        self.cur.execute("commit")
-        self.con.commit()
+            log.debug("explicit end requested, but transaction already ended or db is missing")
+        else:
+            if not suppress_msg:
+                self._log_debug_trans("transaction ending")
+            self.cur.execute("commit")
+            self.con.commit()
         if self.con.in_transaction:
             self._log_debug_trans("transaction NOT ended")
             raise Exception
@@ -299,27 +306,29 @@ class DataStore(object):
         else:
             return revs_row["n_rev"], revs_row["m_rev"]
 
-    def save_new_shadow(self, other_node_id, item_id, new_text, n_rev, m_rev):
+    def save_new_shadow(self, other_node_id, item_id, new_text, n_rev, m_rev, crc):
         self._log_debug_trans("about to save shadow: {} {} {}".format(item_id, other_node_id, n_rev))
         insert = (item_id,
                   other_node_id,
                   n_rev,
                   m_rev,
-                  new_text
+                  new_text,
+                  crc
                   )
         self.cur.execute("""INSERT OR REPLACE INTO shadows
-                           (item, other_node, n_rev, m_rev, shadow)
-                           VALUES (?,?,?,?,?)""", insert)
+                           (item, other_node, n_rev, m_rev, shadow, crc)
+                           VALUES (?,?,?,?,?,?)""", insert)
 
     # ITEM
 
-    def save_item(self, item_id, new_text):
+    def save_item(self, item_id, new_text, text_crc):
         self._log_debug_trans("about to save item: {}".format(item_id))
         self.cur.execute("""INSERT OR REPLACE INTO items
                        (id,
                         text,
-                        node)
-                       VALUES (?,?,?)""", (item_id, new_text, self.node_id))
+                        node,
+                        crc)
+                       VALUES (?,?,?,?)""", (item_id, new_text, self.node_id, text_crc))
         self._log_debug_trans("item {} updated".format(item_id))
 
     def get_item(self, item_id):
@@ -397,17 +406,19 @@ class DataStore(object):
 
     # PATCHES
 
-    def save_new_patches(self, other_node_id, item_id, patches, n_rev, m_rev):
+    def save_new_patches(self, other_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc):
         self._log_debug_trans("about to save patch: {} {} {}".format(item_id, other_node_id, n_rev))
         insert = (item_id,
                   other_node_id,
                   n_rev,
                   m_rev,
-                  patches
+                  patches,
+                  old_crc,
+                  new_crc
                   )
         self.cur.execute("""INSERT OR REPLACE INTO patches
-                           (item, other_node, n_rev, m_rev, patches)
-                           VALUES (?,?,?,?,?)""", insert)
+                           (item, other_node, n_rev, m_rev, patches, old_crc, new_crc)
+                           VALUES (?,?,?,?,?,?,?)""", insert)
 
     def check_if_patch_done(self, other_node_id, item_id, n_rev, m_rev):
         self.cur.execute("""SELECT n_rev, m_rev
