@@ -195,7 +195,7 @@ def _get_shadow(user_id, client_node_id, item_id):
         log.debug("request with the shadow seems ok, trying to save it")
         config.db.start_transaction("_get_shadow")
 
-        item_exists, item = _check_item_exists(item_id)
+        item_exists, item, _ = _check_item_exists(item_id)
         if not item_exists:
             _save_item(item_id, shadow)
 

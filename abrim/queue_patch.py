@@ -166,8 +166,29 @@ def server_patch_queue():
                     time.sleep(2)
 
 
-def implement_me(lock, node_id):
-    return True
+def _check_first_patch(config):
+    return config.db.check_first_patch()
+
+
+def _get_item(config, item_id):
+    return config.db.get_item(item_id)
+
+
+def process_out_patches(lock, node_id):
+    config = Config(node_id="node_2")
+    try:
+        item, other_node, n_rev, m_rev, patches, old_crc, new_crc = _check_first_patch(config)
+        _, text, item_crc = _get_item(config, item)
+
+        if old_crc == item_crc:
+            # original text from client is the same as current text from server, just apply the patch and finish
+            log.debug("CRCs match, client text and server text are the same")
+            raise Exception("implement me! 1")
+        else:
+            raise Exception("implement me! 2")
+    except TypeError:
+        # log.debug("no patches")
+        pass
 
 
 if __name__ == '__main__':
@@ -175,7 +196,7 @@ if __name__ == '__main__':
     node_id_ = "node_2"
     while True:
         lock = multiprocessing.Lock()
-        p = multiprocessing.Process(target=implement_me, args=(lock, node_id_, ))
+        p = multiprocessing.Process(target=process_out_patches, args=(lock, node_id_, ))
         p_name = p.name
         # log.debug(p_name + " starting up")
         p.start()

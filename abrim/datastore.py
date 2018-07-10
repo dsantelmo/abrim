@@ -332,7 +332,7 @@ class DataStore(object):
         self._log_debug_trans("item {} updated".format(item_id))
 
     def get_item(self, item_id):
-        self.cur.execute("""SELECT id, text
+        self.cur.execute("""SELECT text, crc
                   FROM items
                   WHERE
                   id = ? AND
@@ -343,8 +343,8 @@ class DataStore(object):
             self._log_debug_trans("no item found for {}".format(item_id, ))
             return False, None
         else:
-            self._log_debug_trans("{} found".format(item_id, ))
-            return True, item_row["text"]
+            return True, item_row["text"], item_row["crc"]
+
 
     # EDITS
 
@@ -436,3 +436,21 @@ class DataStore(object):
         else:
             self._log_debug_trans("server has correctly applied the patch")
             return True
+
+    def check_first_patch(self):
+        self.cur.execute("""SELECT item, other_node, n_rev, m_rev, patches, old_crc, new_crc
+                            FROM patches
+                            ORDER BY n_rev, m_rev ASC
+                            LIMIT 1""")
+        patch_row = self.cur.fetchone()
+        if not patch_row:
+            return None
+        else:
+            item = patch_row["item"]
+            other_node = patch_row["other_node"]
+            n_rev = patch_row["n_rev"]
+            m_rev = patch_row["m_rev"]
+            patches = patch_row["patches"]
+            old_crc = patch_row["old_crc"]
+            new_crc = patch_row["new_crc"]
+            return item, other_node, n_rev, m_rev, patches, old_crc, new_crc
