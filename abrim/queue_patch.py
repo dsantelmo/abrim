@@ -166,8 +166,8 @@ def server_patch_queue():
                     time.sleep(2)
 
 
-def _check_first_patch(config):
-    return config.db.check_first_patch()
+def _check_first_patch(config, other_node):
+    return config.db.check_first_patch(other_node)
 
 
 def _get_item(config, item_id):
@@ -175,20 +175,34 @@ def _get_item(config, item_id):
 
 
 def process_out_patches(lock, node_id):
-    config = Config(node_id="node_2")
-    try:
-        item, other_node, n_rev, m_rev, patches, old_crc, new_crc = _check_first_patch(config)
-        _, text, item_crc = _get_item(config, item)
+    config = Config(node_id)
 
-        if old_crc == item_crc:
-            # original text from client is the same as current text from server, just apply the patch and finish
-            log.debug("CRCs match, client text and server text are the same")
-            raise Exception("implement me! 1")
-        else:
-            raise Exception("implement me! 2")
-    except TypeError:
-        # log.debug("no patches")
-        pass
+    there_was_nodes = False
+    # to avoid one node hoarding the queue, process one patch a time for each node
+    for other_node_id in config.db.get_nodes_from_patches():
+        there_was_nodes = True
+        log.debug(other_node_id)
+        try:
+            item, other_node, n_rev, m_rev, patches, old_crc, new_crc = _check_first_patch(config, other_node_id)
+            if item:
+                _, text, item_crc = _get_item(config, item)
+
+                if old_crc == item_crc:
+                    # original text from client is the same as current text from server, just apply the patch and finish
+                    log.debug("CRCs match, client text and server text are the same")
+                    time.sleep(15)
+                    raise Exception("implement me! 1")
+                else:
+                    log.debug("CRCs don't match, different texts")
+                    time.sleep(15)
+                    raise Exception("implement me! 2")
+            else:
+                log.debug("no items for this node")
+                time.sleep(15)
+                raise Exception("implement me! 3")
+        except TypeError:
+            # log.debug("no patches")
+            pass
 
 
 if __name__ == '__main__':

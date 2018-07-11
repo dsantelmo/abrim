@@ -437,11 +437,28 @@ class DataStore(object):
             self._log_debug_trans("server has correctly applied the patch")
             return True
 
-    def check_first_patch(self):
+    def get_nodes_from_patches(self):
+        self.cur.execute("""SELECT DISTINCT other_node
+                            FROM patches
+                            GROUP BY other_node
+                            ORDER BY rowid""")
+        nodes = self.cur.fetchall()
+        if not nodes:
+            return None
+        else:
+            node_ids = []
+            for node in nodes:
+                node_ids.append(node["other_node"])
+            return node_ids
+
+
+
+    def check_first_patch(self, other_node):
         self.cur.execute("""SELECT item, other_node, n_rev, m_rev, patches, old_crc, new_crc
                             FROM patches
-                            ORDER BY n_rev, m_rev ASC
-                            LIMIT 1""")
+                            WHERE other_node = ?
+                            ORDER BY m_rev, n_rev, rowid ASC
+                            LIMIT 1""", (other_node,))
         patch_row = self.cur.fetchone()
         if not patch_row:
             return None
