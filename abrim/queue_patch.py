@@ -72,7 +72,7 @@ def process_out_patches(lock, node_id):
         log.debug("processed some patches")
     else:
         # log.debug("no processing done, sleeping for a bit")
-        time.sleep(5)
+        time.sleep(2)
 
 
 if __name__ == '__main__':
