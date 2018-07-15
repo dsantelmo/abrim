@@ -322,7 +322,7 @@ class DataStore(object):
     # ITEM
 
     def save_item(self, item_id, new_text, text_crc):
-        self._log_debug_trans("about to save item: {}".format(item_id))
+        self._log_debug_trans("about to save item: {} {}".format(item_id, text_crc))
         self.cur.execute("""INSERT OR REPLACE INTO items
                        (id,
                         text,
@@ -443,13 +443,11 @@ class DataStore(object):
                             GROUP BY other_node
                             ORDER BY rowid""")
         nodes = self.cur.fetchall()
-        if not nodes:
-            return None
-        else:
-            node_ids = []
+        node_ids = []
+        if nodes:
             for node in nodes:
                 node_ids.append(node["other_node"])
-            return node_ids
+        return node_ids
 
 
 
@@ -471,3 +469,21 @@ class DataStore(object):
             old_crc = patch_row["old_crc"]
             new_crc = patch_row["new_crc"]
             return item, other_node, n_rev, m_rev, patches, old_crc, new_crc
+
+    def archive_patch(self, item, other_node, n_rev):
+        self.cur.execute("""INSERT INTO patches_archive
+                           SELECT * FROM patches
+                           WHERE
+                           item = ? AND
+                           other_node = ? AND
+                           n_rev = ?
+                           """, (item, other_node, n_rev,))
+        self._log_debug_trans("edit rowid {} {} {} archived".format(item, other_node, n_rev))
+
+    def delete_patch(self, item, other_node, n_rev):
+        self.cur.execute("""DELETE FROM patches
+                           WHERE
+                           item = ? AND
+                           other_node = ? AND
+                           n_rev = ?""", (item, other_node, n_rev,))
+        self._log_debug_trans("edit rowid {} {} {} deleted".format(item, other_node, n_rev))
