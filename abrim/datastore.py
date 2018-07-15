@@ -341,7 +341,7 @@ class DataStore(object):
         item_row = self.cur.fetchone()
         if not item_row:
             self._log_debug_trans("no item found for {}".format(item_id, ))
-            return False, None
+            return False, None, None
         else:
             return True, item_row["text"], item_row["crc"]
 
