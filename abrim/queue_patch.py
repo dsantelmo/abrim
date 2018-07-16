@@ -15,7 +15,7 @@ def _get_item(config, item_id):
     return config.db.get_item(item_id)
 
 
-def _patch_server_text(config, item, other_node, n_rev, patches, text, old_crc, new_crc):
+def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc, new_crc):
     patched_text, success = patch_text(patches, text)
     if not success:
         log.info("patching failed. just archive the patch")
@@ -28,7 +28,7 @@ def _patch_server_text(config, item, other_node, n_rev, patches, text, old_crc, 
     config.db.start_transaction()
     _, _, item_crc_again = _get_item(config, item)
     # if the server text has not changed, save the new text
-    if old_crc == item_crc_again:
+    if item_crc == item_crc_again:
         config.db.save_item(item, patched_text, new_crc)
         config.db.archive_patch(item, other_node, n_rev)
         config.db.delete_patch(item, other_node, n_rev)
@@ -56,11 +56,13 @@ def process_out_patches(lock, node_id):
                 if old_crc == item_crc:
                     # original text from client is the same as current text from server, just apply the patch and finish
                     log.debug("CRCs match, client text and server text are the same")
-                    _patch_server_text(config, item, other_node, n_rev, patches, text, old_crc, new_crc)
                 else:
                     log.debug("CRCs don't match, different texts")
-                    time.sleep(15)
-                    raise Exception("implement me! 2")
+                sucessful_patch = _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc, new_crc)
+                if sucessful_patch:
+                    log.debug("patch ok")
+                else:
+                    log.error("patch failed")
             else:
                 log.debug("no items for this node")
                 time.sleep(15)
