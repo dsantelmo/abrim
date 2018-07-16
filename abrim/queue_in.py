@@ -214,31 +214,27 @@ def _get_shadow(user_id, client_node_id, item_id):
 
 def _parse_args_helper():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--id", help="Node ID")
     parser.add_argument("-p", "--port", help="Port")
     parser.add_argument("-l", "--logginglevel", help="Logging level")
     # parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
     args = parser.parse_args()
     if not args.port or int(args.port) <= 0:
-        return None, None
-    return args.port, args.logginglevel
+        return None, None, None
+    return args.id, args.port, args.logginglevel
 
 
 def _init():
     # import pdb; pdb.set_trace()
-    client_port = 0
-    args_port, args_logginglevel = _parse_args_helper()
-    if args_port and int(args_port) > 0:
-        client_port = int(args_port)
-        app.config['API_URL'] = "http://127.0.0.1:" + str( int(args_port)+1 )
-        app.config['NODE_PORT'] = client_port
-        # FIXME client side config
-        app.config['USER_ID'] = "the_user"
-        app.config['NODE_ID'] = "node" + args_port
-    else:
+    args_id, args_port, args_logginglevel = _parse_args_helper()
+    if not args_id:
+        print("use -i to specify a node id")
+        return None, None
+    if not args_port or int(args_port) <= 0:
         print("use -p to specify a port")
-        abort(500)
+        return None, None
     # before_request()
-    return client_port
+    return args_id, int(args_port)
 
 
 def __end():
@@ -259,8 +255,8 @@ def teardown_request(exception):
 
 if __name__ == "__main__":  # pragma: no cover
     log.info("queue_in started")
-    config = Config(node_id="node_2", drop_db=True)
-    client_port = _init()
+    node_id, client_port = _init()
+    config = Config(node_id=node_id, drop_db=True)
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
     # for pycharm debugging
