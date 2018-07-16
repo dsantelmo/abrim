@@ -5,6 +5,7 @@ import traceback
 import time
 import requests
 import json
+import argparse
 from abrim.util import get_log, resp
 from abrim.config import Config
 log = get_log(full_debug=False)
@@ -186,9 +187,34 @@ def get_first_queued_edit(config, other_node_id):
         return edit, item, m_rev, n_rev, rowid
 
 
+def _parse_args_helper():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--id", help="Node ID")
+    parser.add_argument("-p", "--port", help="Port")
+    parser.add_argument("-l", "--logginglevel", help="Logging level")
+    # parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
+    args = parser.parse_args()
+    if not args.port or int(args.port) <= 0:
+        return None, None, None
+    return args.id, args.port, args.logginglevel
+
+
+def _init():
+    # import pdb; pdb.set_trace()
+    args_id, args_port, args_logginglevel = _parse_args_helper()
+    if not args_id:
+        print("use -i to specify a node id")
+        return None, None
+    if not args_port or int(args_port) <= 0:
+        print("use -p to specify a port")
+        return None, None
+    # before_request()
+    return args_id, int(args_port)
+
+
 if __name__ == '__main__':
     log.info("queue_out started")
-    node_id_ = "node_1"
+    node_id_, client_port = _init()
     while True:
         lock = multiprocessing.Lock()
         p = multiprocessing.Process(target=process_out_queue, args=(lock, node_id_, ))
