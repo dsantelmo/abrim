@@ -2,6 +2,7 @@
 
 import sys
 import time
+import argparse
 from abrim.util import get_log, create_diff_edits, create_hash, get_crc
 from abrim.config import Config
 log = get_log(full_debug=False)
@@ -29,9 +30,34 @@ def update_local_item(config, item_id, new_text=""):
     config.db.end_transaction()
 
 
+def _parse_args_helper():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--id", help="Node ID")
+    parser.add_argument("-p", "--port", help="Port")
+    parser.add_argument("-l", "--logginglevel", help="Logging level")
+    # parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
+    args = parser.parse_args()
+    if not args.port or int(args.port) <= 0:
+        return None, None, None
+    return args.id, args.port, args.logginglevel
+
+
+def _init():
+    # import pdb; pdb.set_trace()
+    args_id, args_port, args_logginglevel = _parse_args_helper()
+    if not args_id:
+        print("use -i to specify a node id")
+        return None, None
+    if not args_port or int(args_port) <= 0:
+        print("use -p to specify a port")
+        return None, None
+    # before_request()
+    return args_id, int(args_port)
+
+
 if __name__ == "__main__":
-    config = Config("node_1", drop_db=True)
-    # config = Config("node_1")
+    node_id, client_port = _init()
+    config = Config(node_id=node_id, drop_db=True)
     config.db.add_known_node('node_2', "http://localhost:5002")
 
     # config.db.sql_debug_trace(True)
