@@ -3,7 +3,7 @@
 import multiprocessing
 import time
 from abrim.config import Config
-from abrim.util import get_log, patch_text
+from abrim.util import get_log, patch_text, args_init
 log = get_log(full_debug=False)
 
 
@@ -77,7 +77,7 @@ def process_out_patches(lock, node_id):
 
 if __name__ == '__main__':
     log.info("queue_patch started")
-    node_id_ = "node_2"
+    node_id_, client_port = args_init()
     while True:
         lock = multiprocessing.Lock()
         p = multiprocessing.Process(target=process_out_patches, args=(lock, node_id_, ))

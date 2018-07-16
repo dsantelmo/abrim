@@ -4,6 +4,7 @@ import sys
 import diff_match_patch
 import logging
 import zlib
+import argparse
 from flask import jsonify
 
 
@@ -133,6 +134,31 @@ def get_crc(text):
     # maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
     # is this premature optimization?
     return zlib.adler32(text.encode())
+
+
+def _parse_args_helper():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--id", help="Node ID")
+    parser.add_argument("-p", "--port", help="Port")
+    parser.add_argument("-l", "--logginglevel", help="Logging level")
+    # parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
+    args = parser.parse_args()
+    if not args.port or int(args.port) <= 0:
+        return None, None, None
+    return args.id, args.port, args.logginglevel
+
+
+def args_init():
+    # import pdb; pdb.set_trace()
+    args_id, args_port, args_logginglevel = _parse_args_helper()
+    if not args_id:
+        print("use -i to specify a node id")
+        return None, None
+    if not args_port or int(args_port) <= 0:
+        print("use -p to specify a port")
+        return None, None
+    # before_request()
+    return args_id, int(args_port)
 
 
 if __name__ == "__main__":

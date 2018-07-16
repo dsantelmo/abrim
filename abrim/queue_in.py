@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 
-import argparse
 import traceback
 import time
 from flask import Flask, request, abort
 from abrim.config import Config
-from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc, get_crc
+from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc, get_crc, args_init
 
 
 log = get_log(full_debug=False)
@@ -212,31 +211,6 @@ def _get_shadow(user_id, client_node_id, item_id):
         return resp("queue_in/get_shadow/201/ack", "Sync acknowledged")
 
 
-def _parse_args_helper():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--id", help="Node ID")
-    parser.add_argument("-p", "--port", help="Port")
-    parser.add_argument("-l", "--logginglevel", help="Logging level")
-    # parser.add_argument("-i", "--initdb", help="Init DB", action='store_true')
-    args = parser.parse_args()
-    if not args.port or int(args.port) <= 0:
-        return None, None, None
-    return args.id, args.port, args.logginglevel
-
-
-def _init():
-    # import pdb; pdb.set_trace()
-    args_id, args_port, args_logginglevel = _parse_args_helper()
-    if not args_id:
-        print("use -i to specify a node id")
-        return None, None
-    if not args_port or int(args_port) <= 0:
-        print("use -p to specify a port")
-        return None, None
-    # before_request()
-    return args_id, int(args_port)
-
-
 def __end():
     # db.close_db()
     pass
@@ -255,7 +229,7 @@ def teardown_request(exception):
 
 if __name__ == "__main__":  # pragma: no cover
     log.info("queue_in started")
-    node_id, client_port = _init()
+    node_id, client_port = args_init()
     config = Config(node_id=node_id, drop_db=True)
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
