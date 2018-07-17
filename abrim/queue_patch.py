@@ -3,7 +3,7 @@
 import multiprocessing
 import time
 from abrim.config import Config
-from abrim.util import get_log, patch_text, args_init
+from abrim.util import get_log, fuzzy_patch_text, args_init
 log = get_log(full_debug=False)
 
 
@@ -16,7 +16,7 @@ def _get_item(config, item_id):
 
 
 def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc, new_crc):
-    patched_text, success = patch_text(patches, text)
+    patched_text, success = fuzzy_patch_text(patches, text)
     if not success:
         log.info("patching failed. just archive the patch")
         config.db.start_transaction()

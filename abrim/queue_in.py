@@ -4,7 +4,7 @@ import traceback
 import time
 from flask import Flask, request, abort
 from abrim.config import Config
-from abrim.util import get_log, patch_text, resp, check_fields_in_dict, check_request_method, check_crc, get_crc, args_init
+from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_request_method, check_crc, get_crc, args_init
 
 
 log = get_log(full_debug=False)
@@ -24,7 +24,7 @@ def _patch_server_shadow(edits, shadow):
         log.debug("no shadow or patches, nothing to patch...")
         return "", True
     else:
-        new_shadow, patch_success = patch_text(edits, shadow)
+        new_shadow, patch_success = fragile_patch_text(edits, shadow)
         if not patch_success:
             log.debug("patching failed")
             return "", False
