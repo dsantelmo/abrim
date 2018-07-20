@@ -32,7 +32,7 @@ def _patch_server_shadow(edits, shadow):
             return new_shadow, patch_success
 
 
-def _check_request_ok(r_js):
+def _check_post_sync_request_ok(r_js):
     if not check_fields_in_dict(r_js, ('edits',)):
         log.debug("no edits")
     if not check_fields_in_dict(r_js, ('n_rev', 'm_rev', 'old_shadow_adler32', 'shadow_adler32',)):
@@ -122,7 +122,7 @@ def _post_sync(user_id, client_node_id, item_id):
         r_json = request.get_json()
 
         try:
-            n_rev, m_rev, old_shadow_adler32, shadow_adler32, edits = _check_request_ok(r_json)
+            n_rev, m_rev, old_shadow_adler32, shadow_adler32, edits = _check_post_sync_request_ok(r_json)
         except TypeError:
             return resp("queue_in/post_sync/405/check_req", "Malformed JSON request")
 
@@ -211,6 +211,32 @@ def _put_shadow(user_id, client_node_id, item_id):
         return resp("queue_in/put_shadow/201/ack", "Sync acknowledged")
 
 
+@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['GET'])
+def _get_text(user_id, client_node_id, item_id):
+    log.debug("-------------------------------------------------------------------------------")
+    log.debug("GET REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
+
+    try:
+        if not _check_permissions("to do"):  # TODO: implement me
+            return resp("queue_in/get_text/403/check_permissions", "you have no permissions for that")
+        if not check_request_method(request, 'GET'):
+            return resp("queue_in/get_text/405/check_request_post", "Use GET at this URL")
+
+        config.db.sql_debug_trace(True)
+        item_ok, item_text, item_crc = config.db.get_item(item_id)
+
+        if not item_ok:
+            return resp("queue_in/get_text/404/not_item", "Item not found")
+
+    except Exception as err:
+        log.error(err)
+        traceback.print_exc()
+        return resp("queue_in/get_text/500/transaction_exception", "Unknown error. Please report this")
+    else:
+        log.info("get_text about to finish OK")
+        return resp("queue_in/get_text/200/ok", "get_text OK", {"text": item_text, "crc": item_crc})
+
+
 def __end():
     # db.close_db()
     pass
@@ -230,7 +256,7 @@ def teardown_request(exception):
 if __name__ == "__main__":  # pragma: no cover
     log.info("queue_in started")
     node_id, client_port = args_init()
-    config = Config(node_id=node_id, drop_db=True)
+    config = Config(node_id=node_id)
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
     # for pycharm debugging

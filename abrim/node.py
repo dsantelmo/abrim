@@ -31,7 +31,7 @@ def update_local_item(config, item_id, new_text=""):
 
 if __name__ == "__main__":
     node_id, client_port = args_init()
-    config = Config(node_id=node_id, drop_db=True)
+    config = Config(node_id=node_id, drop_db=False)
     config.db.add_known_node('node_2', "http://localhost:5002")
 
     # config.db.sql_debug_trace(True)

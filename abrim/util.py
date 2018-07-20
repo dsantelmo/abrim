@@ -11,7 +11,7 @@ from flask import jsonify
 def resp(api_unique_code, msg, resp_json=None):
     log.debug("RESPONSE: {} :: {}".format(api_unique_code, msg))
     log.debug("-----------------------------------------------")
-    if resp_json:
+    if not resp_json:
         to_jsonify = {
             'api_unique_code': api_unique_code,
             'message': msg
@@ -20,7 +20,7 @@ def resp(api_unique_code, msg, resp_json=None):
         to_jsonify = {
             'api_unique_code': api_unique_code,
             'message': msg,
-            'resp_json': resp_json
+            'content': resp_json
         }
     response = jsonify(to_jsonify)
     try:
