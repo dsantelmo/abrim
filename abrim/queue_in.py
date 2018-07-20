@@ -108,48 +108,48 @@ def _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev):
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
-def _get_sync(user_id, client_node_id, item_id):
+def _post_sync(user_id, client_node_id, item_id):
     log.debug("-------------------------------------------------------------------------------")
-    log.debug("REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
+    log.debug("POST REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
 
     try:
         if not _check_permissions("to do"):  # TODO: implement me
-            return resp("queue_in/get_sync/403/check_permissions", "you have no permissions for that")
+            return resp("queue_in/post_sync/403/check_permissions", "you have no permissions for that")
 
         if not check_request_method(request, 'POST'):
-            return resp("queue_in/get_sync/405/check_request_post", "Use POST at this URL")
+            return resp("queue_in/post_sync/405/check_request_post", "Use POST at this URL")
 
         r_json = request.get_json()
 
         try:
             n_rev, m_rev, old_shadow_adler32, shadow_adler32, edits = _check_request_ok(r_json)
         except TypeError:
-            return resp("queue_in/get_sync/405/check_req", "Malformed JSON request")
+            return resp("queue_in/post_sync/405/check_req", "Malformed JSON request")
 
-        config.db.start_transaction("_get_sync")
+        config.db.start_transaction("_post_sync")
 
         if not _check_revs(item_id, client_node_id, n_rev, m_rev):
             config.db.rollback_transaction()
-            return resp("queue_in/get_sync/403/no_match_revs", "Revs don't match")
+            return resp("queue_in/post_sync/403/no_match_revs", "Revs don't match")
 
         got_shadow, shadow = _get_server_shadow(item_id, client_node_id, n_rev, m_rev)
         if not got_shadow:
             config.db.rollback_transaction()
-            return resp("queue_in/get_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
+            return resp("queue_in/post_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
 
         if not check_crc(shadow, old_shadow_adler32):
             config.db.rollback_transaction()
-            return resp("queue_in/get_sync/403/check_crc_old", "CRC of old shadow doesn't match")
+            return resp("queue_in/post_sync/403/check_crc_old", "CRC of old shadow doesn't match")
 
         new_shadow, patch_success = _patch_server_shadow(edits, shadow)
 
         if not patch_success:
             config.db.rollback_transaction()
-            return resp("queue_in/get_sync/500/shadow_patch_unsuccessful", "Failed to patch shadow")
+            return resp("queue_in/post_sync/500/shadow_patch_unsuccessful", "Failed to patch shadow")
 
         if not check_crc(new_shadow, shadow_adler32):
             config.db.rollback_transaction()
-            return resp("queue_in/get_sync/403/check_crc_new", "CRC of new shadow doesn't match")
+            return resp("queue_in/post_sync/403/check_crc_new", "CRC of new shadow doesn't match")
 
         n_rev += 1
 
@@ -161,15 +161,15 @@ def _get_sync(user_id, client_node_id, item_id):
         config.db.rollback_transaction()
         log.error(err)
         traceback.print_exc()
-        return resp("queue_in/get_sync/500/transaction_exception", "Unknown error. Please report this")
+        return resp("queue_in/post_sync/500/transaction_exception", "Unknown error. Please report this")
     else:
         config.db.end_transaction()
 
     timeout = 5
     patch_done_json = _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev)
     if not patch_done_json:
-        return resp("queue_in/get_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply")
-    return resp("queue_in/get_sync/201/done", "Sync done", patch_done_json)
+        return resp("queue_in/post_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply")
+    return resp("queue_in/post_sync/201/done", "Sync done", patch_done_json)
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])

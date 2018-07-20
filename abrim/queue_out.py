@@ -96,20 +96,20 @@ def process_out_queue(lock, node_id):
 
                     if response_http == 201:
                         if (
-                                api_unique_code == "queue_in/get_sync/201/done" or
-                                api_unique_code == "queue_in/get_sync/201/ack"):
+                                api_unique_code == "queue_in/post_sync/201/done" or
+                                api_unique_code == "queue_in/post_sync/201/ack"):
                             log.debug("POST successful, archiving this item to queue_2_sent")
                             config.db.archive_edit(rowid)
                             config.db.delete_edit(rowid)
                             config.db.end_transaction()
-                            if api_unique_code == "queue_in/get_sync/201/ack":
+                            if api_unique_code == "queue_in/post_sync/201/ack":
                                 log.info("EVENT: remote node seems overloaded") #  TODO: save events
                             log.debug("-----------------------------------------------------------------")
                         else:
                             raise Exception("implement me! 8")
                     elif response_http == 404:
-                        if api_unique_code == "queue_in/get_sync/404/not_shadow":
-                            log.info("queue_in/get_sync/404/not_shadow")
+                        if api_unique_code == "queue_in/post_sync/404/not_shadow":
+                            log.info("queue_in/post_sync/404/not_shadow")
                             got_shadow, shadow = config.db.get_shadow(item,
                                                                       other_node_id,
                                                                       m_rev,
@@ -130,11 +130,11 @@ def process_out_queue(lock, node_id):
                         else:
                             raise Exception("implement me! 3")
                     elif response_http == 403:
-                        if api_unique_code == "queue_in/get_sync/403/no_match_revs":
-                            log.debug("queue_in/get_sync/403/no_match_revs")
+                        if api_unique_code == "queue_in/post_sync/403/no_match_revs":
+                            log.debug("queue_in/post_sync/403/no_match_revs")
                             config.db.rollback_transaction()
                             raise Exception("implement me! 4")
-                        elif api_unique_code == "queue_in/get_sync/403/check_crc_old":
+                        elif api_unique_code == "queue_in/post_sync/403/check_crc_old":
                             raise Exception("implement me! 5")
                         else:
                             raise Exception("implement me! 6")
