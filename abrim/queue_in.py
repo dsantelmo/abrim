@@ -173,26 +173,26 @@ def _get_sync(user_id, client_node_id, item_id):
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
-def _get_shadow(user_id, client_node_id, item_id):
+def _put_shadow(user_id, client_node_id, item_id):
     log.debug("-------------------------------------------------------------------------------")
-    log.debug("REQUEST: /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
+    log.debug("PUT REQUEST: /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
     config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
 
     try:
         if not _check_permissions(config.item_edit):
-            return resp("queue_in/get_shadow/403/check_permissions", "you have no permissions for that")
+            return resp("queue_in/put_shadow/403/check_permissions", "you have no permissions for that")
 
         if not check_request_method(request, 'PUT'):
-            return resp("queue_in/get_shadow/405/check_request_put", "Use PUT at this URL")
+            return resp("queue_in/put_shadow/405/check_request_put", "Use PUT at this URL")
 
         r_json = request.get_json()
 
         check_shadow_ok, shadow = _check_shadow_request_ok(r_json)
         if not check_shadow_ok:
-            return resp("queue_in/get_shadow/405/check_req", "Malformed JSON request")
+            return resp("queue_in/put_shadow/405/check_req", "Malformed JSON request")
 
         log.debug("request with the shadow seems ok, trying to save it")
-        config.db.start_transaction("_get_shadow")
+        config.db.start_transaction("_put_shadow")
 
         item_exists, item, _ = _check_item_exists(item_id)
         if not item_exists:
@@ -204,11 +204,11 @@ def _get_shadow(user_id, client_node_id, item_id):
         config.db.rollback_transaction()
         log.error(err)
         traceback.print_exc()
-        return resp("queue_in/get_shadow/500/transaction_exception", "Unknown error. Please report this")
+        return resp("queue_in/put_shadow/500/transaction_exception", "Unknown error. Please report this")
     else:
-        log.info("_get_shadow about to finish OK")
+        log.info("_put_shadow about to finish OK")
         config.db.end_transaction()
-        return resp("queue_in/get_shadow/201/ack", "Sync acknowledged")
+        return resp("queue_in/put_shadow/201/ack", "Sync acknowledged")
 
 
 def __end():
