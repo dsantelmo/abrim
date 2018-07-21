@@ -118,10 +118,10 @@ def check_fields_in_dict(my_dict, fields):
     return is_ok
 
 
-def check_request_method(request, method):
-    if request.method == method:
-        return True
-    return False
+# def check_request_method(request, method):
+#     if request.method == method:
+#         return True
+#     return False
 
 
 def check_crc(text, crc):

@@ -4,7 +4,7 @@ import traceback
 import time
 from flask import Flask, request, abort
 from abrim.config import Config
-from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_request_method, check_crc, get_crc, args_init
+from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, args_init
 
 
 log = get_log(full_debug=False)
@@ -116,9 +116,6 @@ def _post_sync(user_id, client_node_id, item_id):
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/post_sync/403/check_permissions", "you have no permissions for that")
 
-        if not check_request_method(request, 'POST'):
-            return resp("queue_in/post_sync/405/check_request_post", "Use POST at this URL")
-
         r_json = request.get_json()
 
         try:
@@ -182,9 +179,6 @@ def _put_shadow(user_id, client_node_id, item_id):
         if not _check_permissions(config.item_edit):
             return resp("queue_in/put_shadow/403/check_permissions", "you have no permissions for that")
 
-        if not check_request_method(request, 'PUT'):
-            return resp("queue_in/put_shadow/405/check_request_put", "Use PUT at this URL")
-
         r_json = request.get_json()
 
         check_shadow_ok, shadow = _check_shadow_request_ok(r_json)
@@ -219,8 +213,6 @@ def _get_text(user_id, client_node_id, item_id):
     try:
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_text/403/check_permissions", "you have no permissions for that")
-        if not check_request_method(request, 'GET'):
-            return resp("queue_in/get_text/405/check_request_post", "Use GET at this URL")
 
         item_ok, item_text, item_crc = config.db.get_item(item_id)
 
@@ -246,8 +238,6 @@ def _get_items(user_id, client_node_id):
     try:
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_items/403/check_permissions", "you have no permissions for that")
-        if not check_request_method(request, 'GET'):
-            return resp("queue_in/get_items/405/check_request_post", "Use GET at this URL")
 
         # config.db.sql_debug_trace(True)
         items = config.db.get_items()
