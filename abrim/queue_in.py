@@ -222,7 +222,6 @@ def _get_text(user_id, client_node_id, item_id):
         if not check_request_method(request, 'GET'):
             return resp("queue_in/get_text/405/check_request_post", "Use GET at this URL")
 
-        config.db.sql_debug_trace(True)
         item_ok, item_text, item_crc = config.db.get_item(item_id)
 
         if not item_ok:
@@ -235,6 +234,33 @@ def _get_text(user_id, client_node_id, item_id):
     else:
         log.info("get_text about to finish OK")
         return resp("queue_in/get_text/200/ok", "get_text OK", {"text": item_text, "crc": item_crc})
+
+
+
+
+@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
+def _get_items(user_id, client_node_id):
+    log.debug("-------------------------------------------------------------------------------")
+    log.debug("GET REQUEST: /users/{}/nodes/{}/items".format(user_id, client_node_id))
+
+    try:
+        if not _check_permissions("to do"):  # TODO: implement me
+            return resp("queue_in/get_items/403/check_permissions", "you have no permissions for that")
+        if not check_request_method(request, 'GET'):
+            return resp("queue_in/get_items/405/check_request_post", "Use GET at this URL")
+
+        # config.db.sql_debug_trace(True)
+        items = config.db.get_items()
+        if not items:
+            return resp("queue_in/get_items/404/not_items", "No items")
+
+    except Exception as err:
+        log.error(err)
+        traceback.print_exc()
+        return resp("queue_in/get_items/500/transaction_exception", "Unknown error. Please report this")
+    else:
+        log.info("get_text about to finish OK")
+        return resp("queue_in/get_items/200/ok", "get_text OK", items)
 
 
 def __end():
