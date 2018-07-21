@@ -4,6 +4,7 @@ import multiprocessing
 import time
 from abrim.config import Config
 from abrim.util import get_log, fuzzy_patch_text, args_init
+from abrim.queue_in import update_item
 log = get_log(full_debug=False)
 
 
@@ -29,7 +30,8 @@ def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc,
     _, _, item_crc_again = _get_item(config, item)
     # if the server text has not changed, save the new text
     if item_crc == item_crc_again:
-        config.db.save_item(item, patched_text, new_crc)
+        # config.db.save_item(item, patched_text, new_crc)
+        update_item(config, item, patched_text)
         config.db.archive_patch(item, other_node, n_rev)
         config.db.delete_patch(item, other_node, n_rev)
         config.db.end_transaction()

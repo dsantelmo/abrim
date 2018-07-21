@@ -89,10 +89,6 @@ def _check_item_exists(item_id):
     return config.db.get_item(item_id)
 
 
-def _save_item(item_id, new_text):
-    config.db.save_item(item_id, new_text, get_crc(new_text))
-
-
 def _save_shadow(client_node_id, item_id, shadow, n_rev, m_rev, crc):
     config.db.save_new_shadow(client_node_id, item_id, shadow, n_rev, m_rev, crc)
 
@@ -201,9 +197,11 @@ def _put_shadow(user_id, client_node_id, item_id):
 
         item_exists, item, _ = _check_item_exists(item_id)
         if not item_exists:
-            _save_item(item_id, shadow)
+            # _save_item(item_id, shadow)
+            update_item(config, item_id, shadow)
 
-        _save_shadow(client_node_id, item_id, shadow, r_json['n_rev'], r_json['m_rev'], get_crc(shadow))
+        else:
+            _save_shadow(client_node_id, item_id, shadow, r_json['n_rev'], r_json['m_rev'], get_crc(shadow))
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -257,21 +255,7 @@ def _put_text(user_id, client_node_id, item_id):
         log.debug("request with the text seems ok, trying to save it")
         config.db.start_transaction("_put_text")
 
-        config.db.save_item(item_id, new_text, get_crc(new_text))
-
-        for other_node_id, _ in config.db.get_known_nodes():
-            n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
-            n_rev += 1
-            config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, get_crc(new_text))
-
-            diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
-            if n_rev == 0 or diffs:
-                old_hash = create_hash(old_shadow)
-                new_hash = create_hash(new_text)
-                log.debug("old_hash: {}, new_hash: {}, diffs: {}".format(old_hash, new_hash, diffs))
-                config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev)
-            else:
-                log.warn("no diffs. Nothing done!")
+        update_item(config, item_id, new_text)
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -282,6 +266,23 @@ def _put_text(user_id, client_node_id, item_id):
         log.info("_put_text about to finish OK")
         config.db.end_transaction()
     return resp("queue_in/put_text/200/ok", "PUT OK")
+
+
+def update_item(config, item_id, new_text):
+    config.db.save_item(item_id, new_text, get_crc(new_text))
+    for other_node_id, _ in config.db.get_known_nodes():
+        n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
+        n_rev += 1
+        config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, get_crc(new_text))
+
+        diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
+        if n_rev == 0 or diffs:
+            old_hash = create_hash(old_shadow)
+            new_hash = create_hash(new_text)
+            log.debug("old_hash: {}, new_hash: {}, diffs: {}".format(old_hash, new_hash, diffs))
+            config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev)
+        else:
+            log.warn("no diffs. Nothing done!")
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
