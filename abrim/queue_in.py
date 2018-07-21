@@ -114,6 +114,22 @@ def _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev):
     return patch_done
 
 
+def update_item(config, item_id, new_text):
+    config.db.save_item(item_id, new_text, get_crc(new_text))
+    for other_node_id, _ in config.db.get_known_nodes():
+        n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
+        n_rev += 1
+        config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, get_crc(new_text))
+        diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
+        if n_rev == 0 or diffs:
+            old_hash = create_hash(old_shadow)
+            new_hash = create_hash(new_text)
+            log.debug("old_hash: {}, new_hash: {}, diffs: {}".format(old_hash, new_hash, diffs))
+            config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev)
+        else:
+            log.warn("no diffs. Nothing done!")
+
+
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 def _post_sync(user_id, client_node_id, item_id):
     log.debug("-------------------------------------------------------------------------------")
@@ -240,7 +256,7 @@ def _get_text(user_id, client_node_id, item_id):
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['PUT'])
 def _put_text(user_id, client_node_id, item_id):
     log.debug("-------------------------------------------------------------------------------")
-    log.debug("PUTT REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
+    log.debug("PUT REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
 
     try:
         if not _check_permissions("to do"):  # TODO: implement me
@@ -266,23 +282,6 @@ def _put_text(user_id, client_node_id, item_id):
         log.info("_put_text about to finish OK")
         config.db.end_transaction()
     return resp("queue_in/put_text/200/ok", "PUT OK")
-
-
-def update_item(config, item_id, new_text):
-    config.db.save_item(item_id, new_text, get_crc(new_text))
-    for other_node_id, _ in config.db.get_known_nodes():
-        n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
-        n_rev += 1
-        config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, get_crc(new_text))
-
-        diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
-        if n_rev == 0 or diffs:
-            old_hash = create_hash(old_shadow)
-            new_hash = create_hash(new_text)
-            log.debug("old_hash: {}, new_hash: {}, diffs: {}".format(old_hash, new_hash, diffs))
-            config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev)
-        else:
-            log.warn("no diffs. Nothing done!")
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
