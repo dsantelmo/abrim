@@ -346,12 +346,12 @@ class DataStore(object):
             return True, item_row["text"], item_row["crc"]
 
     def get_items(self):
-        self.cur.execute("""SELECT id, text, node, crc 
+        self.cur.execute("""SELECT id, node, crc 
                             FROM items
                             ORDER BY id, node""")
         items = []
         for item in self.cur.fetchall():
-            items.append({"id": item["id"], "text": item["text"], "node": item["node"], "crc": item["crc"], })
+            items.append({"id": item["id"], "node": item["node"], "crc": item["crc"], })
         return items
 
     # EDITS
