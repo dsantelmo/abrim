@@ -4,8 +4,8 @@ import traceback
 import time
 from flask import Flask, request, abort
 from abrim.config import Config
-from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, args_init
-
+from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
+                       create_hash, args_init
 
 log = get_log(full_debug=False)
 
@@ -56,6 +56,17 @@ def _check_shadow_request_ok(r_json):
         log.error("no shadow in request")
         return False, _
     return True, r_json['shadow']
+
+
+def _check_text_request_ok(r_json):
+    if not check_fields_in_dict(r_json, ('text',)):
+        return False, _
+    try:
+        log.debug("text: {:.30}...".format(r_json['text'].replace('\n', ' ')))
+    except KeyError:
+        log.error("no shadow in request")
+        return False, _
+    return True, r_json['text']
 
 
 def _check_revs(item_id, client_node_id, n_rev, m_rev):
@@ -228,6 +239,49 @@ def _get_text(user_id, client_node_id, item_id):
         return resp("queue_in/get_text/200/ok", "get_text OK", {"text": item_text, "crc": item_crc})
 
 
+@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['PUT'])
+def _put_text(user_id, client_node_id, item_id):
+    log.debug("-------------------------------------------------------------------------------")
+    log.debug("PUTT REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
+
+    try:
+        if not _check_permissions("to do"):  # TODO: implement me
+            return resp("queue_in/put_text/403/check_permissions", "you have no permissions for that")
+
+        r_json = request.get_json()
+
+        check_text_ok, new_text = _check_text_request_ok(r_json)
+        if not check_text_ok:
+            return resp("queue_in/put_text/405/check_req", "Malformed JSON request")
+
+        log.debug("request with the text seems ok, trying to save it")
+        config.db.start_transaction("_put_text")
+
+        config.db.save_item(item_id, new_text, get_crc(new_text))
+
+        for other_node_id, _ in config.db.get_known_nodes():
+            n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
+            n_rev += 1
+            config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, get_crc(new_text))
+
+            diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
+            if n_rev == 0 or diffs:
+                old_hash = create_hash(old_shadow)
+                new_hash = create_hash(new_text)
+                log.debug("old_hash: {}, new_hash: {}, diffs: {}".format(old_hash, new_hash, diffs))
+                config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev)
+            else:
+                log.warn("no diffs. Nothing done!")
+
+    except Exception as err:
+        config.db.rollback_transaction()
+        log.error(err)
+        traceback.print_exc()
+        return resp("queue_in/put_text/500/transaction_exception", "Unknown error. Please report this")
+    else:
+        log.info("_put_text about to finish OK")
+        config.db.end_transaction()
+    return resp("queue_in/put_text/200/ok", "PUT OK")
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
