@@ -2,6 +2,7 @@
 
 import subprocess
 import threading
+import time
 from abrim.util import args_init
 
 def output_reader(proc, prefix):
@@ -18,8 +19,7 @@ def main():
 
     try:
         while True:
-            pass
-        # time.sleep(0.2)
+            time.sleep(0.1)
         #
         # for i in range(600):
         #     #print("test")

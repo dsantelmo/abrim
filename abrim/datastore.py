@@ -2,6 +2,7 @@ import os
 import random
 import sqlite3
 import sys
+import uuid
 
 from util import get_log
 
@@ -140,7 +141,7 @@ class DataStore(object):
                            WHERE base_url IS NULL""")
             node_uuid = self.cur.fetchone()
             if node_uuid is None:
-                node_uuid = "node_1"  # uuid.uuid4().hex
+                node_uuid = uuid.uuid4().hex
                 insert = (node_uuid,
                           None
                           )
@@ -197,6 +198,12 @@ class DataStore(object):
         if self.con.in_transaction:
             self._log_debug_trans("transaction NOT ended")
             raise Exception
+
+    def check_transaction(self):
+        if self.con.in_transaction:
+            return True
+        else:
+            return False
 
     def rollback_transaction(self, msg=""):
         if self.con.in_transaction:

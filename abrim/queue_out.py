@@ -76,14 +76,11 @@ def process_out_queue(lock, node_id):
     # lock.release()
 
     result = None
-    there_was_nodes = False
     for other_node_id, other_node_url in config.db.get_known_nodes():
-        there_was_nodes = True
         if other_node_url:
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
                 config.db.start_transaction()
-
                 edit, item, m_rev, n_rev, rowid = get_first_queued_edit(config, other_node_id)
                 if not rowid:
                     break
@@ -162,7 +159,7 @@ def process_out_queue(lock, node_id):
                 finally:
                     queue_limit -= 1
 
-    if there_was_nodes:
+    if config.db.check_transaction():
         config.db.end_transaction(True)
     if result:
         lock.acquire()
