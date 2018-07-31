@@ -3,7 +3,7 @@
 import subprocess
 import threading
 import time
-import sys
+import webbrowser
 from abrim.util import args_init
 
 def output_reader(proc, prefix):
@@ -18,6 +18,8 @@ def main():
     proc_queue_in, thread_queue_in = launch_subprocess('input.py', "INPUT", node_id, client_port + 1)
     proc_queue_out, thread_queue_out = launch_subprocess('out.py', "OUT__", node_id, client_port + 1)
     proc_queue_patch, thread_queue_patch = launch_subprocess('patch.py', "PATCH", node_id, client_port + 1)
+
+    webbrowser.open_new_tab("http://localhost:" + str(client_port) + "/")
 
     try:
         while True:

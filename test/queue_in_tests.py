@@ -5,7 +5,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # FIXME use pathlib
 
-from abrim import node, queue_in
+from abrim import node, input
 
 
 # to test:
@@ -79,7 +79,7 @@ class TestNode(TestCase):
         parsed_req = (item_action, item_rev, item_create_date, item_patches, old_shadow_adler32, shadow_adler32)
 
         self.assertEqual(
-            queue_in.parse_req(req_json),
+            input.parse_req(req_json),
             parsed_req
         )
 
@@ -92,7 +92,7 @@ class TestNode(TestCase):
         self.config.item_node_id = "node_1"
         self.config.item_rev = 0
         warnings.simplefilter("ignore") # suppress "ResourceWarning: unclosed <ssl.SSLSocket..." warning
-        self.assertTrue(queue_in.server_create_item(self.config))
+        self.assertTrue(input.server_create_item(self.config))
 
     def test_server_update_item(self):
         self.config.item_user_id = "user_1"
@@ -108,4 +108,4 @@ class TestNode(TestCase):
           tex
         """
         warnings.simplefilter("ignore") # suppress "ResourceWarning: unclosed <ssl.SSLSocket..." warning
-        self.assertTrue(queue_in.server_update_item(self.config))
+        self.assertTrue(input.server_update_item(self.config))
