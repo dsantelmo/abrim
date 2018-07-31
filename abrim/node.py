@@ -3,6 +3,7 @@
 import subprocess
 import threading
 import time
+import sys
 from abrim.util import args_init
 
 def output_reader(proc, prefix):
@@ -13,9 +14,10 @@ def output_reader(proc, prefix):
 def main():
     node_id, client_port = args_init()
 
-    proc_queue_in, thread_queue_in = launch_subprocess('queue_in.py', node_id, client_port)
-    proc_queue_out, thread_queue_out = launch_subprocess('queue_out.py', node_id, client_port)
-    proc_queue_patch, thread_queue_patch = launch_subprocess('queue_patch.py', node_id, client_port)
+    proc_ui, thread_ui = launch_subprocess('ui.py', "UI___", node_id, client_port)
+    proc_queue_in, thread_queue_in = launch_subprocess('input.py', "INPUT", node_id, client_port + 1)
+    proc_queue_out, thread_queue_out = launch_subprocess('out.py', "OUT__", node_id, client_port + 1)
+    proc_queue_patch, thread_queue_patch = launch_subprocess('patch.py', "PATCH", node_id, client_port + 1)
 
     try:
         while True:
@@ -27,10 +29,12 @@ def main():
     finally:
         # This is in 'finally' so that we can terminate the child if something
         # goes wrong
+        proc_terminate(proc_ui)
         proc_terminate(proc_queue_in)
         proc_terminate(proc_queue_out)
         proc_terminate(proc_queue_patch)
 
+    thread_ui.join()
     thread_queue_in.join()
     thread_queue_out.join()
     thread_queue_patch.join()
@@ -45,14 +49,17 @@ def proc_terminate(my_proc):
         print('subprocess did not terminate in time')
 
 
-def launch_subprocess(script, node_id, port):
-    my_proc = subprocess.Popen(['py', '-3', '-u', str(script), '-i', str(node_id), '-p', str(port)],
+def launch_subprocess(script, prefix, node_id, port=None):
+    popen = ['py', '-3', '-u', str(script), '-i', str(node_id)]
+    if port:
+        popen.extend(['-p', str(port)])
+
+    my_proc = subprocess.Popen(popen,
                                      stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT)
-    my_thread = threading.Thread(target=output_reader, args=(my_proc, script))
+    my_thread = threading.Thread(target=output_reader, args=(my_proc, prefix))
     my_thread.start()
     return my_proc, my_thread
-
 
 if __name__ == '__main__':
     main()
