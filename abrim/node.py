@@ -6,6 +6,7 @@ import time
 import webbrowser
 from abrim.util import args_init
 
+
 def output_reader(proc, prefix):
     for line in iter(proc.stdout.readline, b''):
         print('{0}: {1}'.format(prefix, line.decode('utf-8')), end='')
