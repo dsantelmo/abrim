@@ -25,10 +25,10 @@ class Config(object):
         else:
             config_folder_path = "~/.config/{}".format(name, )
 
-        config_folder = Path(config_folder_path)
-        config_file_path = config_folder / "abrim_config.ini"
+        self.config_folder = Path(config_folder_path)
+        self.config_file_path = config_folder / "abrim_config.ini"
 
-        if config_file_path.exists():
+        if self.config_file_path.exists():
             log.debug("trying to load config from {}".format(config_file_path, ))
             # create node id if it doesn't exist
             # node_id = uuid.uuid4().hex
