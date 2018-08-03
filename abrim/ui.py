@@ -2,8 +2,8 @@
 
 import traceback
 import time
-from flask import Flask, render_template
-import flask_login
+from flask import Flask, render_template, redirect, url_for
+from flask_login import LoginManager, current_user
 from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
                        create_hash, args_init
@@ -31,11 +31,15 @@ def teardown_request(exception):
 
 @app.route('/', methods=['GET'])
 def _root():
-    if not flask_login.current_user.is_authenticated:
-         return render_template("login.html")
+    if not current_user.is_authenticated:
+        return redirect(url_for('_login'))
     return render_template('client.html')
 
-
+@app.route('/login', methods=['GET'])
+def _login():
+    if  current_user.is_authenticated:
+        return redirect(url_for('_root'))
+    return render_template("login.html")
 
 if __name__ == "__main__":  # pragma: no cover
     log.info("ui started")
@@ -45,8 +49,7 @@ if __name__ == "__main__":  # pragma: no cover
     # app.run(host='0.0.0.0', port=client_port)
     # for pycharm debugging
 
-    login_manager = flask_login.LoginManager()
-    login_manager.init_app(app)
+    login = LoginManager(app)
 
     app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=False, use_reloader=False)
     __end()
