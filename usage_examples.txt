@@ -1,0 +1,14 @@
+# usage examples
+
+# run one one
+ABRIM_NODE_ID=node_1 python3 abrim/input.py
+
+# list items
+curl http://127.0.0.1:5000/users/user_1/nodes/node_1/items
+
+# put new item
+curl -X PUT -H "Content-Type: application/json" -d '{"text":"test ok"}' http://127.0.0.1:5000/users/user_1/nodes/node_1/items/item_1
+
+# get item
+curl http://127.0.0.1:5000/users/user_1/nodes/node_1/items/item_1
+
