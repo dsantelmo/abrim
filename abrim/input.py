@@ -132,6 +132,7 @@ def update_item(config, item_id, new_text):
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 def _post_sync(user_id, client_node_id, item_id):
+    config = g.config
     log.debug("-------------------------------------------------------------------------------")
     log.debug("POST REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
 
@@ -194,6 +195,7 @@ def _post_sync(user_id, client_node_id, item_id):
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
 def _put_shadow(user_id, client_node_id, item_id):
+    config = g.config
     log.debug("-------------------------------------------------------------------------------")
     log.debug("PUT REQUEST: /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
     config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
@@ -256,6 +258,7 @@ def _get_text(user_id, client_node_id, item_id):
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['PUT'])
 def _put_text(user_id, client_node_id, item_id):
+    config = g.config
     log.debug("-------------------------------------------------------------------------------")
     log.debug("PUT REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
 
@@ -287,6 +290,7 @@ def _put_text(user_id, client_node_id, item_id):
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
 def _get_items(user_id, client_node_id):
+    config = g.config
     log.debug("-------------------------------------------------------------------------------")
     log.debug("GET REQUEST: /users/{}/nodes/{}/items".format(user_id, client_node_id))
 
