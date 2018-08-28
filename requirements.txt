@@ -1,4 +1,4 @@
 appdirs
 diff-match-patch
-# Flask
-# requests
+Flask
+requests
