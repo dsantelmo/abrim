@@ -14,22 +14,22 @@ class Config(object):
         author = "DST"
 
         if sys.platform == 'darwin':
-            config_folder_path = "~/Library/Application Support/{}".format(name, )
+            self.config_folder_path = "~/Library/Application Support/{}".format(name, )
         elif sys.platform == 'win32':
             try:
                 appdata = os.environ['APPDATA']
-                config_folder_path = "{}/{}/{}".format(appdata, author, name, )
+                self.config_folder_path = "{}/{}/{}".format(appdata, author, name, )
             except KeyError:
                 log.error("I think this is a Windows OS and %APPDATA% variable is missing")
                 raise
         else:
-            config_folder_path = "~/.config/{}".format(name, )
+            self.config_folder_path = "~/.config/{}".format(name, )
 
-        self.config_folder = Path(config_folder_path)
-        self.config_file_path = config_folder / "abrim_config.ini"
+        self.config_folder = Path(self.config_folder_path)
+        self.config_file_path = self.config_folder / "abrim_config.ini"
 
         if self.config_file_path.exists():
-            log.debug("trying to load config from {}".format(config_file_path, ))
+            log.debug("trying to load config from {}".format(self.config_file_path, ))
             # create node id if it doesn't exist
             # node_id = uuid.uuid4().hex
             raise Exception  # FIXME: add configparser

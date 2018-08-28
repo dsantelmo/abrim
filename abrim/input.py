@@ -2,7 +2,7 @@
 
 import traceback
 import time
-from flask import Flask, request, abort
+from flask import Flask, g, request, abort
 from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
                        create_hash, args_init
@@ -232,6 +232,7 @@ def _put_shadow(user_id, client_node_id, item_id):
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['GET'])
 def _get_text(user_id, client_node_id, item_id):
+    config = g.config
     log.debug("-------------------------------------------------------------------------------")
     log.debug("GET REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
 
@@ -315,7 +316,9 @@ def __end():
 @app.before_request
 def before_request():
     # db.prepare_db_path(app.config['DB_PATH'])
-    pass
+    config = Config(node_id=app.config['NODE_ID'])
+    g.config = config
+    #pass
 
 
 @app.teardown_request
@@ -326,7 +329,8 @@ def teardown_request(exception):
 if __name__ == "__main__":  # pragma: no cover
     log.info("queue_in started")
     node_id, client_port = args_init()
-    config = Config(node_id=node_id)
+    if 'NODE_ID' not in app.config:
+        app.config['NODE_ID'] = node_id
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
     # for pycharm debugging

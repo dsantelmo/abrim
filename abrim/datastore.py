@@ -193,7 +193,7 @@ class DataStore(object):
         else:
             if not suppress_msg:
                 self._log_debug_trans("transaction ending")
-            self.cur.execute("commit")
+            #self.cur.execute("commit")
             self.con.commit()
         if self.con.in_transaction:
             self._log_debug_trans("transaction NOT ended")
@@ -235,7 +235,8 @@ class DataStore(object):
         self.db_path = ""
         self.get_db_path()
         with sqlite3.connect(self.db_path) as con:
-            con.isolation_level = None
+            #con.isolation_level = None
+            con.isolation_level = 'EXCLUSIVE'
             con.row_factory = sqlite3.Row
             self._init_db(con, drop_db)
 
@@ -353,7 +354,7 @@ class DataStore(object):
             return True, item_row["text"], item_row["crc"]
 
     def get_items(self):
-        self.cur.execute("""SELECT id, node, crc 
+        self.cur.execute("""SELECT id, node, crc
                             FROM items
                             ORDER BY id, node""")
         items = []
@@ -442,7 +443,7 @@ class DataStore(object):
                  item = ? AND
                  other_node = ? AND
                  n_rev = ? AND
-                 m_rev = ? 
+                 m_rev = ?
                  LIMIT 1""", (item_id, other_node_id, n_rev, m_rev))
         patch_row = self.cur.fetchone()
         if not patch_row:
