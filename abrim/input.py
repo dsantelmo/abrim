@@ -12,7 +12,7 @@ log = get_log(full_debug=False)
 app = Flask(__name__)
 
 
-def _get_server_shadow(item_id, client_node_id, n_rev, m_rev):
+def _get_server_shadow(config, item_id, client_node_id, n_rev, m_rev):
     got_shadow, shadow = config.db.get_shadow(item_id, client_node_id, n_rev, m_rev)
     if got_shadow:
         log.debug("shadow: {}".format(shadow))
@@ -69,7 +69,7 @@ def _check_text_request_ok(r_json):
     return True, r_json['text']
 
 
-def _check_revs(item_id, client_node_id, n_rev, m_rev):
+def _check_revs(config, item_id, client_node_id, n_rev, m_rev):
     saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
 
     if n_rev != saved_n_rev:
@@ -85,19 +85,19 @@ def _check_permissions(dummy):  # TODO: implement me
     return True
 
 
-def _check_item_exists(item_id):
+def _check_item_exists(config, item_id):
     return config.db.get_item(item_id)
 
 
-def _save_shadow(client_node_id, item_id, shadow, n_rev, m_rev, crc):
+def _save_shadow(config, client_node_id, item_id, shadow, n_rev, m_rev, crc):
     config.db.save_new_shadow(client_node_id, item_id, shadow, n_rev, m_rev, crc)
 
 
-def _enqueue_patches(client_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc):
+def _enqueue_patches(config, client_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc):
     config.db.save_new_patches(client_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc)
 
 
-def _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev):
+def _check_patch_done(config, timeout, client_node_id, item_id, n_rev, m_rev):
     # wait a bit for the patching of server text
     while True:
         patch_done = config.db.check_if_patch_done(client_node_id, item_id, n_rev, m_rev)
@@ -149,11 +149,11 @@ def _post_sync(user_id, client_node_id, item_id):
 
         config.db.start_transaction("_post_sync")
 
-        if not _check_revs(item_id, client_node_id, n_rev, m_rev):
+        if not _check_revs(config, item_id, client_node_id, n_rev, m_rev):
             config.db.rollback_transaction()
             return resp("queue_in/post_sync/403/no_match_revs", "Revs don't match")
 
-        got_shadow, shadow = _get_server_shadow(item_id, client_node_id, n_rev, m_rev)
+        got_shadow, shadow = _get_server_shadow(config, item_id, client_node_id, n_rev, m_rev)
         if not got_shadow:
             config.db.rollback_transaction()
             return resp("queue_in/post_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
@@ -174,20 +174,20 @@ def _post_sync(user_id, client_node_id, item_id):
 
         n_rev += 1
 
-        _save_shadow(client_node_id, item_id, new_shadow, n_rev, m_rev, shadow_adler32)
+        _save_shadow(config, client_node_id, item_id, new_shadow, n_rev, m_rev, shadow_adler32)
 
-        _enqueue_patches(client_node_id, item_id, edits, n_rev, m_rev, old_shadow_adler32, shadow_adler32)
+        _enqueue_patches(config, client_node_id, item_id, edits, n_rev, m_rev, old_shadow_adler32, shadow_adler32)
 
     except Exception as err:
         config.db.rollback_transaction()
-        log.error(err)
+        log.error("ERROR: {}".format(err))
         traceback.print_exc()
         return resp("queue_in/post_sync/500/transaction_exception", "Unknown error. Please report this")
     else:
         config.db.end_transaction()
 
     timeout = 5
-    patch_done_json = _check_patch_done(timeout, client_node_id, item_id, n_rev, m_rev)
+    patch_done_json = _check_patch_done(config, timeout, client_node_id, item_id, n_rev, m_rev)
     if not patch_done_json:
         return resp("queue_in/post_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply")
     return resp("queue_in/post_sync/201/done", "Sync done", patch_done_json)
@@ -213,13 +213,13 @@ def _put_shadow(user_id, client_node_id, item_id):
         log.debug("request with the shadow seems ok, trying to save it")
         config.db.start_transaction("_put_shadow")
 
-        item_exists, item, _ = _check_item_exists(item_id)
+        item_exists, item, _ = _check_item_exists(config, item_id)
         if not item_exists:
             # _save_item(item_id, shadow)
             update_item(config, item_id, shadow)
 
         else:
-            _save_shadow(client_node_id, item_id, shadow, r_json['n_rev'], r_json['m_rev'], get_crc(shadow))
+            _save_shadow(config, client_node_id, item_id, shadow, r_json['n_rev'], r_json['m_rev'], get_crc(shadow))
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -338,5 +338,5 @@ if __name__ == "__main__":  # pragma: no cover
     # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
     # app.run(host='0.0.0.0', port=client_port)
     # for pycharm debugging
-    app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=False, use_reloader=False)
+    app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=True, use_reloader=False)
     __end()

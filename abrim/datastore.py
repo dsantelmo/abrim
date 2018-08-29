@@ -154,7 +154,11 @@ class DataStore(object):
         except Exception as err:
             self._log_debug_trans("rollback in _init_db")
             log.error(err)
-            self.cur.execute("rollback")
+            if self.con.in_transaction:
+                try:
+                    self.cur.execute("rollback")
+                except sqlite3.OperationalError as exc:
+                    log.error("rollback crashed: {}".format(exc))
             raise
 
     # TRANSACTION
@@ -173,7 +177,10 @@ class DataStore(object):
     def start_transaction(self, msg=None):
         if self.con.in_transaction:
             log.error("cannot start a transaction within a transaction. Rolling back!!")
-            self.cur.execute("rollback")
+            try:
+                self.cur.execute("rollback")
+            except sqlite3.OperationalError as exc:
+                log.error("rollback crashed: {}".format(exc))
             raise Exception
 
         self.cur.execute("begin")
@@ -208,7 +215,10 @@ class DataStore(object):
     def rollback_transaction(self, msg=""):
         if self.con.in_transaction:
             self._log_debug_trans("explicitly rolling back this transaction.")
-            self.cur.execute("rollback")
+            try:
+                self.cur.execute("rollback")
+            except sqlite3.OperationalError as exc:
+                log.error("rollback crashed: {}".format(exc))
         else:
             log.warning("tried to rollback a transaction but there was none!!")
         if self.con.in_transaction:
