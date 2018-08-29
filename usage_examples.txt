@@ -1,14 +1,30 @@
 # usage examples
 
-# run one one
-ABRIM_NODE_ID=node_1 python3 abrim/input.py
+# run one node
+export PYTHONPATH=./:$PYTHONPATH
+export ABRIM_NODE_ID=node_1
+python3 abrim/input.py --port 5001
 
 # list items
-curl http://127.0.0.1:5000/users/user_1/nodes/node_1/items
+curl http://127.0.0.1:5001/users/user_1/nodes/node_1/items
 
 # put new item
-curl -X PUT -H "Content-Type: application/json" -d '{"text":"test ok"}' http://127.0.0.1:5000/users/user_1/nodes/node_1/items/item_1
+curl -X PUT -H "content-type: application/json" -d "{\"text\":\"test ok\"}" http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1
 
 # get item
-curl http://127.0.0.1:5000/users/user_1/nodes/node_1/items/item_1
+curl http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1
 
+# post first sync (will fail with queue_in/post_sync/404/not_shadow )
+curl -X POST http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "content-type: application/json" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
+
+# put shadow
+curl -X PUT http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1/shadow -H "content-type: application/json" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\" }"
+
+# post again fist sync
+curl -X POST http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "content-type: application/json" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
+
+# post second sync (first edit)
+curl -X POST http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "content-type: application/json" -d "{ \"rowid\": 2, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 1, \"m_rev\": 0, \"shadow_adler32\": \"317981617\", \"old_shadow_adler32\": \"1\", \"edits\": \"@@ -0,0 +1,10 @@\n+a new text\n\"}"
+
+# post third sync (second edit)
+curl -X POST http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "content-type: application/json" -d "{ \"rowid\": 3, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 2, \"m_rev\": 0, \"shadow_adler32\": \"469435528\", \"old_shadow_adler32\": \"317981617\", \"edits\": \"@@ -1,10 +1,12 @@\n a new\n+er\n  text\n\"}"
