@@ -338,10 +338,14 @@ def teardown_request(exception):
 if __name__ == "__main__":  # pragma: no cover
     log.info("queue_in started")
     node_id, client_port = args_init()
-    if 'NODE_ID' not in app.config:
-        app.config['NODE_ID'] = node_id
-    # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
-    # app.run(host='0.0.0.0', port=client_port)
-    # for pycharm debugging
-    app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=True, use_reloader=False)
-    __end()
+
+    if not node_id or not client_port:
+        __end()
+    else:
+        if 'NODE_ID' not in app.config:
+            app.config['NODE_ID'] = node_id
+        # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
+        # app.run(host='0.0.0.0', port=client_port)
+        # for pycharm debugging
+        app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=True, use_reloader=False)
+        __end()
