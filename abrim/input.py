@@ -5,7 +5,7 @@ import time
 from flask import Flask, g, request, abort
 from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
-                       create_hash, args_init
+                       create_hash, args_init, requires_auth
 
 log = get_log(full_debug=False)
 
@@ -131,6 +131,7 @@ def update_item(config, item_id, new_text):
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
+@requires_auth
 def _post_sync(user_id, client_node_id, item_id):
     config = g.config
     log.debug("-------------------------------------------------------------------------------")
@@ -194,6 +195,7 @@ def _post_sync(user_id, client_node_id, item_id):
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
+@requires_auth
 def _put_shadow(user_id, client_node_id, item_id):
     config = g.config
     log.debug("-------------------------------------------------------------------------------")
@@ -233,6 +235,7 @@ def _put_shadow(user_id, client_node_id, item_id):
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['GET'])
+@requires_auth
 def _get_text(user_id, client_node_id, item_id):
     config = g.config
     log.debug("-------------------------------------------------------------------------------")
@@ -257,6 +260,7 @@ def _get_text(user_id, client_node_id, item_id):
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['PUT'])
+@requires_auth
 def _put_text(user_id, client_node_id, item_id):
     config = g.config
     log.debug("-------------------------------------------------------------------------------")
@@ -289,6 +293,7 @@ def _put_text(user_id, client_node_id, item_id):
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
+@requires_auth
 def _get_items(user_id, client_node_id):
     config = g.config
     log.debug("-------------------------------------------------------------------------------")

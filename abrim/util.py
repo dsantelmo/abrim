@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 import sys
-import diff_match_patch
+from functools import wraps
 import logging
 import zlib
 import argparse
-from flask import jsonify
+import diff_match_patch
+from flask import jsonify, request, Response
 
 
 def resp(api_unique_code, msg, resp_json=None):
@@ -146,6 +147,33 @@ def get_crc(text):
     # is this premature optimization?
     return zlib.adler32(text.encode())
 
+
+# auth
+def check_auth(username, password):
+    """This function is called to check if a username /
+    password combination is valid.
+    """
+    return username == 'admin' and password == 'secret'
+
+
+def authenticate():
+    """Sends a 401 response that enables basic auth"""
+    return Response(
+    'Could not verify your access level for that URL.\n'
+    'You have to login with proper credentials', 401,
+    {'WWW-Authenticate': 'Basic realm="Login Required"'})
+
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
+
+# args
 
 def _parse_args_helper():
     parser = argparse.ArgumentParser()
