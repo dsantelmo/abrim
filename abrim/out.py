@@ -5,7 +5,7 @@ import traceback
 import time
 import requests
 import json
-from abrim.util import get_log, args_init
+from abrim.util import get_log, args_init, response_parse
 from abrim.config import Config
 log = get_log(full_debug=False)
 
@@ -39,11 +39,8 @@ def send_sync(edit, other_node_url, use_put=False):
             p_response = __requests_put(other_node_url, edit)
         else:
             p_response = __requests_post(other_node_url, edit)
-        log.debug("Response: {}".format(p_response.text))
-        response_http = p_response.status_code
-        response_dict = json.loads(p_response.text)
-        api_unique_code = response_dict['api_unique_code']
-        log.debug("API response: {} HTTP response: {} Dict: {}".format(api_unique_code, response_http, response_dict))
+
+        api_unique_code, response_http, _ = response_parse(p_response)
         return response_http, api_unique_code
     except requests.exceptions.ConnectionError:
         raise

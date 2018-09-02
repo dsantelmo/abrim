@@ -2,11 +2,12 @@
 
 import traceback
 import time
+import requests
 from flask import Flask, request, abort, render_template, redirect, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
-                       create_hash, args_init
+                       create_hash, args_init, response_parse
 
 log = get_log(full_debug=False)
 
@@ -37,10 +38,35 @@ def __end():
     pass
 
 
+def _check_list_items(response):
+    if response:
+        api_unique_code, response_http, response_dict = response_parse(response)
+        if response_http == 200 and api_unique_code == "queue_in/get_items/200/ok":
+            log.debug(response_dict)
+            return response_dict
+        else:
+            return None
+    else:
+        return None
+
+
 def _list_items():
-    """curl -X GET http://127.0.0.1:5001/users/user_1/nodes/node_1/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
+    """curl -X GET http://127.0.0.1:5002/users/user_1/nodes/node_1/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
 """
-    return None
+    url = "http://127.0.0.1:5002/users/user_1/nodes/node_1/items"
+
+    payload = "{\n \"rowid\": 1,\n \"item\": \"item_1\",\n \"other_node\": \"node_2\",\n \"n_rev\": 0,\n \"m_rev\": 0,\n \"shadow_adler32\": \"1\",\n \"old_shadow_adler32\": \"1\",\n \"edits\": \"\"\n}"
+    headers = {
+        'content-type': "application/json",
+        'authorization': "Basic YWRtaW46c2VjcmV0",
+    }
+    log.debug("requesting {}".format(url))
+    response = requests.request("GET", url, data=payload, headers=headers)
+    json_response = _check_list_items(response)
+    if json_response:
+        return json_response
+    else:
+        return None
 
 
 @app.before_request
@@ -100,12 +126,16 @@ def _load_user(userid):
 
 
 if __name__ == "__main__":  # pragma: no cover
-    log.info("ui started")
+    log.info("{} started".format(__file__))
     node_id, client_port = args_init()
-    config = Config(node_id=node_id)
-    # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
-    # app.run(host='0.0.0.0', port=client_port)
-    # for pycharm debugging
 
-    app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=False, use_reloader=False)
-    __end()
+    if not node_id or not client_port:
+        __end()
+    else:
+        config = Config(node_id=node_id)
+        # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
+        # app.run(host='0.0.0.0', port=client_port)
+        # for pycharm debugging
+
+        app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=False, use_reloader=False)
+        __end()

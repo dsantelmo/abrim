@@ -5,6 +5,7 @@ from functools import wraps
 import logging
 import zlib
 import argparse
+import json
 import diff_match_patch
 from flask import jsonify, request, Response
 
@@ -148,7 +149,20 @@ def get_crc(text):
     return zlib.adler32(text.encode())
 
 
+# responses
+
+
+def response_parse(response):
+    log.debug("Response: {}".format(response.text))
+    response_http = response.status_code
+    response_dict = json.loads(response.text)
+    api_unique_code = response_dict['api_unique_code']
+    log.debug("API response: {} HTTP response: {} Dict: {}".format(api_unique_code, response_http, response_dict))
+    return api_unique_code, response_http, response_dict
+
 # auth
+
+
 def check_auth(username, password):
     """This function is called to check if a username /
     password combination is valid.
