@@ -28,12 +28,19 @@ class User(UserMixin):
     def __repr__(self):
         return "%d/%s/%s" % (self.id, self.name, self.password)
 
+
 users = [User(id) for id in range(1, 21)]
 
 
 def __end():
     # db.close_db()
     pass
+
+
+def _list_items():
+    """curl -X GET http://127.0.0.1:5001/users/user_1/nodes/node_1/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
+"""
+    return None
 
 
 @app.before_request
@@ -51,6 +58,8 @@ def teardown_request(exception):
 def _root():
     if not current_user.is_authenticated:
         return redirect(url_for('_login'))
+
+    items = _list_items()
     return render_template('client.html')
 
 
