@@ -80,7 +80,7 @@ def process_out_patches(lock, node_id):
 
 
 if __name__ == '__main__':
-    log.info("queue_patch started")
+    log.info("{} started".format(__file__))
     node_id_, client_port = args_init()
     while True:
         lock = multiprocessing.Lock()

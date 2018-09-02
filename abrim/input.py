@@ -336,12 +336,13 @@ def teardown_request(exception):
 
 
 if __name__ == "__main__":  # pragma: no cover
-    log.info("queue_in started")
+    log.info("{} started".format(__file__))
     node_id, client_port = args_init()
 
     if not node_id or not client_port:
         __end()
     else:
+        log.info("node {} running in port {}".format(node_id, client_port))
         if 'NODE_ID' not in app.config:
             app.config['NODE_ID'] = node_id
         # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
