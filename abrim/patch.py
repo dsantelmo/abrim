@@ -82,18 +82,21 @@ def process_out_patches(lock, node_id):
 if __name__ == '__main__':
     log.info("{} started".format(__file__))
     node_id_, client_port = args_init()
-    while True:
-        lock = multiprocessing.Lock()
-        p = multiprocessing.Process(target=process_out_patches, args=(lock, node_id_, ))
-        p_name = p.name
-        # log.debug(p_name + " starting up")
-        p.start()
-        # Wait for x seconds or until process finishes
-        p.join(30)
-        if p.is_alive():
-            log.debug(p_name + " timeouts")
-            p.terminate()
-            p.join()
-        else:
-            # log.debug(p_name + " finished ok")
-            pass
+    if not node_id_ or not client_port:
+        pass
+    else:
+        while True:
+            lock = multiprocessing.Lock()
+            p = multiprocessing.Process(target=process_out_patches, args=(lock, node_id_, ))
+            p_name = p.name
+            # log.debug(p_name + " starting up")
+            p.start()
+            # Wait for x seconds or until process finishes
+            p.join(30)
+            if p.is_alive():
+                log.debug(p_name + " timeouts")
+                p.terminate()
+                p.join()
+            else:
+                # log.debug(p_name + " finished ok")
+                pass
