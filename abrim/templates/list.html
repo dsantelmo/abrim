@@ -3,29 +3,28 @@
     <header>
         <h1 id="main_title">main</h1>
     </header>
-    <nav>User: {{ user_id|safe }} || Node: {{ node_id|safe }} || <b>main</b> - <a href="/logout">logout</a></nav>
+    <nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><b>main</b> - <a href="/logout">logout</a></nav>
     <main>
         <article>
             <header>
               <h3>...</h3>
-              <p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
-              </p>
+              <!--<p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
+              </p>-->
             </header>
             <section>
                 {% if conn_ok %}
                     {% if content %}
                         {% for item in content %}
-                        <form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
-                            <p> {{ item_id|safe }}
-                            </p>
+                <p> <a href="/nodes/{{ item.node|safe }}/items/{{ item.id|safe }}">{{ item.id|safe }}</a></p>
+
+                        <!--<form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
                             <p>
                                 <textarea name="client_text" placeholder="Some text here...">{{ item|safe }}</textarea>
                             </p>
                             <p>
-                                <!-- <input class="sync_button" name="get_text" type="submit" value="Get server text"> -->
                                 <input class="sync_button" name="send_text" type="submit" value="Sync!">
                             </p>
-                        </form>
+                        </form>-->
                         {% endfor %}
                     {% else %}
                         <p>No content!</p>
@@ -36,7 +35,9 @@
             </section>
         </article>
     </main>
+    <!--
     <nav>recent nav</nav>
     <nav>tags nav<nav>
     <footer>footer</footer>
+    -->
 {% endblock %}

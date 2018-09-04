@@ -95,12 +95,18 @@ def teardown_request(exception):
 
 
 @app.route('/', methods=['GET'])
+@login_required
 def _root():
-    if not current_user.is_authenticated:
-        return redirect(url_for('_login'))
-
+    # if not current_user.is_authenticated:
+    #     return redirect(url_for('_login'))
     content, conn_ok = _list_items()
-    return render_template('client.html', conn_ok=conn_ok, content=content)
+    return render_template('list.html', conn_ok=conn_ok, content=content)
+
+
+@app.route('/nodes/<string:node_id>/items/<string:item_id>', methods=['GET'])
+@login_required
+def _get_item(node_id, item_id):
+    return "ok"
 
 
 @app.route('/login', methods=['GET', 'POST'])
