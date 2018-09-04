@@ -152,10 +152,10 @@ def get_crc(text):
 # responses
 
 
-def response_parse(response):
-    log.debug("Response: {}".format(response.text))
-    response_http = response.status_code
-    response_dict = json.loads(response.text)
+def response_parse(raw_response):
+    log.debug("Response: {}".format(raw_response.text))
+    response_http = raw_response.status_code
+    response_dict = json.loads(raw_response.text)
     api_unique_code = response_dict['api_unique_code']
     log.debug("API response: {} HTTP response: {} Dict: {}".format(api_unique_code, response_http, response_dict))
     return api_unique_code, response_http, response_dict

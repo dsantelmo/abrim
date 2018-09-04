@@ -33,15 +33,20 @@ class User(UserMixin):
 users = [User(id) for id in range(1, 21)]
 
 
+def _test_password(username, password):
+    return True
+
+
 def __end():
     # db.close_db()
     pass
 
 
-def _check_list_items(response):
-    if response:
-        api_unique_code, response_http, response_dict = response_parse(response)
+def _check_list_items(raw_response):
+    if raw_response:
+        api_unique_code, response_http, response_dict = response_parse(raw_response)
         if response_http == 200 and api_unique_code == "queue_in/get_items/200/ok":
+
             log.debug(response_dict)
             return response_dict
         else:
@@ -51,9 +56,9 @@ def _check_list_items(response):
 
 
 def _list_items():
-    """curl -X GET http://127.0.0.1:5002/users/user_1/nodes/node_1/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
+    """curl -X GET http://127.0.0.1:5001/users/user_1/nodes/node_1/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
 """
-    url = "http://127.0.0.1:5002/users/user_1/nodes/node_1/items"
+    url = "http://127.0.0.1:5001/users/user_1/nodes/node_1/items"
 
     payload = "{\n \"rowid\": 1,\n \"item\": \"item_1\",\n \"other_node\": \"node_2\",\n \"n_rev\": 0,\n \"m_rev\": 0,\n \"shadow_adler32\": \"1\",\n \"old_shadow_adler32\": \"1\",\n \"edits\": \"\"\n}"
     headers = {
@@ -61,12 +66,21 @@ def _list_items():
         'authorization': "Basic YWRtaW46c2VjcmV0",
     }
     log.debug("requesting {}".format(url))
-    response = requests.request("GET", url, data=payload, headers=headers)
-    json_response = _check_list_items(response)
-    if json_response:
-        return json_response
+    try:
+        raw_response = requests.get(url, data=payload, headers=headers, timeout=1)
+    except requests.exceptions.ConnectTimeout:
+        return None, False
     else:
-        return None
+        response_dict = _check_list_items(raw_response)
+        if response_dict:
+            try:
+                content = response_dict['content']
+                log.debug(content)
+                return content, True
+            except KeyError:
+                return None, True
+        else:
+            return None, True
 
 
 @app.before_request
@@ -85,8 +99,8 @@ def _root():
     if not current_user.is_authenticated:
         return redirect(url_for('_login'))
 
-    items = _list_items()
-    return render_template('client.html')
+    content, conn_ok = _list_items()
+    return render_template('client.html', conn_ok=conn_ok, content=content)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -97,7 +111,11 @@ def _login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        if password == username + "_secret":
+        #node = request.form['node']
+        #port = request.form['port']
+
+        #if _test_password(username, password, node, port):
+        if _test_password(username, password):
             id = username.split('user')[1]
             user = User(id)
             login_user(user)
@@ -137,5 +155,5 @@ if __name__ == "__main__":  # pragma: no cover
         # app.run(host='0.0.0.0', port=client_port)
         # for pycharm debugging
 
-        app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=False, use_reloader=False)
+        app.run(host='0.0.0.0', port=client_port, debug=False, use_debugger=False, use_reloader=False)
         __end()

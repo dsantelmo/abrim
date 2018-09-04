@@ -12,20 +12,26 @@
               </p>
             </header>
             <section>
-                {% if content %}
-                {% for item, item_id in content %}
-                <form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
-                    <p> {{ item_id|safe }}
-                    </p>
-                    <p>
-                        <textarea name="client_text" placeholder="Some text here...">{{ item|safe }}</textarea>
-                    </p>
-                    <p>
-                        <!-- <input class="sync_button" name="get_text" type="submit" value="Get server text"> -->
-                        <input class="sync_button" name="send_text" type="submit" value="Sync!">
-                    </p>
-                </form>
-                {% endfor %}
+                {% if conn_ok %}
+                    {% if content %}
+                        {% for item in content %}
+                        <form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
+                            <p> {{ item_id|safe }}
+                            </p>
+                            <p>
+                                <textarea name="client_text" placeholder="Some text here...">{{ item|safe }}</textarea>
+                            </p>
+                            <p>
+                                <!-- <input class="sync_button" name="get_text" type="submit" value="Get server text"> -->
+                                <input class="sync_button" name="send_text" type="submit" value="Sync!">
+                            </p>
+                        </form>
+                        {% endfor %}
+                    {% else %}
+                        <p>No content!</p>
+                    {% endif %}
+                {% else %}
+                    <p>Failed to connect!</p>
                 {% endif %}
             </section>
         </article>
