@@ -5,6 +5,9 @@
 *.un~
 abrim.cfg
 geckodriver.log
-.idea
 .coverage
 htmlcov
+# PyCharm, keep run configs
+**/.idea/**
+!**/.idea/runConfigurations/
+!**/.idea/runConfigurations/*
