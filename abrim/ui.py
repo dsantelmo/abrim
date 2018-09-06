@@ -18,6 +18,7 @@ app.secret_key = "CHANGE_ME"  # TODO: manage this in admin UI
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "_login"
+login_manager.login_message_category = "info"
 
 class User(UserMixin):
 
@@ -122,10 +123,13 @@ def _login():
 
         #if _test_password(username, password, node, port):
         if _test_password(username, password):
-            id = username.split('user')[1]
-            user = User(id)
-            login_user(user)
-            return redirect(url_for('_root'))  # TODO: remember the origin and redirect there
+            try:
+                id = username.split('user')[1]
+                user = User(id)
+                login_user(user)
+                return redirect(url_for('_root'))  # TODO: remember the origin and redirect there
+            except IndexError:
+                return abort(401)
         else:
             return abort(401)
     else:
