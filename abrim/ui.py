@@ -34,7 +34,7 @@ class User(UserMixin):
 users = [User(id) for id in range(1, 21)]
 
 
-def _test_password(username, password):
+def _test_password(username, password, node, port):
     return True
 
 
@@ -104,9 +104,9 @@ def _root():
     return render_template('list.html', conn_ok=conn_ok, content=content)
 
 
-@app.route('/nodes/<string:node_id>/items/<string:item_id>', methods=['GET'])
+@app.route('/nodes/<string:str_node_id>/items/<string:str_item_id>', methods=['GET'])
 @login_required
-def _get_item(node_id, item_id):
+def _get_item(str_node_id, str_item_id):
     return "ok"
 
 
@@ -118,14 +118,13 @@ def _login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        #node = request.form['node']
-        #port = request.form['port']
+        node = request.form['node']
+        port = request.form['port']
 
-        #if _test_password(username, password, node, port):
-        if _test_password(username, password):
+        if _test_password(username, password, node, port):
             try:
-                id = username.split('user')[1]
-                user = User(id)
+                uid = username.split('user')[1]
+                user = User(uid)
                 login_user(user)
                 return redirect(url_for('_root'))  # TODO: remember the origin and redirect there
             except IndexError:
