@@ -3,7 +3,7 @@
 import traceback
 import time
 import requests
-from flask import Flask, request, abort, render_template, redirect, url_for
+from flask import Flask, g, request, abort, render_template, redirect, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
@@ -34,7 +34,7 @@ class User(UserMixin):
 users = [User(id) for id in range(1, 21)]
 
 
-def _test_password(username, password):
+def _test_password(username, password, node, port):
     return True
 
 
@@ -85,9 +85,13 @@ def _list_items():
 
 
 @app.before_request
-def before_request():
-    # db.prepare_db_path(app.config['DB_PATH'])
-    pass
+def before_request():  # TODO is doing this secure?
+    try:
+        g.current_user_id = current_user.id
+        g.current_user_name = current_user.name
+        g.current_user_password = current_user.password
+    except AttributeError:
+        pass
 
 
 @app.teardown_request
@@ -98,8 +102,6 @@ def teardown_request(exception):
 @app.route('/', methods=['GET'])
 @login_required
 def _root():
-    # if not current_user.is_authenticated:
-    #     return redirect(url_for('_login'))
     content, conn_ok = _list_items()
     return render_template('list.html', conn_ok=conn_ok, content=content)
 
@@ -112,17 +114,15 @@ def _get_item(node_id, item_id):
 
 @app.route('/login', methods=['GET', 'POST'])
 def _login():
-    if  current_user.is_authenticated:
+    if current_user.is_authenticated:
         return redirect(url_for('_root'))
-
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        #node = request.form['node']
-        #port = request.form['port']
+        node = request.form['node']
+        port = request.form['port']
 
-        #if _test_password(username, password, node, port):
-        if _test_password(username, password):
+        if _test_password(username, password, node, port):
             try:
                 id = username.split('user')[1]
                 user = User(id)
