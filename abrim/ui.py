@@ -194,15 +194,20 @@ def _get_item(node_id, item_id):
         if 'update' in request.args and 'client_text' in request.form:
             new_item_text = request.form['client_text']
             print("UPDATE! {}".format(new_item_text))
-        try:
-            content, conn_ok, auth_ok = _req_get_item(session['current_user_name'],
-                                                    session['current_user_password'],
-                                                    session['user_node'], node_id, item_id)
-            return render_template('item.html', conn_ok=conn_ok, auth_ok=auth_ok, item_id=item_id, content=content, edit=True)
-        except AttributeError:
-            log.debug("AttributeError, logging out")
-            logout_user()
+        elif 'edit' in request.args:
+            try:
+                content, conn_ok, auth_ok = _req_get_item(session['current_user_name'],
+                                                        session['current_user_password'],
+                                                        session['user_node'], node_id, item_id)
+                return render_template('item.html', conn_ok=conn_ok, auth_ok=auth_ok, item_id=item_id, content=content, edit=True)
+            except AttributeError:
+                log.debug("AttributeError, logging out")
+                logout_user()
+                return redirect(url_for('_root'))
+        else:
+            log.error("error in _get_item")
             return redirect(url_for('_root'))
+
 
 
 @app.route('/login', methods=['GET', 'POST'])

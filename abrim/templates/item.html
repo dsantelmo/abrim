@@ -16,7 +16,7 @@
                     {% if conn_ok %}
                         {% if content %}
                             {% if not edit %}
-                                <form autocomplete="off" method="post" onsubmit="submit.disabled = true; return true;" >
+                                <form autocomplete="off" action="?edit" method="post" onsubmit="submit.disabled = true; return true;" >
                             {% else %}
                                 <form autocomplete="off" action="?update" method="post" onsubmit="submit.disabled = true; return true;" >
                                     <textarea name="client_text" placeholder="Some text here...">{% endif %}{{ content.text|safe }}{% if edit %}</textarea>
