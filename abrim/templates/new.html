@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+{% block body %}
+    <header>
+        <h1 id="main_title">{{ item_id|safe }}</h1>
+    </header>
+<nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><a href="/">list</a> - <a href="/new">new</a> - <a href="/logout">logout</a></nav>
+    <main>
+        <article>
+            <header>
+              <h3>...</h3>
+              <!--<p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
+              </p>-->
+            </header>
+            <section>
+                {% if auth_ok %}
+                    <form autocomplete="off" method="post" onsubmit="submit.disabled = true; return true;" >
+                        <input name="item_id" placeholder="item id..." value="{{ item_id|safe }}">
+                        <textarea name="client_text" placeholder="Some text here...">{{ client_text|safe }}</textarea>
+                        <input class="sync_button" name="update_button" type="submit" value="Send">
+                    </form>
+                {% else %}
+                    <p>Authorization failed!</p>
+                {% endif %}
+            </section>
+        </article>
+    </main>
+    <!--
+    <nav>recent nav</nav>
+    <nav>tags nav<nav>
+    <footer>footer</footer>
+    -->
+{% endblock %}

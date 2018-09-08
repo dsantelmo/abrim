@@ -145,11 +145,15 @@ def _check_get_items(raw_response):
 
 
 def _req_get_item(username, password, node, node_id_, item_id):
+    # returns: content, conn_ok, auth_ok
     url_path = "/users/{}/nodes/{}/items/{}".format(username, node_id_, item_id)
     raw_response = _get_request(username, password, node, url_path)
 
     if not raw_response:
-        log.debug("connection error")
+        if raw_response.status_code == 404:
+            log.debug("404 not found")
+        else:
+            log.debug("connection error")
         return None, False, True
     else:
         response_dict = _check_get_items(raw_response)
@@ -240,7 +244,10 @@ def _put_updated_text(client_text,
                       password,
                       node,
                       url_path):
-    payload = "{\"text\": \"" + client_text +"\"}"
+    payload = {"text": client_text }
+
+    import json
+    payload = json.dumps(payload)
 
     _put_request(username, password, node, url_path, payload)
 
@@ -272,6 +279,35 @@ def _login():
             return abort(401)
     else:
         return render_template("login.html")
+
+
+
+@app.route('/new', methods=['GET', 'POST'])
+@login_required
+def _new():
+    log.debug("_new")
+    if request.method == 'POST':
+        try:
+            item_id = request.form['item_id']
+            client_text = request.form['client_text']
+            log.debug(item_id)
+            log.debug(client_text)
+        except IndexError:
+            log.debug("_new IndexError")
+            return render_template("new.html", auth_ok=True, item_id=item_id, client_text=client_text)
+        except KeyError:
+            log.debug("_new KeyError")
+            return render_template("new.html", auth_ok=True, item_id=item_id, client_text=client_text)
+        url_path = "/users/{}/nodes/{}/items/{}".format(session['current_user_name'], node_id, item_id)
+        _put_updated_text(client_text,
+                          session['current_user_name'],
+                          session['current_user_password'],
+                          session['user_node'],
+                          url_path)
+        return redirect(url_for('_get_item', node_id=node_id, item_id=item_id, _method='GET'))
+
+    else:
+        return render_template("new.html", auth_ok=True)
 
 
 @app.route("/logout")
