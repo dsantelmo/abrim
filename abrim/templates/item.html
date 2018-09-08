@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 {% block body %}
     <header>
-        <h1 id="main_title">main</h1>
+        <h1 id="main_title">{{ item_id|safe }}</h1>
     </header>
-    <nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><b>main</b> - <a href="/logout">logout</a></nav>
+<nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><b><a href="/">list</a></b> - <a href="/logout">logout</a></nav>
     <main>
         <article>
             <header>
@@ -15,7 +15,21 @@
                 {% if auth_ok %}
                     {% if conn_ok %}
                         {% if content %}
-                            <p> {{ content.text|safe }}</p>
+                            {% if not edit %}
+                                <form autocomplete="off" method="post" onsubmit="submit.disabled = true; return true;" >
+                            {% else %}
+                                <form autocomplete="off" action="?update" method="post" onsubmit="submit.disabled = true; return true;" >
+                                    <textarea name="client_text" placeholder="Some text here...">{% endif %}{{ content.text|safe }}{% if edit %}</textarea>
+                                <p>
+                                    <input class="sync_button" name="update_button" type="submit" value="Update">
+                                </p>
+                            {% else %}
+                                <p>
+                                    <input class="sync_button" name="edit_button" type="submit" value="Edit">
+                                </p>
+                            {% endif %}
+
+                            </form>
                         {% else %}
                             <p>No content!</p>
                         {% endif %}

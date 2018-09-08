@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 {% block body %}
     <header>
-        <h1 id="main_title">main</h1>
+        <h1 id="main_title">list</h1>
     </header>
-    <nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><b>main</b> - <a href="/logout">logout</a></nav>
+    <nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><a href="/logout">logout</a></nav>
     <main>
         <article>
             <header>
@@ -16,16 +16,7 @@
                     {% if conn_ok %}
                         {% if content %}
                             {% for item in content %}
-                    <p> <a href="/nodes/{{ item.node|safe }}/items/{{ item.id|safe }}">{{ item.id|safe }}</a></p>
-
-                            <!--<form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
-                                <p>
-                                    <textarea name="client_text" placeholder="Some text here...">{{ item|safe }}</textarea>
-                                </p>
-                                <p>
-                                    <input class="sync_button" name="send_text" type="submit" value="Sync!">
-                                </p>
-                            </form>-->
+                                <p> <a href="/nodes/{{ item.node|safe }}/items/{{ item.id|safe }}">{{ item.id|safe }}</a></p>
                             {% endfor %}
                         {% else %}
                             <p>No content!</p>
