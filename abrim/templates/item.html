@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block body %}
+    <header>
+        <h1 id="main_title">main</h1>
+    </header>
+    <nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><b>main</b> - <a href="/logout">logout</a></nav>
+    <main>
+        <article>
+            <header>
+              <h3>...</h3>
+              <!--<p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
+              </p>-->
+            </header>
+            <section>
+                {% if auth_ok %}
+                    {% if conn_ok %}
+                        {% if content %}
+                            <p> {{ content.text|safe }}</p>
+                        {% else %}
+                            <p>No content!</p>
+                        {% endif %}
+                    {% else %}
+                        <p>Failed to connect!</p>
+                    {% endif %}
+                {% else %}
+                    <p>Authorization failed!</p>
+                {% endif %}
+            </section>
+        </article>
+    </main>
+    <!--
+    <nav>recent nav</nav>
+    <nav>tags nav<nav>
+    <footer>footer</footer>
+    -->
+{% endblock %}

@@ -85,7 +85,7 @@ def _check_list_items(raw_response):
 
 
 def _list_items(username, password, node):
-    url_path = "/users/user_1/nodes/node_1/items"
+    url_path = "/users/user_1/nodes/node_1/items"  #FIXME change it so it doesn't ask for user and node
     raw_response = _get_request(username, password, node, url_path)
 
     if not raw_response:
@@ -93,6 +93,45 @@ def _list_items(username, password, node):
         return None, False, True
     else:
         response_dict = _check_list_items(raw_response)
+        if response_dict:
+            try:
+                content = response_dict['content']
+                log.debug(content)
+                return content, True, True
+            except KeyError:
+                log.error("KeyError {}".format(response_dict))
+                return None, True, True
+        else:
+            if raw_response.status_code == 401:
+                log.warning("not auth")
+                return None, True, False
+            else:
+                log.warning("no response_dict {}".format(raw_response))
+                return None, False, True
+
+
+def _check_get_items(raw_response):
+    if raw_response:
+        api_unique_code, response_http, response_dict = response_parse(raw_response)
+        if response_http == 200 and api_unique_code == "queue_in/get_text/200/ok":
+
+            log.debug(response_dict)
+            return response_dict
+        else:
+            return None
+    else:
+        return None
+
+
+def _req_get_item(username, password, node, node_id_, item_id):
+    url_path = "/users/{}/nodes/{}/items/{}".format(username, node_id_, item_id)
+    raw_response = _get_request(username, password, node, url_path)
+
+    if not raw_response:
+        log.debug("connection error")
+        return None, False, True
+    else:
+        response_dict = _check_get_items(raw_response)
         if response_dict:
             try:
                 content = response_dict['content']
@@ -141,7 +180,15 @@ def _root():
 @app.route('/nodes/<string:node_id>/items/<string:item_id>', methods=['GET'])
 @login_required
 def _get_item(node_id, item_id):
-    return "ok"
+    try:
+        content, conn_ok, auth_ok = _req_get_item(session['current_user_name'],
+                                                session['current_user_password'],
+                                                session['user_node'], node_id, item_id)
+        return render_template('item.html', conn_ok=conn_ok, auth_ok=auth_ok, content=content)
+    except AttributeError:
+        log.debug("AttributeError, logging out")
+        logout_user()
+        return redirect(url_for('_root'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
