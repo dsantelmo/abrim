@@ -158,7 +158,7 @@ def _login():
                 user = User(username)
                 login_user(user)
                 session['current_user_name'] = username
-                session['current_user_password'] = password
+                session['current_user_password'] = password # FIXME pretty sure this is NOT secure, use server-side secure cache or use nonces
                 session['user_node'] = node
                 session.modified = True
                 return redirect(url_for('_root'))  # TODO: remember the origin and redirect there
