@@ -12,25 +12,29 @@
               </p>-->
             </header>
             <section>
-                {% if conn_ok %}
-                    {% if content %}
-                        {% for item in content %}
-                <p> <a href="/nodes/{{ item.node|safe }}/items/{{ item.id|safe }}">{{ item.id|safe }}</a></p>
+                {% if auth_ok %}
+                    {% if conn_ok %}
+                        {% if content %}
+                            {% for item in content %}
+                    <p> <a href="/nodes/{{ item.node|safe }}/items/{{ item.id|safe }}">{{ item.id|safe }}</a></p>
 
-                        <!--<form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
-                            <p>
-                                <textarea name="client_text" placeholder="Some text here...">{{ item|safe }}</textarea>
-                            </p>
-                            <p>
-                                <input class="sync_button" name="send_text" type="submit" value="Sync!">
-                            </p>
-                        </form>-->
-                        {% endfor %}
+                            <!--<form autocomplete="off" action="/ui_press_sync" method="post" onsubmit="submit.disabled = true; return true;" >
+                                <p>
+                                    <textarea name="client_text" placeholder="Some text here...">{{ item|safe }}</textarea>
+                                </p>
+                                <p>
+                                    <input class="sync_button" name="send_text" type="submit" value="Sync!">
+                                </p>
+                            </form>-->
+                            {% endfor %}
+                        {% else %}
+                            <p>No content!</p>
+                        {% endif %}
                     {% else %}
-                        <p>No content!</p>
+                        <p>Failed to connect!</p>
                     {% endif %}
                 {% else %}
-                    <p>Failed to connect!</p>
+                    <p>Authorization failed!</p>
                 {% endif %}
             </section>
         </article>
