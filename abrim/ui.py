@@ -54,6 +54,27 @@ def _get_request(username, password, node, url_path, payload=None):
     else:
         return raw_response
 
+
+def _put_request(username, password, node, url_path, payload):
+    url = node + url_path
+    auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii")
+    headers = {
+        'content-type': "application/json",
+        'authorization': "Basic {}".format(auth_basic),
+    }
+    log.debug("requesting {}".format(url))
+    try:
+        raw_response = requests.put(url, data=payload, headers=headers, timeout=1)
+    except requests.exceptions.ConnectTimeout:
+        log.warning("ConnectTimeout")
+        return None
+    except requests.exceptions.MissingSchema:
+        log.warning("MissingSchema")
+        return None
+    else:
+        return raw_response
+
+
 def _test_password(username, password, node):
     url_path = "/auth"
     raw_response = _get_request(username, password, node, url_path)
@@ -192,8 +213,13 @@ def _get_item(node_id, item_id):
             return redirect(url_for('_root'))
     else:  # POST is used to print the textarea for edits and recover the sent edit (where ?update added to url)
         if 'update' in request.args and 'client_text' in request.form:
-            new_item_text = request.form['client_text']
-            print("UPDATE! {}".format(new_item_text))
+            url_path = "/users/{}/nodes/{}/items/{}".format(session['current_user_name'], node_id, item_id)
+            _put_updated_text(request.form['client_text'],
+                              session['current_user_name'],
+                              session['current_user_password'],
+                              session['user_node'],
+                              url_path)
+            return redirect(url_for('_get_item', node_id=node_id, item_id=item_id, _method='GET'))
         elif 'edit' in request.args:
             try:
                 content, conn_ok, auth_ok = _req_get_item(session['current_user_name'],
@@ -207,6 +233,16 @@ def _get_item(node_id, item_id):
         else:
             log.error("error in _get_item")
             return redirect(url_for('_root'))
+
+
+def _put_updated_text(client_text,
+                      username,
+                      password,
+                      node,
+                      url_path):
+    payload = "{\"text\": \"" + client_text +"\"}"
+
+    _put_request(username, password, node, url_path, payload)
 
 
 
