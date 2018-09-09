@@ -19,8 +19,8 @@ def main():
     else:
         proc_ui, thread_ui = launch_subprocess('ui.py', "UI___", node_id, client_port)
         proc_queue_in, thread_queue_in = launch_subprocess('input.py', "INPUT", node_id, client_port + 1)
-        proc_queue_out, thread_queue_out = launch_subprocess('out.py', "OUT__", node_id, client_port + 1)
-        proc_queue_patch, thread_queue_patch = launch_subprocess('patch.py', "PATCH", node_id, client_port + 1)
+        proc_queue_out, thread_queue_out = launch_subprocess('out.py', "OUT__", node_id, client_port + 2)
+        proc_queue_patch, thread_queue_patch = launch_subprocess('patch.py', "PATCH", node_id, client_port + 3)
 
         webbrowser.open_new_tab("http://localhost:" + str(client_port) + "/")
 
