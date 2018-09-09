@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% block body %}
+    <header>
+        <h1 id="main_title"></h1>
+    </header>
+<nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><a href="/">list</a> - <a href="/new">new</a> - <a href="/logout">logout</a></nav>
+    <main>
+        <article>
+            <header>
+              <h3>{{ item_id|safe }}</h3>
+              <!--<p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
+              </p>-->
+            </header>
+            <section>
+                {% if auth_ok %}
+                    {% if conn_ok %}
+                        {% if content %}
+                            {% if not edit %}
+                                <form autocomplete="off" action="?edit" method="post" onsubmit="submit.disabled = true; return true;" >
+                            {% else %}
+                                <form autocomplete="off" action="?update" method="post" onsubmit="submit.disabled = true; return true;" >
+                                    <textarea name="client_text" placeholder="Some text here...">{% endif %}{{ content.text|safe }}{% if edit %}</textarea>
+                                <p>
+                                    <input class="sync_button" name="update_button" type="submit" value="Update">
+                                </p>
+                            {% else %}
+                                <p>
+                                    <input class="sync_button" name="edit_button" type="submit" value="Edit">
+                                </p>
+                            {% endif %}
+
+                            </form>
+                        {% else %}
+                            <p>No content!</p>
+                        {% endif %}
+                    {% else %}
+                        <p>Failed to connect!</p>
+                    {% endif %}
+                {% else %}
+                    <p>Authorization failed!</p>
+                {% endif %}
+            </section>
+        </article>
+    </main>
+    <!--
+    <nav>recent nav</nav>
+    <nav>tags nav<nav>
+    <footer>footer</footer>
+    -->
+{% endblock %}

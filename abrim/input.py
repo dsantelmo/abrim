@@ -130,6 +130,18 @@ def update_item(config, item_id, new_text):
             log.warn("no diffs. Nothing done!")
 
 
+@app.route('/auth', methods=['GET'])
+@requires_auth
+def _auth():
+    log.debug("-------------------------------------------------------------------------------")
+    log.debug("GET REQUEST: /auth")
+
+    if not _check_permissions("to do"):  # TODO: implement me
+        return resp("queue_in/auth/403/check_permissions", "you have no permissions for that")
+    else:
+        return resp("queue_in/auth/200/ok", "auth OK")
+
+
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 @requires_auth
 def _post_sync(user_id, client_node_id, item_id):
@@ -348,5 +360,5 @@ if __name__ == "__main__":  # pragma: no cover
         # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
         # app.run(host='0.0.0.0', port=client_port)
         # for pycharm debugging
-        app.run(host='0.0.0.0', port=client_port, debug=True, use_debugger=True, use_reloader=False)
+        app.run(host='0.0.0.0', port=client_port, debug=False, use_debugger=False, use_reloader=False)
         __end()
