@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="node_2 node 6001" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="node_2 node 6000" type="PythonConfigurationType" factoryName="Python">
     <module name="abrim" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
