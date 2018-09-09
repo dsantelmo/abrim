@@ -54,7 +54,6 @@ def _get_request(username, password, node, url_path, payload=None):
     else:
         return raw_response
 
-users = [User(id) for id in range(1, 21)]
 
 def _put_request(username, password, node, url_path, payload):
     url = node + url_path
@@ -78,13 +77,14 @@ def _put_request(username, password, node, url_path, payload):
 
 def _test_password(username, password, node):
     url_path = "/auth"
+    log.debug(node)
     raw_response = _get_request(username, password, node, url_path)
 
     if not raw_response:
         log.debug("connection error")
         return False
     else:
-        api_unique_code, response_http, _ =  response_parse(raw_response)
+        api_unique_code, response_http, _ = response_parse(raw_response)
         if response_http != 200 or api_unique_code != "queue_in/auth/200/ok":
             log.warning("bad response_http ({}) or api_unique_code ({})".format(response_http, api_unique_code))
             return False
@@ -197,7 +197,7 @@ def _root():
                                                 session['current_user_password'],
                                                 session['user_node'])
         return render_template('list.html', conn_ok=conn_ok, auth_ok=auth_ok, content=content)
-    except AttributeError:
+    except KeyError:
         log.debug("AttributeError, logging out")
         logout_user()
         return redirect(url_for('_root'))
@@ -340,7 +340,7 @@ if __name__ == "__main__":  # pragma: no cover
     if not node_id or not client_port:
         __end()
     else:
-        config = Config(node_id=node_id)
+        config = Config(node_id, client_port)
         # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
         # app.run(host='0.0.0.0', port=client_port)
         # for pycharm debugging

@@ -64,8 +64,8 @@ def prepare_url(config_, item_id, other_node_url):
     return url_route
 
 
-def process_out_queue(lock, node_id):
-    config = Config(node_id)
+def process_out_queue(lock, node_id, port):
+    config = Config(node_id, port)
     # config.db.sql_debug_trace(True)
 
     # lock.acquire()
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     else:
         while True:
             lock = multiprocessing.Lock()
-            p = multiprocessing.Process(target=process_out_queue, args=(lock, node_id_, ))
+            p = multiprocessing.Process(target=process_out_queue, args=(lock, node_id_, client_port ))
             p_name = p.name
             # log.debug(p_name + " starting up")
             p.start()

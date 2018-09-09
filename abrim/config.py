@@ -41,10 +41,10 @@ class Config(object):
                 log.error("can't locate NODE_ID value")
                 raise
 
-    def __init__(self, node_id=None, db_prefix="", drop_db=False):
+    def __init__(self, node_id, port, db_prefix="", drop_db=False):
         if not node_id:
             self.load_config()
         else:
             self.node_id = node_id
-        self.db = DataStore(self.node_id, db_prefix, drop_db)
+        self.db = DataStore(self.node_id, port, db_prefix, drop_db)
         self.edit_queue_limit = 50

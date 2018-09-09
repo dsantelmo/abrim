@@ -337,7 +337,7 @@ def __end():
 @app.before_request
 def before_request():
     # db.prepare_db_path(app.config['DB_PATH'])
-    config = Config(node_id=app.config['NODE_ID'])
+    config = Config(app.config['NODE_ID'], app.config['PORT'])
     g.config = config
     #pass
 
@@ -357,6 +357,8 @@ if __name__ == "__main__":  # pragma: no cover
         log.info("node {} running in port {}".format(node_id, client_port))
         if 'NODE_ID' not in app.config:
             app.config['NODE_ID'] = node_id
+        if 'PORT' not in app.config:
+            app.config['PORT'] = client_port
         # app.run(host='0.0.0.0', port=client_port, use_reloader=False)
         # app.run(host='0.0.0.0', port=client_port)
         # for pycharm debugging

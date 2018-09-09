@@ -14,7 +14,10 @@ class DataStore(object):
     # MAINTENANCE
     def get_db_path(self):
         node_id = self.node_id
-        filename = 'abrim_' + node_id + '.sqlite'
+        port_int = self.port
+        port_temp = str(port_int)
+        port = port_temp[:-1]
+        filename = 'abrim_' + node_id + '_' + port + '.sqlite'
         try:
             # noinspection PyUnresolvedReferences
             import appdirs
@@ -234,16 +237,18 @@ class DataStore(object):
             callb = log.debug
         self.con.set_trace_callback(callb)
 
-    def __init__(self, node_id, db_prefix="", drop_db=False):
-        if not node_id:
+    def __init__(self, node_id, port, db_prefix="", drop_db=False):
+        if not node_id or not port:
             raise Exception
         else:
             self.node_id = node_id
             self.db_prefix = db_prefix
+            self.port = port
 
         self._transaction_code = None
         self.db_path = ""
         self.get_db_path()
+        # log.debug(self.db_path)
         with sqlite3.connect(self.db_path) as con:
             #con.isolation_level = None
             con.isolation_level = 'EXCLUSIVE'

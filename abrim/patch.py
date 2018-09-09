@@ -42,8 +42,8 @@ def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc,
     return True
 
 
-def process_out_patches(lock, node_id):
-    config = Config(node_id)
+def process_out_patches(lock, node_id, port):
+    config = Config(node_id, port)
 
     there_was_nodes = False
     # to avoid one node hoarding the queue, process one patch a time for each node
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     else:
         while True:
             lock = multiprocessing.Lock()
-            p = multiprocessing.Process(target=process_out_patches, args=(lock, node_id_, ))
+            p = multiprocessing.Process(target=process_out_patches, args=(lock, node_id_, client_port))
             p_name = p.name
             # log.debug(p_name + " starting up")
             p.start()
