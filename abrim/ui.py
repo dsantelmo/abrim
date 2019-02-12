@@ -51,6 +51,9 @@ def _get_request(username, password, node, url_path, payload=None):
     except requests.exceptions.MissingSchema:
         log.warning("MissingSchema")
         return None
+    except requests.exceptions.InvalidSchema:
+        log.warning("InvalidSchema")
+        return None
     else:
         return raw_response
 
