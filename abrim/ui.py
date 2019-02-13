@@ -80,7 +80,6 @@ def _put_request(username, password, node, url_path, payload):
 
 def _test_password(username, password, node):
     url_path = "/auth"
-    log.debug(node)
     raw_response = _get_request(username, password, node, url_path)
 
     if not raw_response:
@@ -207,8 +206,13 @@ def _req_get_item(username, password, node, node_id_, item_id):
 
 
 @app.before_request
-def before_request():  # TODO is doing this secure?
-    try:
+def before_request():
+    if request.full_path and request.method:
+        log.debug(request.method + " REQUEST: " + request.full_path)
+    else:
+        log.error("request doesn't have a full_path and/or method")
+        return redirect(url_for('_root'))
+    try:  # TODO is doing this secure?
         session['current_user_name'] = current_user.name
         session['current_user_password'] = current_user.password
     except AttributeError:
@@ -331,7 +335,6 @@ def _login():
 @app.route('/new', methods=['GET', 'POST'])
 @login_required
 def _new():
-    log.debug("_new")
     if request.method == 'POST':
         try:
             item_id = request.form['item_id']
