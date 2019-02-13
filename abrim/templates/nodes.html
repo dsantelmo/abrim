@@ -3,11 +3,11 @@
     <header>
         <h1 id="main_title"></h1>
     </header>
-    <nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><a href="/new">new</a> - <a href="/nodes">nodes</a> - <a href="/logout">logout</a></nav>
+    <nav><!--User: {{ user_id|safe }} || Node: {{ node_id|safe }} || --><a href="/new">new</a> - <a href="/">list</a> - <a href="/logout">logout</a></nav>
     <main>
         <article>
             <header>
-              <h3>items:</h3>
+              <h3>nodes:</h3>
               <!--<p>Last modified: <time datetime="2000-01-01T00:00:00Z">on 2000/01/01 at 0:00pm</time>
               </p>-->
             </header>
@@ -16,10 +16,18 @@
                     {% if conn_ok %}
                         {% if content %}
                             {% for item in content %}
-                                <p> <a href="/nodes/{{ item.node|safe }}/items/{{ item.id|safe }}">{{ item.id|safe }}</a></p>
+                                <p><a href="{{ item.base_url|safe }}">{{ item.id|safe }}</a></p>
                             {% endfor %}
+
+                            <form action="/nodes" method="post">
+                                <p>New node: <input type=text name=new_node_base_url value="http://localhost:6000"></p>
+                                <p><input type=submit value="Add node"></p>
+                            </form>
                         {% else %}
-                            <p>No content!</p>
+                            <form action="/nodes" method="post">
+                                <p>New node: <input type=text name=new_node_base_url value="http://localhost:6000"></p>
+                                <p><input type=submit value="Add node"></p>
+                            </form>
                         {% endif %}
                     {% else %}
                         <p>Failed to connect!</p>

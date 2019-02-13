@@ -78,6 +78,26 @@ def _put_request(username, password, node, url_path, payload):
         return raw_response
 
 
+def _post_request(username, password, node, url_path, payload):
+    url = node + url_path
+    auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii")
+    headers = {
+        'content-type': "application/json",
+        'authorization': "Basic {}".format(auth_basic),
+    }
+    log.debug("requesting {}".format(url))
+    try:
+        raw_response = requests.post(url, data=payload, headers=headers, timeout=1)
+    except requests.exceptions.ConnectTimeout:
+        log.warning("ConnectTimeout")
+        return None
+    except requests.exceptions.MissingSchema:
+        log.warning("MissingSchema")
+        return None
+    else:
+        return raw_response
+
+
 def _test_password(username, password, node):
     url_path = "/auth"
     raw_response = _get_request(username, password, node, url_path)
@@ -99,6 +119,19 @@ def _check_list_items(raw_response):
     if raw_response:
         api_unique_code, response_http, response_dict = response_parse(raw_response)
         if response_http == 200 and api_unique_code == "queue_in/get_items/200/ok":
+
+            log.debug(response_dict)
+            return response_dict
+        else:
+            return None
+    else:
+        return None
+    
+
+def _check_list_nodes(raw_response):
+    if raw_response:
+        api_unique_code, response_http, response_dict = response_parse(raw_response)
+        if response_http == 200 and api_unique_code == "queue_in/get_nodes/200/ok":
 
             log.debug(response_dict)
             return response_dict
@@ -142,7 +175,7 @@ def _list_nodes(username, password, node):
         log.debug("connection error")
         return None, False, True
     else:
-        response_dict = _check_list_items(raw_response)
+        response_dict = _check_list_nodes(raw_response)
         if response_dict:
             try:
                 content = response_dict['content']
@@ -238,21 +271,41 @@ def _root():
         return redirect(url_for('_root'))
 
 
-@app.route('/nodes', methods=['GET'])
+@app.route('/nodes', methods=['GET', 'POST'])
 @login_required
 def _nodes():
-    try:
-        content, conn_ok, auth_ok = _list_nodes(session['current_user_name'],
-                                                session['current_user_password'],
-                                                session['user_node'])
-        return render_template('nodes.html', conn_ok=conn_ok, auth_ok=auth_ok, content=content)
-    except KeyError:
-        log.debug("AttributeError, logging out")
-        logout_user()
-        return redirect(url_for('_root'))
+    if request.method == 'GET':
+        try:
+            content, conn_ok, auth_ok = _list_nodes(session['current_user_name'],
+                                                    session['current_user_password'],
+                                                    session['user_node'])
+            return render_template('nodes.html', conn_ok=conn_ok, auth_ok=auth_ok, content=content)
+        except KeyError:
+            log.debug("AttributeError, logging out")
+            logout_user()
+            return redirect(url_for('_root'))
+    else:
+        try:
+            new_node_base_url = request.form['new_node_base_url']
+            log.debug(new_node_base_url)
+        except IndexError:
+            log.debug("_new IndexError")
+            return redirect(url_for('_nodes'))
+        except KeyError:
+            log.debug("_new KeyError")
+            return redirect(url_for('_nodes'))
+        url_path = "/users/{}/nodes".format(session['current_user_name'])
+        url_path = "/users/user_1/nodes" #fixme
+        _post_new_node(new_node_base_url,
+                          session['current_user_name'],
+                          session['current_user_password'],
+                          session['user_node'],
+                          url_path)
+        return redirect(url_for('_nodes'))
 
 
-@app.route('/nodes/<string:node_id>/items/<string:item_id>', methods=['GET','POST'])
+
+@app.route('/nodes/<string:node_id>/items/<string:item_id>', methods=['GET', 'POST'])
 @login_required
 def _get_item(node_id, item_id):
     if request.method == 'GET':
@@ -301,6 +354,18 @@ def _put_updated_text(client_text,
 
     _put_request(username, password, node, url_path, payload)
 
+
+def _post_new_node(new_node_base_url,
+                   username,
+                   password,
+                   node,
+                   url_path):
+    payload = {"new_node_base_url": new_node_base_url }
+
+    import json
+    payload = json.dumps(payload)
+
+    _post_request(username, password, node, url_path, payload)
 
 
 @app.route('/login', methods=['GET', 'POST'])

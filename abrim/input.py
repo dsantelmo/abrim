@@ -69,6 +69,17 @@ def _check_text_request_ok(r_json):
     return True, r_json['text']
 
 
+def _check_new_node_ok(r_json):
+    if not check_fields_in_dict(r_json, ('new_node_base_url',)):
+        return False, _
+    try:
+        log.debug("new_node_base_url: {:.30}...".format(r_json['new_node_base_url'].replace('\n', ' ')))
+    except KeyError:
+        log.error("no new_node_base_url in request")
+        return False, _
+    return True, r_json['new_node_base_url']
+
+
 def _check_revs(config, item_id, client_node_id, n_rev, m_rev):
     saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
 
@@ -332,6 +343,38 @@ def _get_nodes(user_id):
     else:
         log.info("get_nodes about to finish OK")
         return resp("queue_in/get_nodes/200/ok", "get_nodes OK", nodes)
+
+
+@app.route('/users/<string:user_id>/nodes', methods=['POST'])
+@requires_auth
+def _post_node(user_id):
+    config = g.config
+    try:
+        if not _check_permissions("to do"):  # TODO: implement me
+            return resp("queue_in/post_node/403/check_permissions", "you have no permissions for that")
+
+        r_json = request.get_json()
+
+        check_new_node_ok, new_node_base_url = _check_new_node_ok(r_json)
+        if not check_new_node_ok:
+            return resp("queue_in/post_node/405/check_req", "Malformed JSON request")
+
+        log.debug("request with the new node seems ok, trying to save it")
+        config.db.start_transaction("_put_text")
+
+        config.db.add_known_node(new_node_base_url)
+    except Exception as err:
+        config.db.rollback_transaction()
+        log.error("ERROR: {}".format(err))
+        traceback.print_exc()
+        return resp("queue_in/post_node/500/transaction_exception", "Unknown error. Please report this")
+    else:
+        log.info("_post_node about to finish OK")
+        config.db.end_transaction()
+
+    return resp("queue_in/post_node/201/done", "New node added")
+
+
 
 
 def __end():
