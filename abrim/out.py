@@ -73,7 +73,9 @@ def process_out_queue(lock, node_id, port):
     # lock.release()
 
     result = None
-    for other_node_id, other_node_url in config.db.get_known_nodes():
+    for known_node in config.db.get_known_nodes():
+        other_node_id = known_node["id"]
+        other_node_url = known_node["base_url"]
         if other_node_url:
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
@@ -155,6 +157,7 @@ def process_out_queue(lock, node_id, port):
                     time.sleep(15)
                 finally:
                     queue_limit -= 1
+            config.db.end_transaction(True)
 
     if config.db.check_transaction():
         config.db.end_transaction(True)
