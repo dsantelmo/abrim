@@ -133,9 +133,6 @@ def update_item(config, item_id, new_text):
 @app.route('/auth', methods=['GET'])
 @requires_auth
 def _auth():
-    log.debug("-------------------------------------------------------------------------------")
-    log.debug("GET REQUEST: /auth")
-
     if not _check_permissions("to do"):  # TODO: implement me
         return resp("queue_in/auth/403/check_permissions", "you have no permissions for that")
     else:
@@ -146,9 +143,6 @@ def _auth():
 @requires_auth
 def _post_sync(user_id, client_node_id, item_id):
     config = g.config
-    log.debug("-------------------------------------------------------------------------------")
-    log.debug("POST REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
-
     try:
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/post_sync/403/check_permissions", "you have no permissions for that")
@@ -210,8 +204,6 @@ def _post_sync(user_id, client_node_id, item_id):
 @requires_auth
 def _put_shadow(user_id, client_node_id, item_id):
     config = g.config
-    log.debug("-------------------------------------------------------------------------------")
-    log.debug("PUT REQUEST: /users/{}/nodes/{}/items/{}/shadow".format(user_id, client_node_id, item_id, ))
     config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
 
     try:
@@ -250,9 +242,6 @@ def _put_shadow(user_id, client_node_id, item_id):
 @requires_auth
 def _get_text(user_id, client_node_id, item_id):
     config = g.config
-    log.debug("-------------------------------------------------------------------------------")
-    log.debug("GET REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
-
     try:
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_text/403/check_permissions", "you have no permissions for that")
@@ -275,9 +264,6 @@ def _get_text(user_id, client_node_id, item_id):
 @requires_auth
 def _put_text(user_id, client_node_id, item_id):
     config = g.config
-    log.debug("-------------------------------------------------------------------------------")
-    log.debug("PUT REQUEST: /users/{}/nodes/{}/items/{}".format(user_id, client_node_id, item_id, ))
-
     try:
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/put_text/403/check_permissions", "you have no permissions for that")
@@ -308,9 +294,6 @@ def _put_text(user_id, client_node_id, item_id):
 @requires_auth
 def _get_items(user_id, client_node_id):
     config = g.config
-    log.debug("-------------------------------------------------------------------------------")
-    log.debug("GET REQUEST: /users/{}/nodes/{}/items".format(user_id, client_node_id))
-
     try:
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_items/403/check_permissions", "you have no permissions for that")
@@ -333,9 +316,6 @@ def _get_items(user_id, client_node_id):
 @requires_auth
 def _get_nodes(user_id):
     config = g.config
-    log.debug("-------------------------------------------------------------------------------")
-    log.debug("GET REQUEST: /users/{}/nodes".format(user_id))
-
     try:
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_nodes/403/check_permissions", "you have no permissions for that")
@@ -361,6 +341,12 @@ def __end():
 
 @app.before_request
 def before_request():
+    log.debug("-------------------------------------------------------------------------------")
+    if request.full_path and request.method:
+        log.debug(request.method + " REQUEST: " + request.full_path)
+    else:
+        log.error("request doesn't have a full_path and/or method")
+        return resp("queue_in/before_request/500/unknown", "Unknown error. Please report this")
     # db.prepare_db_path(app.config['DB_PATH'])
     config = Config(app.config['NODE_ID'], app.config['PORT'])
     g.config = config
