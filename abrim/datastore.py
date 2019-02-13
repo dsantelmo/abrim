@@ -270,8 +270,12 @@ class DataStore(object):
         self.cur.execute("""SELECT id, base_url
                        FROM nodes
                        WHERE id <> ?
+                       AND base_url IS NOT NULL
                        ORDER BY id ASC""", (self.node_id,))
-        return self.cur.fetchall()
+        nodes = []
+        for node in self.cur.fetchall():
+            nodes.append({"id": node["id"], "base_url": node["base_url"], })
+        return nodes
 
     # REV AND SHADOW
 

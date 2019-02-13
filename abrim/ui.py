@@ -113,7 +113,7 @@ def _list_items(username, password, node):
     url_path = "/users/user_1/nodes/node_1/items"  #FIXME change it so it doesn't ask for user and node
     raw_response = _get_request(username, password, node, url_path)
 
-    if not raw_response:
+    if not raw_response and raw_response.status_code != 404:
         log.debug("connection error")
         return None, False, True
     else:
@@ -130,6 +130,34 @@ def _list_items(username, password, node):
             if raw_response.status_code == 401:
                 log.warning("not auth")
                 return None, True, False
+            else:
+                log.warning("no response_dict {}".format(raw_response))
+                return None, False, True
+
+
+def _list_nodes(username, password, node):
+    url_path = "/users/user_1/nodes"  #FIXME change it so it doesn't ask for user and node
+    raw_response = _get_request(username, password, node, url_path)
+
+    if not raw_response and raw_response.status_code != 404:
+        log.debug("connection error")
+        return None, False, True
+    else:
+        response_dict = _check_list_items(raw_response)
+        if response_dict:
+            try:
+                content = response_dict['content']
+                log.debug(content)
+                return content, True, True
+            except KeyError:
+                log.error("KeyError {}".format(response_dict))
+                return None, True, True
+        else:
+            if raw_response.status_code == 401:
+                log.warning("not auth")
+                return None, True, False
+            if raw_response.status_code == 404:
+                return None, True, True
             else:
                 log.warning("no response_dict {}".format(raw_response))
                 return None, False, True
@@ -200,6 +228,20 @@ def _root():
                                                 session['current_user_password'],
                                                 session['user_node'])
         return render_template('list.html', conn_ok=conn_ok, auth_ok=auth_ok, content=content)
+    except KeyError:
+        log.debug("AttributeError, logging out")
+        logout_user()
+        return redirect(url_for('_root'))
+
+
+@app.route('/nodes', methods=['GET'])
+@login_required
+def _nodes():
+    try:
+        content, conn_ok, auth_ok = _list_nodes(session['current_user_name'],
+                                                session['current_user_password'],
+                                                session['user_node'])
+        return render_template('nodes.html', conn_ok=conn_ok, auth_ok=auth_ok, content=content)
     except KeyError:
         log.debug("AttributeError, logging out")
         logout_user()

@@ -329,6 +329,31 @@ def _get_items(user_id, client_node_id):
         return resp("queue_in/get_items/200/ok", "get_text OK", items)
 
 
+@app.route('/users/<string:user_id>/nodes', methods=['GET'])
+@requires_auth
+def _get_nodes(user_id):
+    config = g.config
+    log.debug("-------------------------------------------------------------------------------")
+    log.debug("GET REQUEST: /users/{}/nodes".format(user_id))
+
+    try:
+        if not _check_permissions("to do"):  # TODO: implement me
+            return resp("queue_in/get_nodes/403/check_permissions", "you have no permissions for that")
+
+        # config.db.sql_debug_trace(True)
+        nodes = config.db.get_known_nodes()
+        if not nodes:
+            return resp("queue_in/get_nodes/404/not_items", "No nodes")
+
+    except Exception as err:
+        log.error(err)
+        traceback.print_exc()
+        return resp("queue_in/get_nodes/500/transaction_exception", "Unknown error. Please report this")
+    else:
+        log.info("get_nodes about to finish OK")
+        return resp("queue_in/get_nodes/200/ok", "get_nodes OK", nodes)
+
+
 def __end():
     # db.close_db()
     pass
