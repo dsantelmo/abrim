@@ -182,7 +182,10 @@ def __do_request(method, url, username=None, password=None, payload=None):
         raise Exception
 
     headers, payload = __prepare_request(username, password, payload)
-    log.debug(f"about to {method} this {payload} to {url} using {headers}")
+    if payload:
+        log.debug(f"about to {method} this {payload} to {url} using {headers}")
+    else:
+        log.debug(f"about to {method} to {url} using {headers}")
     try:
         if method == 'GET':
             raw_response = requests.get(url, headers=headers, timeout=1)
