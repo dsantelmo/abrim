@@ -15,9 +15,7 @@ def date_handler(obj):
     return obj.isoformat() if hasattr(obj, 'isoformat') else obj
 
 
-def __prepare_request(url, payload):
-    log.debug("about to POST/PUT: {}".format(payload))
-    log.debug("to URL: {}".format(url))
+def __prepare_request(payload):
     temp_str = json.dumps(payload, default=date_handler)
     json_dict = json.loads(temp_str)
 
@@ -32,23 +30,22 @@ def __prepare_request(url, payload):
     return headers, json_dict
 
 
-def __requests_post(url, payload):
-    headers, json_dict = __prepare_request(url, payload)
-    return requests.post(url, headers=headers, json=json_dict)
-
-
-def __requests_put(url, payload):
-    headers, json_dict = __prepare_request(url, payload)
-    return requests.put(url, headers=headers, json=json_dict)
+def __requests_post_put(url, payload, use_put=False):
+    headers, json_dict = __prepare_request(payload)
+    put_post = 'POST'
+    if use_put:
+        put_post = 'PUT'
+    log.debug(f"about to {put_post} this {json_dict} to {url} using {headers}")
+    if use_put:
+        result = requests.put(url, headers=headers, json=json_dict)
+    else:
+        result = requests.post(url, headers=headers, json=json_dict)
+    return result
 
 
 def send_sync(edit, other_node_url, use_put=False):
     try:
-        if use_put:
-            p_response = __requests_put(other_node_url, edit)
-        else:
-            p_response = __requests_post(other_node_url, edit)
-
+        p_response = __requests_post_put(other_node_url, edit, use_put)
         api_unique_code, response_http, _ = response_parse(p_response)
         return response_http, api_unique_code
     except requests.exceptions.ConnectionError:
