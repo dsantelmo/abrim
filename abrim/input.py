@@ -2,7 +2,8 @@
 
 import traceback
 import time
-from flask import Flask, g, request, abort
+import werkzeug
+from flask import Flask, g, request
 from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
                        create_hash, args_init, requires_auth
@@ -353,7 +354,10 @@ def _post_node(user_id):
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/post_node/403/check_permissions", "you have no permissions for that")
 
-        r_json = request.get_json()
+        try:
+            r_json = request.get_json()
+        except werkzeug.exceptions.BadRequest:
+            return resp("queue_in/post_node/405/check_req", "Malformed JSON request")
 
         check_new_node_ok, new_node_base_url = _check_new_node_ok(r_json)
         if not check_new_node_ok:
