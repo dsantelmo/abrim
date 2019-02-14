@@ -19,7 +19,15 @@ def __prepare_request(url, payload):
     log.debug("to URL: {}".format(url))
     temp_str = json.dumps(payload, default=date_handler)
     json_dict = json.loads(temp_str)
-    headers = {'Content-Type': 'application/json'}
+
+    username = "admin"
+    password = "secret"
+    auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii") #FIXME
+
+    headers = {
+        'content-type': "application/json",
+        'authorization': "Basic {}".format(auth_basic),
+    }
     return headers, json_dict
 
 
@@ -80,17 +88,26 @@ def process_out_queue(lock, node_id, port):
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
                 config.db.start_transaction()
+                config.db.sql_debug_trace(True) # DELETEME
                 edit, item, m_rev, n_rev, rowid = get_first_queued_edit(config, other_node_id)
                 if not rowid:
+                    log.debug("not rowid for " + other_node_id) # DELETEME
                     break
 
+                log.debug("other_node_url: " + other_node_url)
                 url = prepare_url(config, item, other_node_url)
                 try:
                     response_http, api_unique_code = send_sync(edit, url)
 
-                    response_http = int(response_http)
+                    try:
+                        response_http = int(response_http)
+                    except TypeError:
+                        response_http = 0
 
-                    if response_http == 201:
+                    if response_http == 0:
+                        log.debug("bad response. Rolling back")
+                        config.db.rollback_transaction()
+                    elif response_http == 201:
                         if (
                                 api_unique_code == "queue_in/post_sync/201/done" or
                                 api_unique_code == "queue_in/post_sync/201/ack"):
@@ -180,6 +197,7 @@ def get_first_queued_edit(config, other_node_id):
         item = edit["item"]
         n_rev = edit["n_rev"]
         m_rev = edit["m_rev"]
+        log.debug("queued edits for " + other_node_id)
         return edit, item, m_rev, n_rev, rowid
 
 
