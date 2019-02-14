@@ -15,7 +15,7 @@ app = Flask(__name__)
 def _get_server_shadow(config, item_id, client_node_id, n_rev, m_rev):
     got_shadow, shadow = config.db.get_shadow(item_id, client_node_id, n_rev, m_rev)
     if got_shadow:
-        log.debug("shadow: {}".format(shadow))
+        log.debug(f"shadow: {shadow}")
     return got_shadow, shadow
 
 
@@ -38,11 +38,10 @@ def _check_post_sync_request_ok(r_js):
     if not check_fields_in_dict(r_js, ('n_rev', 'm_rev', 'old_shadow_adler32', 'shadow_adler32',)):
         return None
     try:
-        log.debug("n_rev: {} - m_rev: {}".format(r_js['n_rev'], r_js['m_rev']))
+        log.debug(f"n_rev: {r_js['n_rev']} - m_rev: {r_js['m_rev']}")
         log.debug("has edits: {:.30}...".format(r_js['edits'].replace('\n', ' ')))
     except KeyError:
-        log.debug("edit request revs: {} - {}, no edits".format(r_js['shadow_client_rev'],
-                                                               r_js['shadow_server_rev']))
+        log.debug(f"edit request revs: {r_js['shadow_client_rev']} - {r_js['shadow_server_rev'])}, no edits")
     return r_js['n_rev'], r_js['m_rev'], r_js['old_shadow_adler32'], r_js['shadow_adler32'], r_js['edits']
 
 
@@ -50,7 +49,7 @@ def _check_shadow_request_ok(r_json):
     if not check_fields_in_dict(r_json, ('n_rev', 'm_rev', 'shadow',)):
         return False, _
     try:
-        log.info("revs: {} - {}".format(r_json['n_rev'], r_json['m_rev']))
+        log.info(f"revs: {r_json['n_rev']} - {r_json['m_rev']}")
         log.info("has shadow: {:.30}...".format(r_json['shadow'].replace('\n', ' ')))
     except KeyError:
         log.error("no shadow in request")
@@ -84,10 +83,10 @@ def _check_revs(config, item_id, client_node_id, n_rev, m_rev):
     saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
 
     if n_rev != saved_n_rev:
-        log.error("n_rev DOESN'T match: {} - {}".format(n_rev, saved_n_rev))
+        log.error(f"n_rev DOESN'T match: {n_rev} - {saved_n_rev}")
         return False
     if m_rev != saved_m_rev:
-        log.error("m_rev DOESN'T match: {} - {}".format(m_rev, saved_m_rev))
+        log.error(f"m_rev DOESN'T match: {m_rev} - {saved_m_rev}")
         return False
     return saved_n_rev, saved_m_rev
 
@@ -136,7 +135,7 @@ def update_item(config, item_id, new_text):
         if n_rev == 0 or diffs:
             old_hash = create_hash(old_shadow)
             new_hash = create_hash(new_text)
-            log.debug("old_hash: {}, new_hash: {}, diffs: {}".format(old_hash, new_hash, diffs))
+            log.debug(f"old_hash: {old_hash}, new_hash: {new_hash}, diffs: {diffs}")
             config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev)
         else:
             log.warn("no diffs. Nothing done!")
@@ -199,7 +198,7 @@ def _post_sync(user_id, client_node_id, item_id):
 
     except Exception as err:
         config.db.rollback_transaction()
-        log.error("ERROR: {}".format(err))
+        log.error(f"ERROR: {err}")
         traceback.print_exc()
         return resp("queue_in/post_sync/500/transaction_exception", "Unknown error. Please report this")
     else:
@@ -366,7 +365,7 @@ def _post_node(user_id):
         config.db.add_known_node(new_node_base_url)
     except Exception as err:
         config.db.rollback_transaction()
-        log.error("ERROR: {}".format(err))
+        log.error(f"ERROR: {err}")
         traceback.print_exc()
         return resp("queue_in/post_node/500/transaction_exception", "Unknown error. Please report this")
     else:
@@ -403,13 +402,13 @@ def teardown_request(exception):
 
 
 if __name__ == "__main__":  # pragma: no cover
-    log.info("{} started".format(__file__))
+    log.info(f"{__file__} started")
     node_id, client_port = args_init()
 
     if not node_id or not client_port:
         __end()
     else:
-        log.info("node {} running in port {}".format(node_id, client_port))
+        log.info(f"node {node_id} running in port {client_port}")
         if 'NODE_ID' not in app.config:
             app.config['NODE_ID'] = node_id
         if 'PORT' not in app.config:

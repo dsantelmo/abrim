@@ -11,7 +11,7 @@ from flask import jsonify, request, Response
 
 
 def resp(api_unique_code, msg, resp_json=None):
-    log.debug("RESPONSE: {} :: {}".format(api_unique_code, msg))
+    log.debug(f"RESPONSE: {api_unique_code} :: {msg}")
     log.debug("-----------------------------------------------")
     if not resp_json:
         to_jsonify = {
@@ -67,7 +67,7 @@ def create_diff_edits(text, shadow):
     if text == shadow:
         log.debug("both texts are the same...")
         return ""
-    log.debug("about to diff \"{}\" with \"{}\"".format(shadow, text,))
+    log.debug(f"about to diff '{shadow}' with '{text}'")
     diff_obj = diff_match_patch.diff_match_patch()
     diff_obj.Diff_Timeout = 1
     diff = diff_obj.diff_main(shadow, text)
@@ -81,7 +81,7 @@ def create_diff_edits(text, shadow):
 
 
 def fragile_patch_text(item_patches, text):
-    log.debug("patching: {}\nwith: {}".format(item_patches, text))
+    log.debug(f"patching: {item_patches}\nwith: {text}")
     diff_obj = diff_match_patch.diff_match_patch()
     # these are FRAGILE patches and must match perfectly
     diff_match_patch.Match_Threshold = 0
@@ -92,7 +92,7 @@ def fragile_patch_text(item_patches, text):
 
 
 def fuzzy_patch_text(item_patches, text):
-    log.debug("patching: {}\nwith: {}".format(item_patches, text))
+    log.debug(f"patching: {item_patches}\nwith: {text}")
     diff_obj = diff_match_patch.diff_match_patch()
     # these are best-effort FUZZY patches
     diff_match_patch.Match_Threshold = 1
@@ -104,18 +104,18 @@ def fuzzy_patch_text(item_patches, text):
 
 def create_hash(text):
     adler32 = zlib.adler32(text.encode())
-    log.debug("new hash {}".format(adler32))
+    log.debug(f"new hash {adler32}")
     return adler32
 
 
 def check_fields_in_dict(my_dict, fields):
-    log.debug("checking {} for {}".format(my_dict,fields))
+    log.debug(f"checking {my_dict} for {fields}")
     is_ok = True
     for field in fields:
         try:
             _ = my_dict[field]
         except KeyError:
-            log.error("missing '{}' in dict".format(field))
+            log.error(f"missing '{field}' in dict")
             is_ok = False
     return is_ok
 
@@ -127,17 +127,17 @@ def check_fields_in_dict(my_dict, fields):
 
 
 def check_crc(text, crc):
-    log.debug("checking CRC of {} to {}".format(text, crc))
+    log.debug(f"checking CRC of {text} to {crc}")
     text_crc = zlib.adler32(text.encode())
 
     try:
         int_crc = int(crc)
     except ValueError:
-        log.error("request CRC isn't int: {} {}".format(crc, type(crc), ))
+        log.error(f"request CRC isn't int: {crc} {type(crc)}")
         return False
 
     if int_crc != text_crc:
-        log.error("CRCs don't match {} {}".format(int_crc, text_crc, ))
+        log.error(f"CRCs don't match {int_crc} {text_crc}")
         return False
     else:
         return True
@@ -153,14 +153,14 @@ def get_crc(text):
 
 
 def response_parse(raw_response):
-    log.debug("Response: {}".format(raw_response.text))
+    log.debug(f"Response: {raw_response.text}")
     response_http = raw_response.status_code
     try:
         response_dict = json.loads(raw_response.text)
     except json.decoder.JSONDecodeError:
         return None, None, None
     api_unique_code = response_dict['api_unique_code']
-    log.debug("API response: {} HTTP response: {} Dict: {}".format(api_unique_code, response_http, response_dict))
+    log.debug(f"API response: {api_unique_code} HTTP response: {response_http} Dict: {response_dict}")
     return api_unique_code, response_http, response_dict
 
 # auth

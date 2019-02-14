@@ -25,7 +25,7 @@ def __prepare_request(payload):
 
     headers = {
         'content-type': "application/json",
-        'authorization': "Basic {}".format(auth_basic),
+        'authorization': f"Basic {auth_basic}",
     }
     return headers, json_dict
 
@@ -52,10 +52,10 @@ def send_sync(edit, other_node_url, use_put=False):
         raise
     except requests.exceptions.HTTPError as err:
         post_response = err.response.status_code
-        log.info("HTTPError!! code: {} Sleep 15 secs".format(post_response))
+        log.info(f"HTTPError!! code: {post_response} Sleep 15 secs")
         raise
     except json.decoder.JSONDecodeError as err:
-        log.info("JSONDecodeError!! code: {} Sleep 15 secs".format(err))
+        log.info(f"JSONDecodeError!! code: {err} Sleep 15 secs")
         raise
     except (AttributeError, TypeError):
         log.error("Error in the response payload. Sleep 15 secs")
@@ -63,10 +63,7 @@ def send_sync(edit, other_node_url, use_put=False):
 
 
 def prepare_url(config_, item_id, other_node_url):
-    url_route = "{}/users/user_1/nodes/{}/items/{}".format(
-        other_node_url,
-        config_.node_id,
-        item_id, )  # FIXME don't trust node_id from url
+    url_route = f"{other_node_url}/users/user_1/nodes/{config_.node_id}/items/{item_id}"  # FIXME don't trust node_id from url
     return url_route
 
 
@@ -151,7 +148,7 @@ def process_out_queue(lock, node_id, port):
                             raise Exception("implement me! 6")
                     else:
                         # raise for the rest of the codes
-                        log.error("Undefined HTTP response: {} {}".format(response_http, api_unique_code))
+                        log.error(f"Undefined HTTP response: {response_http} {api_unique_code}")
                         config.db.rollback_transaction()
                         raise Exception("Undefined HTTP response")  # fail for the rest of HTTP codes
                 except (requests.exceptions.ConnectionError) as err:
@@ -200,7 +197,7 @@ def get_first_queued_edit(config, other_node_id):
 
 
 if __name__ == '__main__':
-    log.info("{} started".format(__file__))
+    log.info(f"{__file__} started")
     node_id_, client_port = args_init()
     if not node_id_ or not client_port:
         pass

@@ -37,9 +37,9 @@ def _get_request(username, password, node, url_path, payload=None):
     auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii")
     headers = {
         'content-type': "application/json",
-        'authorization': "Basic {}".format(auth_basic),
+        'authorization': f"Basic {auth_basic}",
     }
-    log.debug("requesting {}".format(url))
+    log.debug(f"requesting {url}")
     try:
         if payload:
             raw_response = requests.get(url, data=payload, headers=headers, timeout=1)
@@ -63,9 +63,9 @@ def _put_request(username, password, node, url_path, payload):
     auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii")
     headers = {
         'content-type': "application/json",
-        'authorization': "Basic {}".format(auth_basic),
+        'authorization': f"Basic {auth_basic}",
     }
-    log.debug("requesting {}".format(url))
+    log.debug(f"requesting {url}")
     try:
         raw_response = requests.put(url, data=payload, headers=headers, timeout=1)
     except requests.exceptions.ConnectTimeout:
@@ -83,9 +83,9 @@ def _post_request(username, password, node, url_path, payload):
     auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii")
     headers = {
         'content-type': "application/json",
-        'authorization': "Basic {}".format(auth_basic),
+        'authorization': f"Basic {auth_basic}",
     }
-    log.debug("requesting {}".format(url))
+    log.debug(f"requesting {url}")
     try:
         raw_response = requests.post(url, data=payload, headers=headers, timeout=1)
     except requests.exceptions.ConnectTimeout:
@@ -108,7 +108,7 @@ def _test_password(username, password, node):
     else:
         api_unique_code, response_http, _ = response_parse(raw_response)
         if response_http != 200 or api_unique_code != "queue_in/auth/200/ok":
-            log.warning("bad response_http ({}) or api_unique_code ({})".format(response_http, api_unique_code))
+            log.warning(f"bad response_http ({response_http}) or api_unique_code ({api_unique_code})")
             return False
         else:
             log.debug("auth OK")
@@ -156,7 +156,7 @@ def _list_items(username, password, node):
                 log.debug(content)
                 return content, True, True
             except KeyError:
-                log.error("KeyError {}".format(response_dict))
+                log.error(f"KeyError in {response_dict}")
                 return None, True, True
         else:
             if raw_response.status_code == 401:
@@ -165,7 +165,7 @@ def _list_items(username, password, node):
             if raw_response.status_code == 404:
                 return None, True, True
             else:
-                log.warning("no response_dict {}".format(raw_response))
+                log.warning(f"no response_dict in {raw_response}")
                 return None, False, True
 
 
@@ -184,7 +184,7 @@ def _list_nodes(username, password, node):
                 log.debug(content)
                 return content, True, True
             except KeyError:
-                log.error("KeyError {}".format(response_dict))
+                log.error(f"KeyError in {response_dict}")
                 return None, True, True
         else:
             if raw_response.status_code == 401:
@@ -193,7 +193,7 @@ def _list_nodes(username, password, node):
             if raw_response.status_code == 404:
                 return None, True, True
             else:
-                log.warning("no response_dict {}".format(raw_response))
+                log.warning(f"no response_dict {raw_response}")
                 return None, False, True
 
 
@@ -212,7 +212,7 @@ def _check_get_items(raw_response):
 
 def _req_get_item(username, password, node, node_id_, item_id):
     # returns: content, conn_ok, auth_ok
-    url_path = "/users/{}/nodes/{}/items/{}".format(username, node_id_, item_id)
+    url_path = f"/users/{username}/nodes/{node_id_}/items/{item_id}"
     raw_response = _get_request(username, password, node, url_path)
 
     if not raw_response:
@@ -229,14 +229,14 @@ def _req_get_item(username, password, node, node_id_, item_id):
                 log.debug(content)
                 return content, True, True
             except KeyError:
-                log.error("KeyError {}".format(response_dict))
+                log.error(f"KeyError in {response_dict}")
                 return None, True, True
         else:
             if raw_response.status_code == 401:
                 log.warning("not auth")
                 return None, True, False
             else:
-                log.warning("no response_dict {}".format(raw_response))
+                log.warning(f"no response_dict in {raw_response}")
                 return None, False, True
 
 
@@ -296,7 +296,7 @@ def _nodes():
         except KeyError:
             log.debug("_new KeyError")
             return redirect(url_for('_nodes'))
-        url_path = "/users/{}/nodes".format(session['current_user_name'])
+        url_path = f"/users/{session['current_user_name']}/nodes"
         url_path = "/users/user_1/nodes" #fixme
         _post_new_node(new_node_base_url,
                           session['current_user_name'],
@@ -322,7 +322,7 @@ def _get_item(node_id, item_id):
             return redirect(url_for('_root'))
     else:  # POST is used to print the textarea for edits and recover the sent edit (where ?update added to url)
         if 'update' in request.args and 'client_text' in request.form:
-            url_path = "/users/{}/nodes/{}/items/{}".format(session['current_user_name'], node_id, item_id)
+            url_path = f"/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
             _put_updated_text(request.form['client_text'],
                               session['current_user_name'],
                               session['current_user_password'],
@@ -414,7 +414,7 @@ def _new():
         except KeyError:
             log.debug("_new KeyError")
             return render_template("new.html", auth_ok=True, item_id=item_id, client_text=client_text)
-        url_path = "/users/{}/nodes/{}/items/{}".format(session['current_user_name'], node_id, item_id)
+        url_path = f"/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
         _put_updated_text(client_text,
                           session['current_user_name'],
                           session['current_user_password'],
@@ -449,7 +449,7 @@ def __end():
 
 
 if __name__ == "__main__":  # pragma: no cover
-    log.info("{} started".format(__file__))
+    log.info(f"{__file__} started")
     node_id, client_port = args_init()
 
     if not node_id or not client_port:

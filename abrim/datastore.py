@@ -161,7 +161,7 @@ class DataStore(object):
                 try:
                     self.cur.execute("rollback")
                 except sqlite3.OperationalError as exc:
-                    log.error("rollback crashed: {}".format(exc))
+                    log.error(f"rollback crashed: {exc}")
             raise
 
     # TRANSACTION
@@ -174,8 +174,7 @@ class DataStore(object):
 
     # TODO: add more hints
     def _log_debug_trans(self, msg: str):  # FIXME maybe use extra or add a filter in logger
-        debug_msg = "{}" + str(msg)
-        log.debug(debug_msg.format(self._get_trans_prefix()))
+        log.debug(f"{self._get_trans_prefix()} {str(msg)}")
 
     def start_transaction(self, msg=None):
         if self.con.in_transaction:
@@ -183,16 +182,14 @@ class DataStore(object):
             try:
                 self.cur.execute("rollback")
             except sqlite3.OperationalError as exc:
-                log.error("rollback crashed: {}".format(exc))
+                log.debug(f"rollback crashed: {exc}")
             raise Exception
 
         self.cur.execute("begin")
         if self.con.in_transaction:
             self._transaction_code = random.randint(0, 1000000)
-            edited_msg = ""
             if msg:
-                edited_msg = ": " + msg
-                self._log_debug_trans("transaction started{}".format(edited_msg))
+                self._log_debug_trans(f"transaction started: {msg}")
         else:
             log.error("NOT in_transaction")
             raise Exception
@@ -221,7 +218,7 @@ class DataStore(object):
             try:
                 self.cur.execute("rollback")
             except sqlite3.OperationalError as exc:
-                log.error("rollback crashed: {}".format(exc))
+                log.error(f"rollback crashed: {exc}")
         else:
             log.warning("tried to rollback a transaction but there was none!!")
         if self.con.in_transaction:
@@ -248,7 +245,7 @@ class DataStore(object):
         self._transaction_code = None
         self.db_path = ""
         self.get_db_path()
-        # log.debug(self.db_path)
+        # log.debug("db_path: " + self.db_path)
         with sqlite3.connect(self.db_path) as con:
             #con.isolation_level = None
             con.isolation_level = 'EXCLUSIVE'
@@ -335,7 +332,7 @@ class DataStore(object):
             return revs_row["n_rev"], revs_row["m_rev"]
 
     def save_new_shadow(self, other_node_id, item_id, new_text, n_rev, m_rev, crc):
-        self._log_debug_trans("about to save shadow: {} {} {}".format(item_id, other_node_id, n_rev))
+        self._log_debug_trans(f"about to save shadow: {item_id} {other_node_id} {n_rev}")
         insert = (item_id,
                   other_node_id,
                   n_rev,
@@ -350,14 +347,14 @@ class DataStore(object):
     # ITEM
 
     def save_item(self, item_id, new_text, text_crc):
-        self._log_debug_trans("about to save item: {} {}".format(item_id, text_crc))
+        self._log_debug_trans(f"about to save item: {item_id} {text_crc}")
         self.cur.execute("""INSERT OR REPLACE INTO items
                        (id,
                         text,
                         node,
                         crc)
                        VALUES (?,?,?,?)""", (item_id, new_text, self.node_id, text_crc))
-        self._log_debug_trans("item {} updated".format(item_id))
+        self._log_debug_trans(f"item {item_id} updated")
 
     def get_item(self, item_id):
         self.cur.execute("""SELECT text, crc
@@ -368,7 +365,7 @@ class DataStore(object):
                   LIMIT 1""", (item_id, self.node_id))
         item_row = self.cur.fetchone()
         if not item_row:
-            self._log_debug_trans("no item found for {}".format(item_id, ))
+            self._log_debug_trans(f"no item found for {item_id}")
             return False, None, None
         else:
             return True, item_row["text"], item_row["crc"]
@@ -399,18 +396,10 @@ class DataStore(object):
                                (item, other_node, n_rev, m_rev, edits, old_shadow_adler32, shadow_adler32)
                                VALUES (?,?,?,?,?,?,?)""", insert)
         except sqlite3.InterfaceError as err:
-            self._log_debug_trans("ERROR AT INSERT VALUES: {}, {}, {}, {}, {}, {}, {}".format(
-                item_id,
-                other_node_id,
-                n_rev,
-                m_rev,
-                diffs,
-                old_hash,
-                new_hash,
-            ))
+            self._log_debug_trans(f"ERROR ({str(err)}) AT INSERT VALUES: {item_id}, {other_node_id}, {n_rev}, {m_rev}, {diffs}, {old_hash}, {new_hash}")
             raise
 
-        self._log_debug_trans("edits {} {} {} saved".format(item_id, other_node_id, n_rev))
+        self._log_debug_trans(f"edits {item_id} {other_node_id} {n_rev} saved")
 
     def get_first_queued_edit(self, other_node_id):
         self.cur.execute("""SELECT rowid, *
@@ -432,18 +421,18 @@ class DataStore(object):
         self.cur.execute("""INSERT INTO edits_archive
                            SELECT * FROM edits
                            WHERE rowid=?""", (edit_rowid,))
-        self._log_debug_trans("edit rowid {} archived".format(edit_rowid))
+        self._log_debug_trans(f"edit rowid {edit_rowid} archived")
 
     def delete_edit(self, edit_rowid):
         self.cur.execute("""DELETE FROM edits
                            WHERE rowid=?""", (edit_rowid,))
-        self._log_debug_trans("edit rowid {} deleted".format(edit_rowid))
+        self._log_debug_trans(f"edit rowid {edit_rowid} deleted")
 
 
     # PATCHES
 
     def save_new_patches(self, other_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc):
-        self._log_debug_trans("about to save patch: {} {} {}".format(item_id, other_node_id, n_rev))
+        self._log_debug_trans(f"about to save patch: {item_id} {other_node_id} {n_rev}")
         insert = (item_id,
                   other_node_id,
                   n_rev,
@@ -512,7 +501,7 @@ class DataStore(object):
                            other_node = ? AND
                            n_rev = ?
                            """, (item, other_node, n_rev,))
-        self._log_debug_trans("edit rowid {} {} {} archived".format(item, other_node, n_rev))
+        self._log_debug_trans(f"edit rowid {item} {other_node} {n_rev} archived")
 
     def delete_patch(self, item, other_node, n_rev):
         self.cur.execute("""DELETE FROM patches
@@ -520,4 +509,4 @@ class DataStore(object):
                            item = ? AND
                            other_node = ? AND
                            n_rev = ?""", (item, other_node, n_rev,))
-        self._log_debug_trans("edit rowid {} {} {} deleted".format(item, other_node, n_rev))
+        self._log_debug_trans(f"edit rowid {item} {other_node} {n_rev} deleted")
