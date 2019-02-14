@@ -41,7 +41,7 @@ def _check_post_sync_request_ok(r_js):
         log.debug(f"n_rev: {r_js['n_rev']} - m_rev: {r_js['m_rev']}")
         log.debug("has edits: {:.30}...".format(r_js['edits'].replace('\n', ' ')))
     except KeyError:
-        log.debug(f"edit request revs: {r_js['shadow_client_rev']} - {r_js['shadow_server_rev'])}, no edits")
+        log.debug(f"edit request revs: {r_js['shadow_client_rev']} - {r_js['shadow_server_rev']}, no edits")
     return r_js['n_rev'], r_js['m_rev'], r_js['old_shadow_adler32'], r_js['shadow_adler32'], r_js['edits']
 
 
