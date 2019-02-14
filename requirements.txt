@@ -2,3 +2,4 @@ appdirs
 diff-match-patch
 Flask
 requests
+flask_login
