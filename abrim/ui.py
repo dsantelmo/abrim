@@ -162,6 +162,8 @@ def _list_items(username, password, node):
             if raw_response.status_code == 401:
                 log.warning("not auth")
                 return None, True, False
+            if raw_response.status_code == 404:
+                return None, True, True
             else:
                 log.warning("no response_dict {}".format(raw_response))
                 return None, False, True
