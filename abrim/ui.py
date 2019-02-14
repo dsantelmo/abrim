@@ -1,14 +1,9 @@
 #!/usr/bin/env python
 
-import traceback
-import time
-import requests
-from base64 import b64encode
 from flask import Flask, session, request, abort, render_template, redirect, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from abrim.config import Config
-from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
-                       create_hash, args_init, response_parse
+from abrim.util import get_log, args_init, response_parse, get_request, post_request, put_request
 
 log = get_log(full_debug=False)
 
@@ -32,75 +27,9 @@ class User(UserMixin):
         return "%s/%s/%s" % (self.id, self.name, self.active)
 
 
-def _get_request(username, password, node, url_path, payload=None):
-    url = node + url_path
-    auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii")
-    headers = {
-        'content-type': "application/json",
-        'authorization': f"Basic {auth_basic}",
-    }
-    log.debug(f"requesting {url}")
-    try:
-        if payload:
-            raw_response = requests.get(url, data=payload, headers=headers, timeout=1)
-        else:
-            raw_response = requests.get(url, headers=headers, timeout=1)
-    except requests.exceptions.ConnectTimeout:
-        log.warning("ConnectTimeout")
-        return None
-    except requests.exceptions.MissingSchema:
-        log.warning("MissingSchema")
-        return None
-    except requests.exceptions.InvalidSchema:
-        log.warning("InvalidSchema")
-        return None
-    else:
-        return raw_response
-
-
-def _put_request(username, password, node, url_path, payload):
-    url = node + url_path
-    auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii")
-    headers = {
-        'content-type': "application/json",
-        'authorization': f"Basic {auth_basic}",
-    }
-    log.debug(f"requesting {url}")
-    try:
-        raw_response = requests.put(url, data=payload, headers=headers, timeout=1)
-    except requests.exceptions.ConnectTimeout:
-        log.warning("ConnectTimeout")
-        return None
-    except requests.exceptions.MissingSchema:
-        log.warning("MissingSchema")
-        return None
-    else:
-        return raw_response
-
-
-def _post_request(username, password, node, url_path, payload):
-    url = node + url_path
-    auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii")
-    headers = {
-        'content-type': "application/json",
-        'authorization': f"Basic {auth_basic}",
-    }
-    log.debug(f"requesting {url}")
-    try:
-        raw_response = requests.post(url, data=payload, headers=headers, timeout=1)
-    except requests.exceptions.ConnectTimeout:
-        log.warning("ConnectTimeout")
-        return None
-    except requests.exceptions.MissingSchema:
-        log.warning("MissingSchema")
-        return None
-    else:
-        return raw_response
-
-
 def _test_password(username, password, node):
-    url_path = "/auth"
-    raw_response = _get_request(username, password, node, url_path)
+    url = f"{node}/auth"
+    raw_response = get_request(url, username, password)
 
     if not raw_response:
         log.debug("connection error")
@@ -142,8 +71,8 @@ def _check_list_nodes(raw_response):
 
 
 def _list_items(username, password, node):
-    url_path = "/users/user_1/nodes/node_1/items"  #FIXME change it so it doesn't ask for user and node
-    raw_response = _get_request(username, password, node, url_path)
+    url = f"{node}/users/user_1/nodes/node_1/items"  #FIXME change it so it doesn't ask for user and node
+    raw_response = get_request(url, username, password)
 
     if not raw_response and raw_response.status_code != 404:
         log.debug("connection error")
@@ -170,8 +99,8 @@ def _list_items(username, password, node):
 
 
 def _list_nodes(username, password, node):
-    url_path = "/users/user_1/nodes"  #FIXME change it so it doesn't ask for user and node
-    raw_response = _get_request(username, password, node, url_path)
+    url = f"{node}/users/user_1/nodes"  #FIXME change it so it doesn't ask for user and node
+    raw_response = get_request(url, username, password)
 
     if not raw_response and raw_response.status_code != 404:
         log.debug("connection error")
@@ -212,8 +141,8 @@ def _check_get_items(raw_response):
 
 def _req_get_item(username, password, node, node_id_, item_id):
     # returns: content, conn_ok, auth_ok
-    url_path = f"/users/{username}/nodes/{node_id_}/items/{item_id}"
-    raw_response = _get_request(username, password, node, url_path)
+    url = f"{node}/users/{username}/nodes/{node_id_}/items/{item_id}"
+    raw_response = get_request(url, username, password)
 
     if not raw_response:
         if raw_response.status_code == 404:
@@ -296,13 +225,10 @@ def _nodes():
         except KeyError:
             log.debug("_new KeyError")
             return redirect(url_for('_nodes'))
-        url_path = f"/users/{session['current_user_name']}/nodes"
-        url_path = "/users/user_1/nodes" #fixme
-        _post_new_node(new_node_base_url,
-                          session['current_user_name'],
-                          session['current_user_password'],
-                          session['user_node'],
-                          url_path)
+        url = f"/users/{session['current_user_name']}/nodes"
+        url = f"{session['user_node']}/users/user_1/nodes" #fixme
+        post_request(url, {"new_node_base_url": new_node_base_url}, session['current_user_name'], session['current_user_password'])
+
         return redirect(url_for('_nodes'))
 
 
@@ -322,12 +248,9 @@ def _get_item(node_id, item_id):
             return redirect(url_for('_root'))
     else:  # POST is used to print the textarea for edits and recover the sent edit (where ?update added to url)
         if 'update' in request.args and 'client_text' in request.form:
-            url_path = f"/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
-            _put_updated_text(request.form['client_text'],
-                              session['current_user_name'],
-                              session['current_user_password'],
-                              session['user_node'],
-                              url_path)
+            url = f"{session['user_node']}/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
+            put_request(url, {"text": request.form['client_text']}, session['current_user_name'], session['current_user_password'])
+
             return redirect(url_for('_get_item', node_id=node_id, item_id=item_id, _method='GET'))
         elif 'edit' in request.args:
             try:
@@ -342,32 +265,6 @@ def _get_item(node_id, item_id):
         else:
             log.error("error in _get_item")
             return redirect(url_for('_root'))
-
-
-def _put_updated_text(client_text,
-                      username,
-                      password,
-                      node,
-                      url_path):
-    payload = {"text": client_text }
-
-    import json
-    payload = json.dumps(payload)
-
-    _put_request(username, password, node, url_path, payload)
-
-
-def _post_new_node(new_node_base_url,
-                   username,
-                   password,
-                   node,
-                   url_path):
-    payload = {"new_node_base_url": new_node_base_url }
-
-    import json
-    payload = json.dumps(payload)
-
-    _post_request(username, password, node, url_path, payload)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -414,12 +311,9 @@ def _new():
         except KeyError:
             log.debug("_new KeyError")
             return render_template("new.html", auth_ok=True, item_id=item_id, client_text=client_text)
-        url_path = f"/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
-        _put_updated_text(client_text,
-                          session['current_user_name'],
-                          session['current_user_password'],
-                          session['user_node'],
-                          url_path)
+        url = f"{session['user_node']}/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
+        put_request(url, {"text": client_text}, session['current_user_name'], session['current_user_password'])
+
         return redirect(url_for('_get_item', node_id=node_id, item_id=item_id, _method='GET'))
 
     else:

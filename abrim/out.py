@@ -5,47 +5,18 @@ import traceback
 import time
 import requests
 import json
-from base64 import b64encode
-from abrim.util import get_log, args_init, response_parse
+from abrim.util import get_log, args_init, response_parse, post_request, put_request
 from abrim.config import Config
 log = get_log(full_debug=False)
 
 
-def date_handler(obj):
-    return obj.isoformat() if hasattr(obj, 'isoformat') else obj
-
-
-def __prepare_request(payload):
-    temp_str = json.dumps(payload, default=date_handler)
-    json_dict = json.loads(temp_str)
-
-    username = "admin"
-    password = "secret"
-    auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii") #FIXME
-
-    headers = {
-        'content-type': "application/json",
-        'authorization': f"Basic {auth_basic}",
-    }
-    return headers, json_dict
-
-
-def __requests_post_put(url, payload, use_put=False):
-    headers, json_dict = __prepare_request(payload)
-    put_post = 'POST'
-    if use_put:
-        put_post = 'PUT'
-    log.debug(f"about to {put_post} this {json_dict} to {url} using {headers}")
-    if use_put:
-        result = requests.put(url, headers=headers, json=json_dict)
-    else:
-        result = requests.post(url, headers=headers, json=json_dict)
-    return result
-
-
 def send_sync(edit, other_node_url, use_put=False):
     try:
-        p_response = __requests_post_put(other_node_url, edit, use_put)
+        if use_put:
+            p_response = post_request(other_node_url, edit)
+        else:
+            p_response = put_request(other_node_url, edit)
+
         api_unique_code, response_http, _ = response_parse(p_response)
         return response_http, api_unique_code
     except requests.exceptions.ConnectionError:

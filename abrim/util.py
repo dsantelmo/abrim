@@ -6,6 +6,8 @@ import logging
 import zlib
 import argparse
 import json
+import requests
+from base64 import b64encode
 import diff_match_patch
 from flask import jsonify, request, Response
 
@@ -147,6 +149,72 @@ def get_crc(text):
     # maybe save the CRC to avoid recalculating but it makes more complex updating the DB by hand...
     # is this premature optimization?
     return zlib.adler32(text.encode())
+
+
+# requests
+
+
+def __date_handler(obj):
+    return obj.isoformat() if hasattr(obj, 'isoformat') else obj
+
+
+def __prepare_request(username=None, password=None, payload=None):
+    json_dict = None
+    if payload:
+        temp_str = json.dumps(payload, default=__date_handler)
+        json_dict = json.loads(temp_str)
+
+    if not username:
+        username = "admin"
+    if not password:
+        password = "secret"
+    auth_basic = b64encode(username.encode('utf-8') + b":" + password.encode('utf-8')).decode("ascii") #FIXME
+
+    headers = {
+        'content-type': "application/json",
+        'authorization': f"Basic {auth_basic}",
+    }
+    return headers, json_dict
+
+
+def __do_request(method, url, username=None, password=None, payload=None):
+    if method != 'GET' and method != 'POST' and method != 'PUT':
+        raise Exception
+
+    headers, payload = __prepare_request(username, password, payload)
+    log.debug(f"about to {method} this {payload} to {url} using {headers}")
+    try:
+        if method == 'GET':
+            raw_response = requests.get(url, headers=headers, timeout=1)
+        elif method == 'POST':
+            raw_response = requests.post(url, data=payload, headers=headers, timeout=1)
+        elif method == 'PUT':
+            raw_response = requests.put(url, data=payload, headers=headers, timeout=1)
+        else:
+            raise Exception
+    except requests.exceptions.ConnectTimeout:
+        log.warning("ConnectTimeout")
+        return None
+    except requests.exceptions.MissingSchema:
+        log.warning("MissingSchema")
+        return None
+    except requests.exceptions.InvalidSchema:
+        log.warning("InvalidSchema")
+        return None
+    else:
+        return raw_response
+
+
+def get_request(url, username=None, password=None):
+    return __do_request('GET', url, username, password, None)
+
+
+def put_request(url, payload, username=None, password=None):
+    return __do_request('PUT', url, username, password, payload)
+
+
+def post_request(url, payload, username=None, password=None):
+    return __do_request('POST', url, username, password, payload)
 
 
 # responses
