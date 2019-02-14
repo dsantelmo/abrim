@@ -243,7 +243,7 @@ def _req_get_item(username, password, node, node_id_, item_id):
 @app.before_request
 def before_request():
     if request.full_path and request.method:
-        log.debug(request.method + " REQUEST: " + request.full_path)
+        log.debug(f"{request.method} REQUEST: {request.full_path}")
     else:
         log.error("request doesn't have a full_path and/or method")
         return redirect(url_for('_root'))

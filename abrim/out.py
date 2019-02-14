@@ -86,10 +86,10 @@ def process_out_queue(lock, node_id, port):
                 config.db.sql_debug_trace(True) # DELETEME
                 edit, item, m_rev, n_rev, rowid = get_first_queued_edit(config, other_node_id)
                 if not rowid:
-                    log.debug("not rowid for " + other_node_id) # DELETEME
+                    log.debug(f"not rowid for {other_node_id}") # DELETEME
                     break
 
-                log.debug("other_node_url: " + other_node_url)
+                log.debug(f"other_node_url: {other_node_url}")
                 url = prepare_url(config, item, other_node_url)
                 try:
                     response_http, api_unique_code = send_sync(edit, url)
@@ -192,7 +192,7 @@ def get_first_queued_edit(config, other_node_id):
         item = edit["item"]
         n_rev = edit["n_rev"]
         m_rev = edit["m_rev"]
-        log.debug("queued edits for " + other_node_id)
+        log.debug(f"queued edits for {other_node_id}")
         return edit, item, m_rev, n_rev, rowid
 
 
@@ -211,7 +211,7 @@ if __name__ == '__main__':
             # Wait for x seconds or until process finishes
             p.join(30)
             if p.is_alive():
-                log.debug(p_name + " timeouts")
+                log.debug(f"{p_name} timeouts")
                 p.terminate()
                 p.join()
             else:

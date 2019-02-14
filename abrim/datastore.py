@@ -17,7 +17,7 @@ class DataStore(object):
         port_int = self.port
         port_temp = str(port_int)
         port = port_temp[:-1]
-        filename = 'abrim_' + node_id + '_' + port + '.sqlite'
+        filename = f'abrim_{node_id}_{port}.sqlite'
         try:
             # noinspection PyUnresolvedReferences
             import appdirs
@@ -27,11 +27,9 @@ class DataStore(object):
                 os.makedirs(udd)
         except ImportError:
             try:
-                db_path = "." \
-                          + os.path.basename(sys.modules['__main__'].__file__) \
-                          + filename
+                db_path = f".{os.path.basename(sys.modules['__main__'].__file__)}{filename}"
             except AttributeError:
-                db_path = filename + '_error.sqlite'
+                db_path = f'{filename}_error.sqlite'
         self.db_path = db_path
         # log.debug(self.db_path)
 
@@ -168,7 +166,7 @@ class DataStore(object):
 
     def _get_trans_prefix(self):
         if self.con.in_transaction:
-            return "[trans-" + str(self._transaction_code) + "] "
+            return f"[trans-{str(self._transaction_code)}] "
         else:
             return ""
 
