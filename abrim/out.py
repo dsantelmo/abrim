@@ -33,12 +33,12 @@ def __prepare_request(url, payload):
 
 def __requests_post(url, payload):
     headers, json_dict = __prepare_request(url, payload)
-    return requests.post(url, headers = headers, json = json_dict)
+    return requests.post(url, headers=headers, json=json_dict)
 
 
 def __requests_put(url, payload):
     headers, json_dict = __prepare_request(url, payload)
-    return requests.put(url, headers = headers, json = json_dict)
+    return requests.put(url, headers=headers, json=json_dict)
 
 
 def send_sync(edit, other_node_url, use_put=False):
