@@ -127,7 +127,8 @@ def _check_patch_done(config, timeout, client_node_id, item_id, n_rev, m_rev):
 
 def update_item(config, item_id, new_text):
     config.db.save_item(item_id, new_text, get_crc(new_text))
-    for other_node_id, _ in config.db.get_known_nodes():
+    for known_node in config.db.get_known_nodes():
+        other_node_id = known_node["id"]
         n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
         n_rev += 1
         config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, get_crc(new_text))
