@@ -5,6 +5,7 @@ import traceback
 import time
 import requests
 import json
+from base64 import b64encode
 from abrim.util import get_log, args_init, response_parse
 from abrim.config import Config
 log = get_log(full_debug=False)
