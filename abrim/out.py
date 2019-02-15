@@ -18,8 +18,12 @@ def send_sync(edit, other_node_url, use_put=False):
             p_response = put_request(other_node_url, edit)
 
         api_unique_code, response_http, _ = response_parse(p_response)
-        return response_http, api_unique_code
+        if api_unique_code and response_http:
+            return response_http, api_unique_code
+        else:
+            raise Exception
     except requests.exceptions.ConnectionError:
+        log.debug("send_sync ConnectionError")
         raise
     except requests.exceptions.HTTPError as err:
         post_response = err.response.status_code
@@ -54,15 +58,16 @@ def process_out_queue(lock, node_id, port):
             queue_limit = config.edit_queue_limit
             while queue_limit > 0:
                 config.db.start_transaction()
-                config.db.sql_debug_trace(True) # DELETEME
+                # config.db.sql_debug_trace(True)
                 edit, item, m_rev, n_rev, rowid = get_first_queued_edit(config, other_node_id)
                 if not rowid:
-                    log.debug(f"not rowid for {other_node_id}") # DELETEME
+                    # log.debug(f"not rowid for {other_node_id}")
                     break
 
                 log.debug(f"other_node_url: {other_node_url}")
                 url = prepare_url(config, item, other_node_url)
                 try:
+                    log.debug(f"about to send {edit} to {url}")
                     response_http, api_unique_code = send_sync(edit, url)
 
                     try:

@@ -196,13 +196,13 @@ def __do_request(method, url, username=None, password=None, payload=None):
             raise Exception
     except requests.exceptions.ConnectTimeout:
         log.warning("ConnectTimeout")
-        return None
+        raise
     except requests.exceptions.MissingSchema:
         log.warning("MissingSchema")
-        return None
+        raise
     except requests.exceptions.InvalidSchema:
         log.warning("InvalidSchema")
-        return None
+        raise
     else:
         return raw_response
 
@@ -223,12 +223,17 @@ def post_request(url, payload, username=None, password=None):
 
 
 def response_parse(raw_response):
-    log.debug(f"Response: {raw_response.text}")
-    response_http = raw_response.status_code
+    log.debug(f"Response: {raw_response}")
     try:
+        log.debug(f"Response code: {raw_response.status_code} text: {raw_response.text}")
+        response_http = raw_response.status_code
         response_dict = json.loads(raw_response.text)
+    except AttributeError:
+        log.debug(f"Response doesn't have status or text")
+        raise
     except json.decoder.JSONDecodeError:
-        return None, None, None
+        log.debug(f"JSON decode error")
+        raise
     api_unique_code = response_dict['api_unique_code']
     log.debug(f"API response: {api_unique_code} HTTP response: {response_http} Dict: {response_dict}")
     return api_unique_code, response_http, response_dict
