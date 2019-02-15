@@ -161,8 +161,7 @@ def __date_handler(obj):
 def __prepare_request(username=None, password=None, payload=None):
     json_dict = None
     if payload:
-        temp_str = json.dumps(payload, default=__date_handler)
-        json_dict = json.loads(temp_str)
+        json_dict = json.loads(json.dumps(payload, default=__date_handler))
 
     if not username:
         username = "admin"
@@ -181,18 +180,18 @@ def __do_request(method, url, username=None, password=None, payload=None):
     if method != 'GET' and method != 'POST' and method != 'PUT':
         raise Exception
 
-    headers, payload = __prepare_request(username, password, payload)
-    if payload:
-        log.debug(f"about to {method} this {payload} to {url} using {headers}")
+    headers, json_dict = __prepare_request(username, password, payload)
+    if json_dict:
+        log.debug(f"about to {method} this {json_dict} to {url} using {headers}")
     else:
         log.debug(f"about to {method} to {url} using {headers}")
     try:
         if method == 'GET':
             raw_response = requests.get(url, headers=headers, timeout=1)
         elif method == 'POST':
-            raw_response = requests.post(url, data=payload, headers=headers, timeout=1)
+            raw_response = requests.post(url, json=json_dict, headers=headers, timeout=1)
         elif method == 'PUT':
-            raw_response = requests.put(url, data=payload, headers=headers, timeout=1)
+            raw_response = requests.put(url, json=json_dict, headers=headers, timeout=1)
         else:
             raise Exception
     except requests.exceptions.ConnectTimeout:
