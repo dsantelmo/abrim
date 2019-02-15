@@ -280,7 +280,10 @@ def _put_text(user_id, client_node_id, item_id):
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/put_text/403/check_permissions", "you have no permissions for that")
 
-        r_json = request.get_json()
+        try:
+            r_json = request.get_json()
+        except werkzeug.exceptions.BadRequest:
+            return resp("queue_in/put_text/405/check_req", "Malformed JSON request")
 
         check_text_ok, new_text = _check_text_request_ok(r_json)
         if not check_text_ok:
