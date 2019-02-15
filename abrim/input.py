@@ -126,17 +126,23 @@ def _check_patch_done(config, timeout, client_node_id, item_id, n_rev, m_rev):
 
 
 def update_item(config, item_id, new_text):
-    config.db.save_item(item_id, new_text, get_crc(new_text))
+    log.debug(f"saving item {item_id} with {new_text}")
+    new_text_crc = get_crc(new_text)
+    config.db.save_item(item_id, new_text, new_text_crc)
     for known_node in config.db.get_known_nodes():
         other_node_id = known_node["id"]
         n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
+        log.debug(f"latest revs for that item in {other_node_id} are {n_rev} - {m_rev}")
         n_rev += 1
-        config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, get_crc(new_text))
+        log.debug(f"saving new shadow for {other_node_id} with crc {new_text_crc}")
+        config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, new_text_crc)
+        log.debug(f"creating diffs")
         diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
         if n_rev == 0 or diffs:
+            log.debug(f"diffs for n_rev: {n_rev}")
             old_hash = create_hash(old_shadow)
             new_hash = create_hash(new_text)
-            log.debug(f"old_hash: {old_hash}, new_hash: {new_hash}, diffs: {diffs}")
+            log.debug(f"enquing edits - old_hash: {old_hash}, new_hash: {new_hash}, diffs: {diffs}")
             config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev)
         else:
             log.warn("no diffs. Nothing done!")
