@@ -391,6 +391,8 @@ def before_request():
     log.debug("-------------------------------------------------------------------------------")
     if request.full_path and request.method:
         log.debug(f"{request.method} REQUEST: {request.full_path}")
+        if request.data:
+            log.debug(f"{request.method} REQUEST HAS DATA: {request.data}")
     else:
         log.error("request doesn't have a full_path and/or method")
         return resp("queue_in/before_request/500/unknown", "Unknown error. Please report this")
