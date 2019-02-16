@@ -64,7 +64,7 @@ def _check_text_request_ok(r_json):
     try:
         log.debug("text: {:.30}...".format(r_json['text'].replace('\n', ' ')))
     except KeyError:
-        log.error("no shadow in request")
+        log.error("no text in request")
         return False, _
     return True, r_json['text']
 

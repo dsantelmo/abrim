@@ -13,9 +13,9 @@ log = get_log(full_debug=False)
 def send_sync(edit, other_node_url, use_put=False):
     try:
         if use_put:
-            p_response = post_request(other_node_url, edit)
-        else:
             p_response = put_request(other_node_url, edit)
+        else:
+            p_response = post_request(other_node_url, edit)
 
         api_unique_code, response_http, _ = response_parse(p_response)
         if api_unique_code and response_http:
