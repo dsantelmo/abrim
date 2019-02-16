@@ -383,7 +383,7 @@ def _post_node(user_id):
         log.debug("request with the new node seems ok, trying to save it")
         config.db.start_transaction("_put_text")
 
-        config.db.add_known_node(new_node_base_url)
+        node_uuid = config.db.add_known_node(new_node_base_url)
     except Exception as err:
         config.db.rollback_transaction()
         log.error(f"ERROR: {err}")
@@ -393,7 +393,7 @@ def _post_node(user_id):
         log.info("_post_node about to finish OK")
         config.db.end_transaction()
 
-    return resp("queue_in/post_node/201/done", "New node added")
+    return resp("queue_in/post_node/201/done", f"{node_uuid}")
 
 
 

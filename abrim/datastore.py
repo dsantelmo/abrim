@@ -263,6 +263,7 @@ class DataStore(object):
                             base_url)
                            VALUES (?,?)""", insert)
         self.con.commit()
+        return node_uuid
 
     def get_known_nodes(self):
         self.cur.execute("""SELECT id, base_url
