@@ -1,5 +1,12 @@
 The process:
 
+This program is composed of 5 independent components:
+ * node.py will start and control the other components
+ * ui.py will start the (optional) user interface
+ * input.py will process messages from the UI and other nodes
+ * out.py will process a queue to send messages to the other nodes input.py
+ * patch.py will process a queue and internally apply the patches recovered from input.py
+
 We will use 2 nodes: 5000 and 6000
 
 1. Delete the .sqlite files to start from scratch.
@@ -13,7 +20,7 @@ We will use 2 nodes: 5000 and 6000
 		1. Send:
 				curl -X POST http://localhost:5001/users/user_1/nodes -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"new_node_base_url\":\"http://localhost:6001\" }"
 		12. Reply form server:
-				{"api_unique_code":"queue_in/post_node/201/done","message":"New node added"}
+				{"api_unique_code":"queue_in/post_node/201/done","message":"<NODE_2_INTERNAL_ID>"}
 	2. Using UI:
 		1. Connect to http://localhost:5000/
 		2. Login and create and go to nodes: http://localhost:5000/nodes
@@ -30,7 +37,7 @@ We will use 2 nodes: 5000 and 6000
 			* ID: item_id_01
 			* TEXT: all ok
 		3. Press Send
-5. Now the input.py process does this:
+5. With this message the input.py process does this:
 	1. Saves the new item
 	2. For each known node (for now only node_2):
 		1. Checks if its shadow exists (it doesn't)
@@ -45,8 +52,17 @@ We will use 2 nodes: 5000 and 6000
 			* edits: <edits>
 			* old_shadow_adler32: 1
 			* shadow_adler32: 130089524
+			* old_shadow: <shadow>
 	3. input.py finishes processing and returns 200
 6. out.py keeps checking each known node (other_node) for data in the edits table
 	1. Gets the edit data and PUTs it against the node it was checking
 	2. Something like this, using cURL (change other_node value):
-			curl -X PUT http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"779a509d728e4a0bb03e5b9423700a6e\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"old_shadow_adler32\": \"1\", \"shadow_adler32\": \"130089524\"}"
+			curl -X POST http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"old_shadow_adler32\": \"1\", \"shadow_adler32\": \"130089524\"}"
+	3. The other node will reply:
+	        {"api_unique_code":"queue_in/post_sync/404/not_shadow","message":"Shadow not found. PUT the full shadow to URL + /shadow"}
+	4. The other node doesn't have our shadow for that item, so out.py will rollback the current transaction and send it:
+			curl -X PUT http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01/shadow -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\"}"
+	5. The other node should accept it with:
+			{"api_unique_code":"queue_in/put_shadow/201/ack","message":"Sync acknowledged"}
+	6. out.py will stop processing this entry of the queue and continue with the rest of the remote nodes. Eventually it will find again this queued edit and it will try to process it again:
+			
