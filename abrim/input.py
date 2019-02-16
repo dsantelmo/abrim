@@ -151,6 +151,7 @@ def update_item(config, item_id, new_text):
 @app.route('/auth', methods=['GET'])
 @requires_auth
 def _auth():
+    log.debug("_auth")
     if not _check_permissions("to do"):  # TODO: implement me
         return resp("queue_in/auth/403/check_permissions", "you have no permissions for that")
     else:
@@ -160,6 +161,7 @@ def _auth():
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
 @requires_auth
 def _post_sync(user_id, client_node_id, item_id):
+    log.debug("_post_sync")
     config = g.config
     try:
         if not _check_permissions("to do"):  # TODO: implement me
@@ -221,6 +223,7 @@ def _post_sync(user_id, client_node_id, item_id):
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
 @requires_auth
 def _put_shadow(user_id, client_node_id, item_id):
+    log.debug("_put_shadow")
     config = g.config
     config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
 
@@ -259,6 +262,7 @@ def _put_shadow(user_id, client_node_id, item_id):
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['GET'])
 @requires_auth
 def _get_text(user_id, client_node_id, item_id):
+    log.debug("_get_text")
     config = g.config
     try:
         if not _check_permissions("to do"):  # TODO: implement me
@@ -281,6 +285,7 @@ def _get_text(user_id, client_node_id, item_id):
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['PUT'])
 @requires_auth
 def _put_text(user_id, client_node_id, item_id):
+    log.debug("_put_text")
     config = g.config
     try:
         if not _check_permissions("to do"):  # TODO: implement me
@@ -314,6 +319,7 @@ def _put_text(user_id, client_node_id, item_id):
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
 @requires_auth
 def _get_items(user_id, client_node_id):
+    log.debug("_get_items")
     config = g.config
     try:
         if not _check_permissions("to do"):  # TODO: implement me
@@ -336,6 +342,7 @@ def _get_items(user_id, client_node_id):
 @app.route('/users/<string:user_id>/nodes', methods=['GET'])
 @requires_auth
 def _get_nodes(user_id):
+    log.debug("_get_nodes")
     config = g.config
     try:
         if not _check_permissions("to do"):  # TODO: implement me
@@ -358,6 +365,7 @@ def _get_nodes(user_id):
 @app.route('/users/<string:user_id>/nodes', methods=['POST'])
 @requires_auth
 def _post_node(user_id):
+    log.debug("_post_node")
     config = g.config
     try:
         if not _check_permissions("to do"):  # TODO: implement me
