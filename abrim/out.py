@@ -60,7 +60,10 @@ def process_out_queue(lock, node_id, port):
                 config.db.start_transaction()
                 # config.db.sql_debug_trace(True)
                 edit, item, m_rev, n_rev, old_shadow, rowid = get_first_queued_edit(config, other_node_id)
-                edit.pop("old_shadow", None) # do not send old shadow during sync
+                try:
+                    edit.pop("old_shadow", None) # do not send old shadow during sync
+                except AttributeError:
+                    pass
                 if not rowid:
                     # log.debug(f"not rowid for {other_node_id}")
                     break
@@ -159,7 +162,7 @@ def process_out_queue(lock, node_id, port):
 def get_first_queued_edit(config, other_node_id):
     rowid, edit = config.db.get_first_queued_edit(other_node_id)
     if not edit or not rowid:
-        return None, None, None, None, None
+        return None, None, None, None, None, None
     else:
         item = edit["item"]
         n_rev = edit["n_rev"]
