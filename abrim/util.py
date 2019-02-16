@@ -139,7 +139,7 @@ def check_crc(text, crc):
         return False
 
     if int_crc != text_crc:
-        log.error(f"CRCs don't match {int_crc} {text_crc}")
+        log.error(f"CRCs don't match {text_crc} {int_crc}")
         return False
     else:
         return True
