@@ -59,7 +59,8 @@ def process_out_queue(lock, node_id, port):
             while queue_limit > 0:
                 config.db.start_transaction()
                 # config.db.sql_debug_trace(True)
-                edit, item, m_rev, n_rev, rowid = get_first_queued_edit(config, other_node_id)
+                edit, item, m_rev, n_rev, old_shadow, rowid = get_first_queued_edit(config, other_node_id)
+                edit.pop("old_shadow", None) # do not send old shadow during sync
                 if not rowid:
                     # log.debug(f"not rowid for {other_node_id}")
                     break
@@ -91,19 +92,13 @@ def process_out_queue(lock, node_id, port):
                             log.debug("-----------------------------------------------------------------")
                         else:
                             raise Exception("implement me! 8")
-                    elif response_http == 404:
+                    elif response_http == 404:  # the other node doesn't find a shadow, send it
                         if api_unique_code == "queue_in/post_sync/404/not_shadow":
                             log.info("queue_in/post_sync/404/not_shadow")
-                            got_shadow, shadow = config.db.get_shadow(item,
-                                                                      other_node_id,
-                                                                      m_rev,
-                                                                      n_rev)
                             config.db.rollback_transaction()
                             shadow_json = {'n_rev': n_rev,
                                            'm_rev': m_rev,
-                                           'shadow': ""}
-                            if got_shadow:
-                                shadow_json['shadow'] = shadow
+                                           'shadow': old_shadow}
 
                             log.debug("trying to send the shadow again")
                             shad_http, shad_api_unique_code = send_sync(shadow_json, url + "/shadow", use_put=True)
@@ -112,6 +107,7 @@ def process_out_queue(lock, node_id, port):
                             else:
                                 raise Exception("implement me! 2")
                         else:
+                            config.db.rollback_transaction()
                             raise Exception("implement me! 3")
                     elif response_http == 403:
                         if api_unique_code == "queue_in/post_sync/403/no_match_revs":
@@ -168,8 +164,9 @@ def get_first_queued_edit(config, other_node_id):
         item = edit["item"]
         n_rev = edit["n_rev"]
         m_rev = edit["m_rev"]
+        old_shadow = edit["old_shadow"]
         log.debug(f"queued edits for {other_node_id}")
-        return edit, item, m_rev, n_rev, rowid
+        return edit, item, m_rev, n_rev, old_shadow, rowid
 
 
 if __name__ == '__main__':

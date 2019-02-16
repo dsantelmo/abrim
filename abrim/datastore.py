@@ -86,6 +86,7 @@ class DataStore(object):
             edits TEXT,
             old_shadow_adler32 TEXT,
             shadow_adler32 TEXT,
+            old_shadow TEXT,
             PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
@@ -100,6 +101,7 @@ class DataStore(object):
             edits TEXT,
             old_shadow_adler32 TEXT,
             shadow_adler32 TEXT,
+            old_shadow TEXT,
             PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
@@ -379,7 +381,7 @@ class DataStore(object):
 
     # EDITS
 
-    def enqueue_client_edits(self, other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev):
+    def enqueue_client_edits(self, other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev, old_shadow):
         insert = (
             item_id,
             other_node_id,
@@ -388,13 +390,14 @@ class DataStore(object):
             diffs,
             old_hash,
             new_hash,
+            old_shadow,
         )
         try:
             self.cur.execute("""INSERT INTO edits
-                               (item, other_node, n_rev, m_rev, edits, old_shadow_adler32, shadow_adler32)
-                               VALUES (?,?,?,?,?,?,?)""", insert)
+                               (item, other_node, n_rev, m_rev, edits, old_shadow_adler32, shadow_adler32, old_shadow)
+                               VALUES (?,?,?,?,?,?,?,?)""", insert)
         except sqlite3.InterfaceError as err:
-            self._log_debug_trans(f"ERROR ({str(err)}) AT INSERT VALUES: {item_id}, {other_node_id}, {n_rev}, {m_rev}, {diffs}, {old_hash}, {new_hash}")
+            self._log_debug_trans(f"ERROR ({str(err)}) AT INSERT VALUES: {item_id}, {other_node_id}, {n_rev}, {m_rev}, {diffs}, {old_hash}, {new_hash}, {old_shadow}")
             raise
 
         self._log_debug_trans(f"edits {item_id} {other_node_id} {n_rev} saved")
