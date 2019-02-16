@@ -12,14 +12,18 @@ We will use 2 nodes: 5000 and 6000
 1. Delete the .sqlite files to start from scratch.
 2. Start both nodes:
 	1. Start node_2 at port 6000:
+	
 			python node.py node.py -i node_2 -p 6000
 	2. Start node_1 at port 5000:
+	
 			python node.py node.py -i node_1 -p 5000
 3. Create a new node connection in node_1:
 	1. Using cURL:
 		1. Send:
+		
 				curl -X POST http://localhost:5001/users/user_1/nodes -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"new_node_base_url\":\"http://localhost:6001\" }"
 		12. Reply form server:
+		
 				{"api_unique_code":"queue_in/post_node/201/done","message":"<NODE_2_INTERNAL_ID>"}
 	2. Using UI:
 		1. Connect to http://localhost:5000/
@@ -28,8 +32,10 @@ We will use 2 nodes: 5000 and 6000
 4. Create a new item
 	1. Using cURL:
 		1. Send:
+
 		    	curl -X PUT http://localhost:5001/users/admin/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all ok\"}"
 		2. Reply from server:
+
 				{"api_unique_code":"queue_in/put_text/200/ok","message":"PUT OK"}
 	2. Using UI:
 		1. Go to new: http://localhost:5000/new
@@ -57,12 +63,16 @@ We will use 2 nodes: 5000 and 6000
 6. out.py keeps checking each known node (other_node) for data in the edits table
 	1. Gets the edit data and PUTs it against the node it was checking
 	2. Something like this, using cURL (change other_node value):
+
 			curl -X POST http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"old_shadow_adler32\": \"1\", \"shadow_adler32\": \"130089524\"}"
 	3. The other node will reply:
+	
 	        {"api_unique_code":"queue_in/post_sync/404/not_shadow","message":"Shadow not found. PUT the full shadow to URL + /shadow"}
 	4. The other node doesn't have our shadow for that item, so out.py will rollback the current transaction and send it:
+
 			curl -X PUT http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01/shadow -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\"}"
 	5. The other node should accept it with:
+
 			{"api_unique_code":"queue_in/put_shadow/201/ack","message":"Sync acknowledged"}
 	6. out.py will stop processing this entry of the queue and continue with the rest of the remote nodes. Eventually it will find again this queued edit and it will try to process it again:
 			
