@@ -79,10 +79,7 @@ def process_out_queue(lock, node_id, port):
                     except TypeError:
                         response_http = 0
 
-                    if response_http == 0:
-                        log.debug("bad response. Rolling back")
-                        config.db.rollback_transaction()
-                    elif response_http == 201:
+                    if response_http == 201:
                         if (
                                 api_unique_code == "queue_in/post_sync/201/done" or
                                 api_unique_code == "queue_in/post_sync/201/ack"):
