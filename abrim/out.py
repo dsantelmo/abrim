@@ -103,7 +103,8 @@ def process_out_queue(lock, node_id, port):
                             log.debug("trying to send the shadow again")
                             shad_http, shad_api_unique_code = send_sync(shadow_json, url + "/shadow", use_put=True)
                             if shad_http == 201 and shad_api_unique_code == "queue_in/put_shadow/201/ack":
-                                log.info("EVENT: remote needed the shadow") #  TODO: save events
+                                log.info("EVENT: remote needed the shadow... sleep 3 secs") #  TODO: save events
+                                time.sleep(3)
                             else:
                                 raise Exception("implement me! 2")
                         else:
