@@ -173,14 +173,18 @@ Example using 2 nodes: 5000 and 6000
 
     6. This node's out.py stops processing this entry of the queue and continue with the rest of the remote nodes.
 
-7. Eventually it finds this edit again
-	1. It tries to process it again:
+7. Eventually out.py finds this edit again:
+
+	1. It tries to process it:
 
             curl -X POST http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"old_shadow_adler32\": \"1\", \"shadow_adler32\": \"130089524\"}"
 
-    2. The other node's input.py processes the POST again. This time it finds the shadow so enqueues the edit. Then in waits 5 seconds for the patch.py process to catch up with its queue. During that time checks every second if the edit has been processed.
+    2. The other node's input.py processes the POST again. This time it finds the shadow so enqueues the edit.
+
+    3. Then it waits 5 seconds for the patch.py process to catch up with its queue. During that time checks every second if the edit has been processed.
 
 8. Hopefully patch.py finds the new entry of the queue before timeout.
+
 	1. It tries to fuzzy patch the text with the patches.
 
     	* If it fails it just archives the patch.
@@ -192,6 +196,7 @@ Example using 2 nodes: 5000 and 6000
     	    * If it isn't just rollbacks and does nothing.
 
 	2. At this point the other node's input.py has 2 possible returns:
+
     	* If patch.py doesn't apply the patch within the alloted time, it returns:
 
             	{"queue_in/post_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply}
@@ -201,3 +206,9 @@ Example using 2 nodes: 5000 and 6000
             	{"api_unique_code":"queue_in/post_sync/201/done","content":{"json":"response_all_ok_and_new_edits_for_client"},"message":"Sync done"}
 
 8. Now both nodes has the same text
+
+<CHANGE THE TEXT IN NODE_1>
+
+9. Local node's out.py tries send the updated text to node_2:
+	1. Sends the edit:
+		curl -X POST http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"old_shadow_adler32\": \"1\", \"shadow_adler32\": \"130089524\"}"
