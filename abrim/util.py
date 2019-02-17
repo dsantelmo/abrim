@@ -225,7 +225,7 @@ def post_request(url, payload, username=None, password=None):
 def response_parse(raw_response):
     log.debug(f"Response: {raw_response}")
     try:
-        log.debug(f"Response code: {raw_response.status_code} text: {raw_response.text}")
+        log.debug(f"Response code: {raw_response.status_code} text: {raw_response.text.replace('\n', ' ')}")
         response_http = raw_response.status_code
         response_dict = json.loads(raw_response.text)
     except AttributeError:

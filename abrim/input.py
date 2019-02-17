@@ -142,7 +142,7 @@ def update_item(config, item_id, new_text):
             log.debug(f"diffs for n_rev: {n_rev}")
             old_hash = create_hash(old_shadow)
             new_hash = create_hash(new_text)
-            log.debug(f"enquing edits - old_hash: {old_hash}, new_hash: {new_hash}, diffs: {diffs}")
+            log.debug(f"enquing edits - old_hash: {old_hash}, new_hash: {new_hash}, diffs: {diffs.replace('\n', ' ')}")
             config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev, old_shadow)
         else:
             log.warn("no diffs. Nothing done!")
