@@ -7,7 +7,7 @@ abrim.cfg
 geckodriver.log
 .coverage
 htmlcov
-# PyCharm, keep run configs
+# PyCharm
 **/.idea/**
-!**/.idea/runConfigurations/
-!**/.idea/runConfigurations/*
+#!**/.idea/runConfigurations/
+#!**/.idea/runConfigurations/*
