@@ -185,9 +185,11 @@ Example using 2 nodes: 5000 and 6000
 
     	* If it fails it just archives the patch.
 
-    	* If the patching works it starts a transaction and checks if the (server) text is still the same.
+    	* If the patching works it starts a transaction and checks if the local text is still the same:
 
-    	* If it is the same it applies the patch to the text and archives it. If it isn't just rollbacks and does nothing.
+    	    * If it is the same it applies the patch to the text and archives it.
+
+    	    * If it isn't just rollbacks and does nothing.
 
 	2. At this point the other node's input.py has 2 possible returns:
     	* If patch.py doesn't apply the patch within the alloted time, it returns:
