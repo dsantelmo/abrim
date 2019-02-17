@@ -303,7 +303,7 @@ class DataStore(object):
         # if n_rev == 0 and m_rev == 0:
         #    self._log_debug_trans("n_revs 0 - 0, assuming there is no shadow")
         #    return None
-        self.cur.execute("""SELECT shadow
+        self.cur.execute("""SELECT rowid, shadow
                  FROM shadows
                  WHERE
                  item = ? AND
