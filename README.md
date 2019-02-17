@@ -171,21 +171,31 @@ Example using 2 nodes: 5000 and 6000
 
             {"api_unique_code":"queue_in/put_shadow/201/ack","message":"Sync acknowledged"}
 
-    6. This node's out.py stops processing this entry of the queue and continue with the rest of the remote nodes. Eventually it finds this edit again and it tries to process it:
+    6. This node's out.py stops processing this entry of the queue and continue with the rest of the remote nodes.
+
+7. Eventually it finds this edit again
+	1. It tries to process it again:
 
             curl -X POST http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"old_shadow_adler32\": \"1\", \"shadow_adler32\": \"130089524\"}"
 
-    7. The other node's input.py processes the POST again. This time it finds the shadow so enqueues the edit. Then in waits 5 seconds for the patch.py process to catch up with its queue. During that time checks every second if the edit has been processed.
+    2. The other node's input.py processes the POST again. This time it finds the shadow so enqueues the edit. Then in waits 5 seconds for the patch.py process to catch up with its queue. During that time checks every second if the edit has been processed.
 
-    8. Hopefully patch.py finds the new entry of the queue before timeout. It tries to fuzzy patch the text with the patches.
+8. Hopefully patch.py finds the new entry of the queue before timeout.
+	1. It tries to fuzzy patch the text with the patches.
 
-    9. If it fails it just archives the patch. If the patching works it starts a transaction and checks if the (server) text is still the same. If it is the same it applies the patch to the text and archives it. If it isn't just rollbacks and does nothing.
-    10. If patch.py doesn't apply the patch within the alloted time, the other node's input.py returns:
+    	* If it fails it just archives the patch.
 
-            {"queue_in/post_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply}
+    	* If the patching works it starts a transaction and checks if the (server) text is still the same.
 
-    11. If patching works the other node's input.py replies:
+    	* If it is the same it applies the patch to the text and archives it. If it isn't just rollbacks and does nothing.
 
-            {"api_unique_code":"queue_in/post_sync/201/done","content":{"json":"response_all_ok_and_new_edits_for_client"},"message":"Sync done"}
+	2. At this point the other node's input.py has 2 possible returns:
+    	* If patch.py doesn't apply the patch within the alloted time, it returns:
 
-    12. Now both nodes has the same text
+            	{"queue_in/post_sync/201/ack", "Sync acknowledged. Still waiting for patch to apply}
+
+    	* If patching works before timeout, it replies:
+
+            	{"api_unique_code":"queue_in/post_sync/201/done","content":{"json":"response_all_ok_and_new_edits_for_client"},"message":"Sync done"}
+
+8. Now both nodes has the same text
