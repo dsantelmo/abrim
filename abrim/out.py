@@ -126,21 +126,16 @@ def process_out_queue(lock, node_id, port):
                         log.error(f"Undefined HTTP response: {response_http} {api_unique_code}")
                         config.db.rollback_transaction()
                         raise Exception("Undefined HTTP response")  # fail for the rest of HTTP codes
-                except (requests.exceptions.ConnectionError) as err:
-                    config.db.rollback_transaction()
-                    log.debug("ConnectionError: sleep 15 secs")
-                    time.sleep(15)
-                except (requests.exceptions.HTTPError, KeyError, json.decoder.JSONDecodeError) as err:
+                except (requests.exceptions.ConnectionError,
+                        requests.exceptions.HTTPError,
+                        requests.exceptions.ReadTimeout,
+                        json.decoder.JSONDecodeError,
+                        KeyError,
+                        Exception, ) as err:
                     config.db.rollback_transaction()
                     log.debug(err)
-                    traceback.print_exc()
-                    log.debug("sleep 15 secs")
-                    time.sleep(15)
-                except Exception as err:
-                    config.db.rollback_transaction()
-                    log.error(err)
-                    traceback.print_exc()
-                    log.debug("sleep 15 secs")
+                    # traceback.print_exc()
+                    log.debug("Exception... sleep 15 secs")
                     time.sleep(15)
                 finally:
                     queue_limit -= 1
