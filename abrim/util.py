@@ -186,12 +186,13 @@ def __do_request(method, url, username=None, password=None, payload=None):
     else:
         log.debug(f"about to {method} to {url} using {headers}")
     try:
+        _timeout = 10  # timeout 1 is not enough for the remote node to patch its text
         if method == 'GET':
-            raw_response = requests.get(url, headers=headers, timeout=1)
+            raw_response = requests.get(url, headers=headers, timeout=_timeout)
         elif method == 'POST':
-            raw_response = requests.post(url, json=json_dict, headers=headers, timeout=1)
+            raw_response = requests.post(url, json=json_dict, headers=headers, timeout=_timeout)
         elif method == 'PUT':
-            raw_response = requests.put(url, json=json_dict, headers=headers, timeout=1)
+            raw_response = requests.put(url, json=json_dict, headers=headers, timeout=_timeout)
         else:
             raise Exception
     except requests.exceptions.ConnectTimeout:
