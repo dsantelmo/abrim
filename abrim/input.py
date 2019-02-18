@@ -80,18 +80,6 @@ def _check_new_node_ok(r_json):
     return True, r_json['new_node_base_url']
 
 
-def _check_revs(config, item_id, client_node_id, n_rev, m_rev):
-    saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
-
-    if n_rev != saved_n_rev:
-        log.error(f"n_rev DOESN'T match: {n_rev} - {saved_n_rev}")
-        return False
-    if m_rev != saved_m_rev:
-        log.error(f"m_rev DOESN'T match: {m_rev} - {saved_m_rev}")
-        return False
-    return saved_n_rev, saved_m_rev
-
-
 def _check_permissions(dummy):  # TODO: implement me
     return True
 
@@ -177,9 +165,30 @@ def _post_sync(user_id, client_node_id, item_id):
 
         config.db.start_transaction("_post_sync")
 
-        if not _check_revs(config, item_id, client_node_id, n_rev, m_rev):
+        saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
+        if n_rev != saved_n_rev:
+            if n_rev < saved_n_rev:
+                log.warn(f"n_rev DOESN'T match: {n_rev} < {saved_n_rev}")
+                if config.db.find_rev_shadow(client_node_id, item_id, n_rev, m_rev, old_shadow_adler32):
+                    # lost return packet
+                    # FIXME: we should delete local edits at this point
+                    # copy backup shadow to shadow (in our code that means deleting shadows with a higher than n_rev)
+                    config.db.delete_revs_higher_than(client_node_id, item_id, n_rev)
+                    config.db.end_transaction()
+                    return resp("queue_in/post_sync/201/lost_return_packet", "Accepted, but that looked like you lost a return packet from me")
+                else:
+                    config.db.rollback_transaction()
+                    raise Exception("implement me! 1")
+            else:
+                log.warn(f"n_rev DOESN'T match: {n_rev} > {saved_n_rev}")
+                config.db.rollback_transaction()
+                raise Exception("implement me! 2")
+            # return resp("queue_in/post_sync/403/no_match_revs", "Revs don't match")
+        if m_rev != saved_m_rev:
+            log.error(f"m_rev DOESN'T match: {m_rev} != {saved_m_rev}")
             config.db.rollback_transaction()
-            return resp("queue_in/post_sync/403/no_match_revs", "Revs don't match")
+            raise Exception("implement me! 3")
+
 
         got_shadow, shadow = _get_server_shadow(config, item_id, client_node_id, n_rev, m_rev)
         if not got_shadow:

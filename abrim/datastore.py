@@ -299,6 +299,25 @@ class DataStore(object):
             log.error(err)
             raise
 
+    def find_rev_shadow(self, other_node_id, item_id, n_rev, m_rev, crc):
+        self.cur.execute("""SELECT crc
+                FROM shadows
+                WHERE item = ?
+                AND other_node = ?
+                AND n_rev = ?
+                AND m_rev = ?
+                AND crc = ?
+                """, (item_id, other_node_id,n_rev, m_rev, crc,))
+        crc = self.cur.fetchone()
+
+        try:
+            if crc['crc']:
+                return True
+            else:
+                return False
+        except (TypeError, IndexError):
+            return False
+
     def get_shadow(self, item, other_node_id, n_rev, m_rev):
         # if n_rev == 0 and m_rev == 0:
         #    self._log_debug_trans("n_revs 0 - 0, assuming there is no shadow")
@@ -331,6 +350,15 @@ class DataStore(object):
             return 0, 0
         else:
             return revs_row["n_rev"], revs_row["m_rev"]
+
+    def delete_revs_higher_than(self, other_node_id, item_id, n_rev):
+        self.cur.execute("""DELETE FROM shadows
+                        WHERE
+                        item = ? AND
+                        other_node = ? AND
+                        n_rev > ?
+                        """, (item_id, other_node_id, n_rev))
+        self._log_debug_trans(f"deleted from shadows where item = {item_id} and other_node = {other_node_id} and n_rev > {n_rev}")
 
     def save_new_shadow(self, other_node_id, item_id, new_text, n_rev, m_rev, crc):
         self._log_debug_trans(f"about to save shadow: {item_id} {other_node_id} {n_rev}")
