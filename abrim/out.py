@@ -149,9 +149,9 @@ def process_out_queue(lock, node_id, port):
         lock.release()
     else:
         lock.acquire()
-        # log.info("Nothing done! waiting 1 additional second")
+        #log.info("Nothing done! waiting 0.5 additional seconds")
         lock.release()
-        time.sleep(1)
+        time.sleep(0.5)
 
 
 def get_first_queued_edit(config, other_node_id):
@@ -188,3 +188,4 @@ if __name__ == '__main__':
             else:
                 # log.debug(p_name + " finished ok")
                 pass
+            time.sleep(3)
