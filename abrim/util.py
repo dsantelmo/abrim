@@ -184,6 +184,8 @@ def prefix_debug(double_jump=False):
         temp_line_numb2 = temp_line_numb.f_back
         temp_func_name2 = temp_func_name.f_back
     else:
+        temp_file_name2 = temp_file_name
+        temp_line_numb2 = temp_line_numb
         temp_func_name2 = temp_func_name
     file_name = temp_file_name2.f_code.co_filename
     line_numb = temp_line_numb2.f_lineno
