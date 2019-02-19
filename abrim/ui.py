@@ -72,7 +72,11 @@ def _check_list_nodes(raw_response):
 
 def _list_items(username, password, node):
     url = f"{node}/users/user_1/nodes/node_1/items"  #FIXME change it so it doesn't ask for user and node
-    raw_response = get_request(url, username, password)
+    try:
+        raw_response = get_request(url, username, password)
+    except ConnectionError:
+        log.debug("ConnectionError")
+        return None, False, True
 
     if not raw_response and raw_response.status_code != 404:
         log.debug("connection error")
