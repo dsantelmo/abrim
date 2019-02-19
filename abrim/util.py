@@ -13,7 +13,7 @@ from flask import jsonify, request, Response
 
 
 def resp(api_unique_code, msg, resp_json=None):
-    log.debug(f"RESPONSE: {api_unique_code} :: {msg}")
+    log.debug(f"{prefix_debug()} RESPONSE: {api_unique_code} :: {msg}")
     log.debug("-----------------------------------------------")
     if not resp_json:
         to_jsonify = {
@@ -67,9 +67,9 @@ log = get_log(full_debug=False)
 
 def create_diff_edits(text, shadow):
     if text == shadow:
-        log.debug("both texts are the same...")
+        log.debug(f"{prefix_debug()} both texts are the same...")
         return ""
-    log.debug(f"about to diff '{shadow}' with '{text}'")
+    log.debug(f"{prefix_debug()} about to diff '{shadow}' with '{text}'")
     diff_obj = diff_match_patch.diff_match_patch()
     diff_obj.Diff_Timeout = 1
     diff = diff_obj.diff_main(shadow, text)
@@ -78,12 +78,12 @@ def create_diff_edits(text, shadow):
     if patch:
         return diff_obj.patch_toText(patch)
     else:
-        log.debug("no patch results...")
+        log.debug(f"{prefix_debug()} no patch results...")
         return None
 
 
 def fragile_patch_text(item_patches, text):
-    log.debug(f"patching: {item_patches}\nwith: {text}")
+    log.debug(f"{prefix_debug()} patching: {item_patches}\nwith: {text}")
     diff_obj = diff_match_patch.diff_match_patch()
     # these are FRAGILE patches and must match perfectly
     diff_match_patch.Match_Threshold = 0
@@ -94,7 +94,7 @@ def fragile_patch_text(item_patches, text):
 
 
 def fuzzy_patch_text(item_patches, text):
-    log.debug(f"patching: {item_patches}\nwith: {text}")
+    log.debug(f"{prefix_debug()} patching: {item_patches}\nwith: {text}")
     diff_obj = diff_match_patch.diff_match_patch()
     # these are best-effort FUZZY patches
     diff_match_patch.Match_Threshold = 1
@@ -106,12 +106,12 @@ def fuzzy_patch_text(item_patches, text):
 
 def create_hash(text):
     adler32 = zlib.adler32(text.encode())
-    log.debug(f"new hash {adler32}")
+    log.debug(f"{prefix_debug()} new hash {adler32}")
     return adler32
 
 
 def check_fields_in_dict(my_dict, fields):
-    log.debug(f"checking {my_dict} for {fields}")
+    log.debug(f"{prefix_debug()} checking {my_dict} for {fields}")
     is_ok = True
     for field in fields:
         try:
@@ -129,17 +129,17 @@ def check_fields_in_dict(my_dict, fields):
 
 
 def check_crc(text, crc):
-    log.debug(f"checking CRC of {text} to {crc}")
+    log.debug(f"{prefix_debug()} checking CRC of {text} to {crc}")
     text_crc = zlib.adler32(text.encode())
 
     try:
         int_crc = int(crc)
     except ValueError:
-        log.error(f"request CRC isn't int: {crc} {type(crc)}")
+        log.error(f"{prefix_debug()} request CRC isn't int: {crc} {type(crc)}")
         return False
 
     if int_crc != text_crc:
-        log.error(f"CRCs don't match {text_crc} {int_crc}")
+        log.error(f"{prefix_debug()} CRCs don't match {text_crc} {int_crc}")
         return False
     else:
         return True
@@ -175,6 +175,21 @@ def __prepare_request(username=None, password=None, payload=None):
     }
     return headers, json_dict
 
+def prefix_debug(double_jump=False):
+    temp_file_name = sys._getframe().f_back.f_back
+    temp_line_numb = sys._getframe().f_back.f_back
+    temp_func_name = sys._getframe().f_back.f_back
+    if double_jump:
+        temp_file_name2 = temp_file_name.f_back
+        temp_line_numb2 = temp_line_numb.f_back
+        temp_func_name2 = temp_func_name.f_back
+    else:
+        temp_func_name2 = temp_func_name
+    file_name = temp_file_name2.f_code.co_filename
+    line_numb = temp_line_numb2.f_lineno
+    func_name = temp_func_name2.f_code.co_name
+    return f"({file_name}:{line_numb} {func_name})"
+
 
 def __do_request(method, url, username=None, password=None, payload=None):
     if method != 'GET' and method != 'POST' and method != 'PUT':
@@ -182,9 +197,9 @@ def __do_request(method, url, username=None, password=None, payload=None):
 
     headers, json_dict = __prepare_request(username, password, payload)
     if json_dict:
-        log.debug(f"about to {method} this {json_dict} to {url} using {headers}")
+        log.debug(f"{prefix_debug(double_jump=True)} about to {method} this {json_dict} to {url} using {headers}")
     else:
-        log.debug(f"about to {method} to {url} using {headers}")
+        log.debug(f"{prefix_debug(double_jump=True)} about to {method} to {url} using {headers}")
     try:
         _timeout = 10  # timeout 1 is not enough for the remote node to patch its text
         if method == 'GET':
@@ -195,6 +210,9 @@ def __do_request(method, url, username=None, password=None, payload=None):
             raw_response = requests.put(url, json=json_dict, headers=headers, timeout=_timeout)
         else:
             raise Exception
+    except requests.exceptions.ConnectionError:
+        log.warning("ConnectionError")
+        raise
     except requests.exceptions.ConnectTimeout:
         log.warning("ConnectTimeout")
         raise
@@ -224,20 +242,20 @@ def post_request(url, payload, username=None, password=None):
 
 
 def response_parse(raw_response):
-    log.debug(f"Response: {raw_response}")
+    log.debug(f"{prefix_debug()} Response: {raw_response}")
     try:
         temp_text = raw_response.text.replace('\n', ' ')
-        log.debug(f"Response code: {raw_response.status_code} text: {temp_text}")
+        log.debug(f"{prefix_debug()} Response code: {raw_response.status_code} text: {temp_text}")
         response_http = raw_response.status_code
         response_dict = json.loads(raw_response.text)
     except AttributeError:
-        log.debug(f"Response doesn't have status or text")
+        log.debug(f"{prefix_debug()} Response doesn't have status or text")
         raise
     except json.decoder.JSONDecodeError:
-        log.debug(f"JSON decode error")
+        log.debug(f"{prefix_debug()} JSON decode error")
         raise
     api_unique_code = response_dict['api_unique_code']
-    log.debug(f"API response: {api_unique_code} HTTP response: {response_http} Dict: {response_dict}")
+    log.debug(f"{prefix_debug()} API response: {api_unique_code} HTTP response: {response_http} Dict: {response_dict}")
     return api_unique_code, response_http, response_dict
 
 # auth
