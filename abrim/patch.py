@@ -76,7 +76,7 @@ def process_out_patches(lock, node_id, port):
         log.debug("processed some patches")
     else:
         # log.debug("no processing done, sleeping for a bit")
-        time.sleep(0.5)
+        time.sleep(0.5)  # TODO: make this adaptative
 
 
 if __name__ == '__main__':
@@ -100,4 +100,4 @@ if __name__ == '__main__':
             else:
                 # log.debug(p_name + " finished ok")
                 pass
-            time.sleep(3)
+            time.sleep(3)  # TODO: make this adaptative
