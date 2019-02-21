@@ -22,7 +22,7 @@ def main():
         proc_queue_out, thread_queue_out = launch_subprocess('out.py', "OUT__", node_id, client_port + 2)
         proc_queue_patch, thread_queue_patch = launch_subprocess('patch.py', "PATCH", node_id, client_port + 3)
 
-        webbrowser.open_new_tab("http://localhost:" + str(client_port) + "/")
+        #webbrowser.open_new_tab("http://localhost:" + str(client_port) + "/")
 
         try:
             while True:
