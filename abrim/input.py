@@ -391,7 +391,7 @@ def _post_node(user_id):
             return resp("queue_in/post_node/405/check_req", "Malformed JSON request")
 
         log.debug("request with the new node seems ok, trying to save it")
-        config.db.start_transaction("_put_text")
+        config.db.start_transaction("_post_node")
 
         node_uuid = config.db.add_known_node(new_node_base_url)
     except Exception as err:
