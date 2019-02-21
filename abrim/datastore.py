@@ -201,10 +201,15 @@ class DataStore(object):
             if not suppress_msg:
                 self._log_debug_trans("transaction ending")
             #self.cur.execute("commit")
-            self.con.commit()
-        if self.con.in_transaction:
-            self._log_debug_trans("transaction NOT ended")
-            raise Exception
+            try:
+                self.con.commit()
+            except sqlite3.OperationalError as err:
+                self._log_debug_trans(f"commit to end transaction crashed: {err}")
+                #raise
+
+                if self.con.in_transaction:
+                    self._log_debug_trans("transaction NOT ended")
+                    raise Exception
 
     def check_transaction(self):
         if self.con.in_transaction:
