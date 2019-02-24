@@ -126,15 +126,18 @@ def process_out_queue(lock, node_id, port):
                         log.error(f"Undefined HTTP response: {response_http} {api_unique_code}")
                         config.db.rollback_transaction()
                         raise Exception("Undefined HTTP response")  # fail for the rest of HTTP codes
-                except (requests.exceptions.ConnectionError,
-                        requests.exceptions.HTTPError,
+                except (requests.exceptions.ConnectionError):
+                    log.debug("other node seems offline... sleep 5 secs")
+                    config.db.rollback_transaction()
+                    time.sleep(5) # TODO make this adaptative and break the for loop for the nodes whose wait time is not finished yet
+                except (requests.exceptions.HTTPError,
                         requests.exceptions.ReadTimeout,
                         json.decoder.JSONDecodeError,
                         KeyError,
                         Exception, ) as err:
                     config.db.rollback_transaction()
                     log.debug(err)
-                    # traceback.print_exc()
+                    traceback.print_exc()
                     log.debug("Exception... sleep 15 secs")
                     time.sleep(15)
                 finally:
