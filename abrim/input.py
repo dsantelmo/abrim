@@ -105,13 +105,45 @@ def _check_patch_done(config, timeout, client_node_id, item_id, n_rev, m_rev):
             break
         else:
             if timeout < 0:
-                log.warn("server didn't processed the patch within the allotted time. Possible server overload")
+                log.warning("server didn't processed the patch within the allotted time. Possible server overload")
                 return None
             time.sleep(1)
             timeout -= 1
 
     patch_done = {'json': 'response_all_ok_and_new_edits_for_client'} # fixme: delete me
     return patch_done
+
+
+def _enqueue_edit(config, other_node_id, item_id, diffs,  n_rev, m_rev, old_shadow):
+    hash_ = create_hash(old_shadow)
+    temp_diffs = diffs.replace('\n', ' ')
+    log.debug(f"enquing edits ({n_rev},{m_rev}) old_hash: {hash_}, diffs: {temp_diffs}")
+    config.db.enqueue_client_edits(other_node_id, item_id, diffs, hash_, n_rev, m_rev, old_shadow)
+
+
+def new_item(config, item_id, new_text):
+    log.debug(f"saving NEW item {item_id} with {new_text}")
+    new_text_crc = get_crc(new_text)
+    config.db.save_new_item(item_id, new_text, new_text_crc)  # save the new item
+    for known_node in config.db.get_known_nodes():
+        other_node_id = known_node["id"]
+
+        n_rev = 0
+        m_rev = 0
+        old_shadow = ""
+
+        # create and enqueue the edit for the new item
+        log.debug(f"creating diffs")
+        diffs = create_diff_edits(new_text, old_shadow)  # TODO: maybe doing a slow blocking diff in a transaction is wrong
+        if diffs:
+            _enqueue_edit(config, other_node_id, item_id, diffs, n_rev, m_rev, old_shadow)
+
+            # now save the new shadow for the other node
+            n_rev += 1
+            log.debug(f"saving new shadow for {other_node_id} with crc {new_text_crc}")
+            config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, new_text_crc)
+        else:
+            log.warning("no diffs. Nothing done!")
 
 
 def update_item(config, item_id, new_text):
@@ -175,8 +207,8 @@ def _post_sync(user_id, client_node_id, item_id):
 
         if n_rev != saved_n_rev:
             if n_rev < saved_n_rev:
-                log.warn(f"n_rev DOESN'T match: {n_rev} < {saved_n_rev}")
-                if config.db.find_rev_shadow(client_node_id, item_id, n_rev, m_rev, old_shadow_adler32):
+                log.warning(f"n_rev DOESN'T match: {n_rev} < {saved_n_rev}")
+                if config.db.find_rev_shadow(client_node_id, item_id, n_rev, m_rev, hash_):
                     # lost return packet
                     # FIXME: we should delete local edits at this point
                     # copy backup shadow to shadow (in our code that means deleting shadows with a higher than n_rev)
@@ -187,7 +219,7 @@ def _post_sync(user_id, client_node_id, item_id):
                     config.db.rollback_transaction()
                     raise Exception("implement me! 1")
             else:
-                log.warn(f"n_rev DOESN'T match: {n_rev} > {saved_n_rev}")
+                log.warning(f"n_rev DOESN'T match: {n_rev} > {saved_n_rev}")
                 config.db.rollback_transaction()
                 raise Exception("implement me! 2")
             # return resp("queue_in/post_sync/403/no_match_revs", "Revs don't match")
