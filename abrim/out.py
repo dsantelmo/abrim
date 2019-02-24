@@ -38,7 +38,7 @@ def send_sync(edit, other_node_url, use_put=False):
 
 
 def prepare_url(config_, item_id, other_node_url):
-    url_route = f"{other_node_url}/users/user_1/nodes/{config_.node_id}/items/{item_id}"  # FIXME don't trust node_id from url
+    url_route = f"{other_node_url}/users/user_1/nodes/{config_.node_id}/items/{item_id}/sync"  # FIXME don't trust node_id from url
     return url_route
 
 

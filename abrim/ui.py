@@ -312,11 +312,13 @@ def _post_new():
 def _post_item(node_id, item_id):
     log.debug("_post_item")
     if 'update' in request.args and 'client_text' in request.form:
+        log.debug("_post_item-update")
         url = f"{session['user_node']}/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
-        put_request(url, {"text": request.form['client_text']}, session['current_user_name'], session['current_user_password'])
+        post_request(url, {"text": request.form['client_text']}, session['current_user_name'], session['current_user_password'])
 
         return redirect(url_for('_get_item', node_id=node_id, item_id=item_id, _method='GET'))
     elif 'edit' in request.args:
+        log.debug("_post_item-edit")
         try:
             content, conn_ok, auth_ok = _req_get_item(session['current_user_name'],
                                                     session['current_user_password'],
@@ -327,6 +329,7 @@ def _post_item(node_id, item_id):
             logout_user()
             return redirect(url_for('_root'))
     else:
+        log.debug("_post_item-error")
         log.error("error in _post_item")
         return redirect(url_for('_root'))
 

@@ -179,7 +179,7 @@ def _auth():
         return resp("queue_in/auth/200/ok", "auth OK")
 
 
-@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
+@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/sync', methods=['POST'])
 @requires_auth
 def _post_sync(user_id, client_node_id, item_id):
     log.debug("_post_sync")
@@ -363,6 +363,46 @@ def _put_text(user_id, client_node_id, item_id):
         log.info("_put_text about to finish OK")
         config.db.end_transaction()
     return resp("queue_in/put_text/200/ok", "PUT OK")
+
+
+
+
+@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
+@requires_auth
+def _post_text(user_id, client_node_id, item_id):
+    log.debug("_post_text")
+    config = g.config
+    try:
+        if not _check_permissions("to do"):  # TODO: implement me
+            return resp("queue_in/post_text/403/check_permissions", "you have no permissions for that")
+
+        try:
+            r_json = request.get_json()
+        except werkzeug.exceptions.BadRequest:
+            return resp("queue_in/post_text/405/check_req", "Malformed JSON request")
+
+        check_text_ok, new_text = _check_text_request_ok(r_json)
+        if not check_text_ok:
+            return resp("queue_in/post_text/405/check_req", "Malformed JSON request")
+
+        log.debug("request with the text seems ok, trying to save it")
+        config.db.start_transaction("_post_text")
+        item_exists, item, _ = _check_item_exists(config, item_id)
+
+        if item_exists:
+            update_item(config, item_id, new_text)
+        else:
+            new_item(config, item_id, new_text)
+
+    except Exception as err:
+        config.db.rollback_transaction()
+        log.error(err)
+        traceback.print_exc()
+        return resp("queue_in/post_text/500/transaction_exception", "Unknown error. Please report this")
+    else:
+        log.info("_post_text about to finish OK")
+        config.db.end_transaction()
+    return resp("queue_in/post_text/200/ok", "PUT OK")
 
 
 @app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
