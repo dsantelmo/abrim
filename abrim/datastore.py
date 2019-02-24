@@ -289,16 +289,16 @@ class DataStore(object):
 
         if shadow is None:
             self._log_debug_trans("shadow doesn't exist")
-            n_rev = -1
+            n_rev = 0
             m_rev = 0
             shadow = ""
             return n_rev, m_rev, shadow
-
-        try:
-            return shadow['n_rev'], shadow['m_rev'], shadow['shadow']
-        except (TypeError, IndexError) as err:
-            log.error(err)
-            raise
+        else:
+            try:
+                return shadow['n_rev'], shadow['m_rev'], shadow['shadow']
+            except (TypeError, IndexError) as err:
+                log.error(err)
+                raise
 
     def find_rev_shadow(self, other_node_id, item_id, n_rev, m_rev, crc):
         self.cur.execute("""SELECT crc
@@ -347,8 +347,8 @@ class DataStore(object):
                  ORDER BY n_rev DESC LIMIT 1""", (item, other_node_id,))
         revs_row = self.cur.fetchone()
         if not revs_row:
-            self._log_debug_trans("no revs, defaulting to 0 - 0")
-            return 0, 0
+            self._log_debug_trans("no revs, returning None")
+            return None, None
         else:
             return revs_row["n_rev"], revs_row["m_rev"]
 
