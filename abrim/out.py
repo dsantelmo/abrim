@@ -117,7 +117,7 @@ def process_out_queue(lock, node_id, port):
                             log.debug("queue_in/post_sync/403/no_match_revs")
                             config.db.rollback_transaction()
                             raise Exception("implement me! 4")
-                        elif api_unique_code == "queue_in/post_sync/403/check_crc_old":
+                        elif api_unique_code == "queue_in/post_sync/403/check_crc":
                             raise Exception("implement me! 5")
                         else:
                             raise Exception("implement me! 6")

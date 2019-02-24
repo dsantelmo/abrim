@@ -84,8 +84,7 @@ class DataStore(object):
             n_rev INTEGER NOT NULL,
             m_rev INTEGER NOT NULL,
             edits TEXT,
-            old_shadow_adler32 TEXT,
-            shadow_adler32 TEXT,
+            hash TEXT,
             old_shadow TEXT,
             PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
@@ -99,8 +98,7 @@ class DataStore(object):
             n_rev INTEGER NOT NULL,
             m_rev INTEGER NOT NULL,
             edits TEXT,
-            old_shadow_adler32 TEXT,
-            shadow_adler32 TEXT,
+            hash TEXT,
             old_shadow TEXT,
             PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
@@ -114,8 +112,7 @@ class DataStore(object):
             n_rev INTEGER NOT NULL,
             m_rev INTEGER NOT NULL,
             patches TEXT,
-            old_crc INTEGER NOT NULL,
-            new_crc INTEGER NOT NULL,
+            crc INTEGER NOT NULL,
             PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
@@ -128,8 +125,7 @@ class DataStore(object):
             n_rev INTEGER NOT NULL,
             m_rev INTEGER NOT NULL,
             patches TEXT,
-            old_crc INTEGER NOT NULL,
-            new_crc INTEGER NOT NULL,
+            crc INTEGER NOT NULL,
             PRIMARY KEY(item, other_node, n_rev),
             FOREIGN KEY(item) REFERENCES items(id),
             FOREIGN KEY(other_node) REFERENCES nodes(id)
@@ -267,7 +263,7 @@ class DataStore(object):
                            (id,
                             base_url)
                            VALUES (?,?)""", insert)
-        self.con.commit()
+        # self.con.commit()
         return node_uuid
 
     def get_known_nodes(self):
@@ -380,7 +376,18 @@ class DataStore(object):
 
     # ITEM
 
-    def save_item(self, item_id, new_text, text_crc):
+
+    def save_new_item(self, item_id, new_text, text_crc):
+        self._log_debug_trans(f"about to save item: {item_id} {text_crc}")
+        self.cur.execute("""INSERT INTO items
+                       (id,
+                        text,
+                        node,
+                        crc)
+                       VALUES (?,?,?,?)""", (item_id, new_text, self.node_id, text_crc))
+        self._log_debug_trans(f"new item {item_id} saved")
+
+    def update_item(self, item_id, new_text, text_crc):
         self._log_debug_trans(f"about to save item: {item_id} {text_crc}")
         self.cur.execute("""INSERT OR REPLACE INTO items
                        (id,
@@ -415,23 +422,22 @@ class DataStore(object):
 
     # EDITS
 
-    def enqueue_client_edits(self, other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev, old_shadow):
+    def enqueue_client_edits(self, other_node_id, item_id, diffs, hash_, n_rev, m_rev, old_shadow):
         insert = (
             item_id,
             other_node_id,
             n_rev,
             m_rev,
             diffs,
-            old_hash,
-            new_hash,
+            hash_,
             old_shadow,
         )
         try:
             self.cur.execute("""INSERT INTO edits
-                               (item, other_node, n_rev, m_rev, edits, old_shadow_adler32, shadow_adler32, old_shadow)
-                               VALUES (?,?,?,?,?,?,?,?)""", insert)
+                               (item, other_node, n_rev, m_rev, edits, hash, old_shadow)
+                               VALUES (?,?,?,?,?,?,?)""", insert)
         except sqlite3.InterfaceError as err:
-            self._log_debug_trans(f"ERROR ({str(err)}) AT INSERT VALUES: {item_id}, {other_node_id}, {n_rev}, {m_rev}, {diffs}, {old_hash}, {new_hash}, {old_shadow}")
+            self._log_debug_trans(f"ERROR ({str(err)}) AT INSERT VALUES: {item_id}, {other_node_id}, {n_rev}, {m_rev}, {diffs}, {hash_}, {old_shadow}")
             raise
 
         self._log_debug_trans(f"edits {item_id} {other_node_id} {n_rev} saved")
@@ -466,19 +472,18 @@ class DataStore(object):
 
     # PATCHES
 
-    def save_new_patches(self, other_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc):
+    def save_new_patches(self, other_node_id, item_id, patches, n_rev, m_rev, crc):
         self._log_debug_trans(f"about to save patch: {item_id} {other_node_id} {n_rev}")
         insert = (item_id,
                   other_node_id,
                   n_rev,
                   m_rev,
                   patches,
-                  old_crc,
-                  new_crc
+                  crc
                   )
         self.cur.execute("""INSERT OR REPLACE INTO patches
-                           (item, other_node, n_rev, m_rev, patches, old_crc, new_crc)
-                           VALUES (?,?,?,?,?,?,?)""", insert)
+                           (item, other_node, n_rev, m_rev, patches, crc)
+                           VALUES (?,?,?,?,?,?)""", insert)
 
     def check_if_patch_done(self, other_node_id, item_id, n_rev, m_rev):
         self.cur.execute("""SELECT n_rev, m_rev
@@ -510,7 +515,7 @@ class DataStore(object):
         return node_ids
 
     def check_first_patch(self, other_node):
-        self.cur.execute("""SELECT item, other_node, n_rev, m_rev, patches, old_crc, new_crc
+        self.cur.execute("""SELECT item, other_node, n_rev, m_rev, patches, crc
                             FROM patches
                             WHERE other_node = ?
                             ORDER BY m_rev, n_rev, rowid ASC
@@ -524,9 +529,8 @@ class DataStore(object):
             n_rev = patch_row["n_rev"]
             m_rev = patch_row["m_rev"]
             patches = patch_row["patches"]
-            old_crc = patch_row["old_crc"]
-            new_crc = patch_row["new_crc"]
-            return item, other_node, n_rev, m_rev, patches, old_crc, new_crc
+            crc = patch_row["crc"]
+            return item, other_node, n_rev, m_rev, patches, crc
 
     def archive_patch(self, item, other_node, n_rev):
         self.cur.execute("""INSERT INTO patches_archive

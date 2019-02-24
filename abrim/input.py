@@ -34,16 +34,17 @@ def _patch_server_shadow(edits, shadow):
 
 
 def _check_post_sync_request_ok(r_js):
+    # {'rowid': 1, 'item': 'item_id_01', 'other_node': '<id>', 'n_rev': 0, 'm_rev': 0, 'edits': '@@ -0,0 +1,6 @@\n+all ok\n', 'hash': '1'}
     if not check_fields_in_dict(r_js, ('edits',)):
         log.debug("no edits")
-    if not check_fields_in_dict(r_js, ('n_rev', 'm_rev', 'old_shadow_adler32', 'shadow_adler32',)):
+    if not check_fields_in_dict(r_js, ('n_rev', 'm_rev', 'hash',)):
         return None
     try:
         log.debug(f"n_rev: {r_js['n_rev']} - m_rev: {r_js['m_rev']}")
         log.debug("has edits: {:.30}...".format(r_js['edits'].replace('\n', ' ')))
     except KeyError:
-        log.debug(f"edit request revs: {r_js['shadow_client_rev']} - {r_js['shadow_server_rev']}, no edits")
-    return r_js['n_rev'], r_js['m_rev'], r_js['old_shadow_adler32'], r_js['shadow_adler32'], r_js['edits']
+        log.debug(f"wrongly formated sync request: {r_js}")
+    return r_js['n_rev'], r_js['m_rev'], r_js['hash'], r_js['edits']
 
 
 def _check_shadow_request_ok(r_json):
@@ -92,8 +93,8 @@ def _save_shadow(config, client_node_id, item_id, shadow, n_rev, m_rev, crc):
     config.db.save_new_shadow(client_node_id, item_id, shadow, n_rev, m_rev, crc)
 
 
-def _enqueue_patches(config, client_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc):
-    config.db.save_new_patches(client_node_id, item_id, patches, n_rev, m_rev, old_crc, new_crc)
+def _enqueue_patches(config, client_node_id, item_id, patches, n_rev, m_rev, crc):
+    config.db.save_new_patches(client_node_id, item_id, patches, n_rev, m_rev, crc)
 
 
 def _check_patch_done(config, timeout, client_node_id, item_id, n_rev, m_rev):
@@ -116,25 +117,24 @@ def _check_patch_done(config, timeout, client_node_id, item_id, n_rev, m_rev):
 def update_item(config, item_id, new_text):
     log.debug(f"saving item {item_id} with {new_text}")
     new_text_crc = get_crc(new_text)
-    config.db.save_item(item_id, new_text, new_text_crc)
+    config.db.update_item(item_id, new_text, new_text_crc)
     for known_node in config.db.get_known_nodes():
         other_node_id = known_node["id"]
+
         n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
+
         log.debug(f"latest revs for that item in {other_node_id} are {n_rev} - {m_rev}")
-        n_rev += 1
-        log.debug(f"saving new shadow for {other_node_id} with crc {new_text_crc}")
-        config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, new_text_crc)
         log.debug(f"creating diffs")
         diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
-        if n_rev == 0 or diffs:
-            log.debug(f"diffs for n_rev: {n_rev}")
-            old_hash = create_hash(old_shadow)
-            new_hash = create_hash(new_text)
-            temp_diff = diffs.replace('\n', ' ')
-            log.debug(f"enquing edits - old_hash: {old_hash}, new_hash: {new_hash}, diffs: {temp_diff}")
-            config.db.enqueue_client_edits(other_node_id, item_id, diffs, old_hash, new_hash, n_rev, m_rev, old_shadow)
+        if diffs:
+            _enqueue_edit(config, other_node_id, item_id, diffs, n_rev, m_rev, old_shadow)
+
+            # now save the new shadow for the other node
+            n_rev += 1
+            log.debug(f"saving new shadow for {other_node_id} with crc {new_text_crc}")
+            config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, new_text_crc)
         else:
-            log.warn("no diffs. Nothing done!")
+            log.warning("no diffs. Nothing done!")
 
 
 @app.route('/auth', methods=['GET'])
@@ -159,13 +159,20 @@ def _post_sync(user_id, client_node_id, item_id):
         r_json = request.get_json()
 
         try:
-            n_rev, m_rev, old_shadow_adler32, shadow_adler32, edits = _check_post_sync_request_ok(r_json)
+            n_rev, m_rev, hash_, edits = _check_post_sync_request_ok(r_json)
         except TypeError:
             return resp("queue_in/post_sync/405/check_req", "Malformed JSON request")
 
         config.db.start_transaction("_post_sync")
 
         saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
+
+        if not saved_n_rev and not saved_m_rev:
+            # it's a new item, so create a new empty shadow
+            saved_n_rev = 0
+            saved_m_rev = 0
+            _save_shadow(config, client_node_id, item_id, "", saved_n_rev, saved_m_rev, 1)
+
         if n_rev != saved_n_rev:
             if n_rev < saved_n_rev:
                 log.warn(f"n_rev DOESN'T match: {n_rev} < {saved_n_rev}")
@@ -189,31 +196,25 @@ def _post_sync(user_id, client_node_id, item_id):
             config.db.rollback_transaction()
             raise Exception("implement me! 3")
 
-
         got_shadow, shadow = _get_server_shadow(config, item_id, client_node_id, n_rev, m_rev)
+
         if not got_shadow:
             config.db.rollback_transaction()
             return resp("queue_in/post_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
-
-        if not check_crc(shadow, old_shadow_adler32):
+        if not check_crc(shadow, hash_):
             config.db.rollback_transaction()
-            return resp("queue_in/post_sync/403/check_crc_old", "CRC of old shadow doesn't match")
+            return resp("queue_in/post_sync/403/check_crc", "CRC of shadow doesn't match")
 
         new_shadow, patch_success = _patch_server_shadow(edits, shadow)
 
         if not patch_success:
             config.db.rollback_transaction()
             return resp("queue_in/post_sync/500/shadow_patch_unsuccessful", "Failed to patch shadow")
-
-        if not check_crc(new_shadow, shadow_adler32):
-            config.db.rollback_transaction()
-            return resp("queue_in/post_sync/403/check_crc_new", "CRC of new shadow doesn't match")
-
-        n_rev += 1
-
-        _save_shadow(config, client_node_id, item_id, new_shadow, n_rev, m_rev, shadow_adler32)
-
-        _enqueue_patches(config, client_node_id, item_id, edits, n_rev, m_rev, old_shadow_adler32, shadow_adler32)
+        else:
+            _enqueue_patches(config, client_node_id, item_id, edits, n_rev, m_rev, hash_) # save patches to patch queue
+            n_rev += 1
+            new_hash = get_crc(new_shadow)
+            _save_shadow(config, client_node_id, item_id, new_shadow, n_rev, m_rev, new_hash) # save new shadow
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -335,7 +336,6 @@ def _get_items(user_id, client_node_id):
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_items/403/check_permissions", "you have no permissions for that")
 
-        # config.db.sql_debug_trace(True)
         items = config.db.get_items()
         if not items:
             return resp("queue_in/get_items/404/not_items", "No items")
@@ -358,7 +358,6 @@ def _get_nodes(user_id):
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_nodes/403/check_permissions", "you have no permissions for that")
 
-        # config.db.sql_debug_trace(True)
         nodes = config.db.get_known_nodes()
         if not nodes:
             return resp("queue_in/get_nodes/404/not_items", "No nodes")

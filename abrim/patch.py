@@ -16,7 +16,7 @@ def _get_item(config, item_id):
     return config.db.get_item(item_id)
 
 
-def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc, new_crc):
+def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc):
     patched_text, success = fuzzy_patch_text(patches, text)
     if not success:
         log.info("patching failed. just archive the patch")
@@ -30,7 +30,7 @@ def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc,
     _, _, item_crc_again = _get_item(config, item)
     # if the server text has not changed, save the new text
     if item_crc == item_crc_again:
-        # config.db.save_item(item, patched_text, new_crc)
+        # config.db.save_item(item, patched_text)
         update_item(config, item, patched_text)
         config.db.archive_patch(item, other_node, n_rev)
         config.db.delete_patch(item, other_node, n_rev)
