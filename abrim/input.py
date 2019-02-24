@@ -313,8 +313,14 @@ def _put_text(user_id, client_node_id, item_id):
 
         log.debug("request with the text seems ok, trying to save it")
         config.db.start_transaction("_put_text")
+        item_exists, item, _ = _check_item_exists(config, item_id)
 
-        update_item(config, item_id, new_text)
+        if item_exists:
+            # update_item(config, item_id, new_text)
+            config.db.end_transaction()
+            return resp("queue_in/put_text/200/item_exists", "ITEM EXISTS")
+        else:
+            new_item(config, item_id, new_text)
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -425,7 +431,6 @@ def before_request():
     # db.prepare_db_path(app.config['DB_PATH'])
     config = Config(app.config['NODE_ID'], app.config['PORT'])
     g.config = config
-    #pass
 
 
 @app.teardown_request
