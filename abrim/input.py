@@ -302,9 +302,9 @@ def _put_shadow(user_id, client_node_id, item_id):
         return resp("queue_in/put_shadow/201/ack", "Sync acknowledged")
 
 
-@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['GET'])
+@app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['GET'])
 @requires_auth
-def _get_text(user_id, client_node_id, item_id):
+def _get_text(item_id):
     log.debug("_get_text")
     config = g.config
     try:
@@ -325,9 +325,9 @@ def _get_text(user_id, client_node_id, item_id):
         return resp("queue_in/get_text/200/ok", "get_text OK", {"text": item_text, "crc": item_crc})
 
 
-@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['PUT'])
+@app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['PUT'])
 @requires_auth
-def _put_text(user_id, client_node_id, item_id):
+def _put_text(item_id):
     log.debug("_put_text")
     config = g.config
     try:
@@ -367,9 +367,9 @@ def _put_text(user_id, client_node_id, item_id):
 
 
 
-@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>', methods=['POST'])
+@app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['POST'])
 @requires_auth
-def _post_text(user_id, client_node_id, item_id):
+def _post_text(item_id):
     log.debug("_post_text")
     config = g.config
     try:

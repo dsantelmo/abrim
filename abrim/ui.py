@@ -143,9 +143,9 @@ def _check_get_items(raw_response):
         return None
 
 
-def _req_get_item(username, password, node, node_id_, item_id):
+def _req_get_item(username, password, item_id):
     # returns: content, conn_ok, auth_ok
-    url = f"{node}/users/{username}/nodes/{node_id_}/items/{item_id}"
+    url = f"{session['user_node']}{ROUTE_FOR['items']}/{item_id}"
     raw_response = get_request(url, username, password)
 
     if not raw_response:
@@ -235,14 +235,14 @@ def _nodes():
 
 
 
-@app.route('/nodes/<string:node_id>/items/<string:item_id>', methods=['GET'])
+@app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['GET'])
 @login_required
-def _get_item(node_id, item_id):
+def _get_item(item_id):
     log.debug("_get_item")
     try:
         content, conn_ok, auth_ok = _req_get_item(session['current_user_name'],
                                                 session['current_user_password'],
-                                                session['user_node'], node_id, item_id)
+                                                item_id)
         return render_template('item.html', conn_ok=conn_ok, auth_ok=auth_ok, item_id=item_id, content=content, edit=False)
     except AttributeError:
         log.debug("AttributeError, logging out")
@@ -300,27 +300,28 @@ def _post_new():
     except KeyError:
         log.debug("_new KeyError")
         return render_template("new.html", auth_ok=True, item_id=item_id, client_text=client_text)
-    url = f"{session['user_node']}/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
+
+    url = f"{session['user_node']}{ROUTE_FOR['items']}/{item_id}"
     put_request(url, {"text": client_text}, session['current_user_name'], session['current_user_password'])
     return redirect(url_for('_get_item', node_id=node_id, item_id=item_id, _method='GET'))
 
 
-@app.route('/nodes/<string:node_id>/items/<string:item_id>', methods=['POST'])
+@app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['POST'])
 @login_required
-def _post_item(node_id, item_id):
+def _post_item(item_id):
     log.debug("_post_item")
     if 'update' in request.args and 'client_text' in request.form:
         log.debug("_post_item-update")
-        url = f"{session['user_node']}/users/{session['current_user_name']}/nodes/{node_id}/items/{item_id}"
+        url = f"{session['user_node']}{ROUTE_FOR['items']}/{item_id}"
         post_request(url, {"text": request.form['client_text']}, session['current_user_name'], session['current_user_password'])
 
-        return redirect(url_for('_get_item', node_id=node_id, item_id=item_id, _method='GET'))
+        return redirect(url_for('_get_item', item_id=item_id, _method='GET'))
     elif 'edit' in request.args:
         log.debug("_post_item-edit")
         try:
             content, conn_ok, auth_ok = _req_get_item(session['current_user_name'],
                                                     session['current_user_password'],
-                                                    session['user_node'], node_id, item_id)
+                                                    item_id)
             return render_template('item.html', conn_ok=conn_ok, auth_ok=auth_ok, item_id=item_id, content=content, edit=True)
         except AttributeError:
             log.debug("AttributeError, logging out")

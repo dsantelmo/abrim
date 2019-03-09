@@ -20,31 +20,31 @@ Right click -> New -> String
     py -3 abrim/input.py -i node_1 -p 5000
 
 ### List items
-    curl -X GET http://127.0.0.1:5001/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
+    curl -X GET http://localhost:5001/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
 
 ### Put new item
-    curl -X PUT http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json" -d "{\"text\":\"item 1 ok\"}"
+    curl -X PUT http://localhost:5001/items/item_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json" -d "{\"text\":\"item 1 ok\"}"
 
 ### Put another new item
-    curl -X PUT http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_2 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json" -d "{\"text\":\"this is item 2\"}"
+    curl -X PUT http://localhost:5001/items/item_2 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json" -d "{\"text\":\"this is item 2\"}"
 
 ### get item
-    curl -X GET http://127.0.0.1:5001/users/user_1/nodes/node_1/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
+    curl -X GET http://localhost:5001//items/item_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
 
 ### Post first sync (will fail with queue_in/post_sync/404/not_shadow )
-    curl -X POST http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
+    curl -X POST http://localhost:5001/users/user_1/nodes/node_1/items/item_1/sync -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
 
 ### Put shadow
-    curl -X PUT http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1/shadow -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\" }"
+    curl -X PUT http://localhost:5001/users/user_1/nodes/node_1/items/item_1/shadow -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\" }"
 
 ### Post again first sync
-    curl -X POST http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
+    curl -X POST http://localhost:5001/users/user_1/nodes/node_1/items/item_1/sync -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
 
 ### Post second sync (first edit)
-    curl -X POST http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 2, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 1, \"m_rev\": 0, \"shadow_adler32\": \"317981617\", \"old_shadow_adler32\": \"1\", \"edits\": \"@@ -0,0 +1,10 @@\n+a new text\n\"}"
+    curl -X POST http://localhost:5001/users/user_1/nodes/node_1/items/item_1/sync -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 2, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 1, \"m_rev\": 0, \"shadow_adler32\": \"317981617\", \"old_shadow_adler32\": \"1\", \"edits\": \"@@ -0,0 +1,10 @@\n+a new text\n\"}"
 
 ### Post third sync (second edit)
-    curl -X POST http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 3, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 2, \"m_rev\": 0, \"shadow_adler32\": \"469435528\", \"old_shadow_adler32\": \"317981617\", \"edits\": \"@@ -1,10 +1,12 @@\n a new\n+er\n  text\n\"}"
+    curl -X POST http://localhost:5001/users/user_1/nodes/node_1/items/item_1/sync -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 3, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 2, \"m_rev\": 0, \"shadow_adler32\": \"469435528\", \"old_shadow_adler32\": \"317981617\", \"edits\": \"@@ -1,10 +1,12 @@\n a new\n+er\n  text\n\"}"
 
 
 # The process' internals
@@ -103,7 +103,7 @@ Example using 2 nodes: 5000 and 6000
 
 			1. Send:
 
-					curl -X PUT http://localhost:5001/users/admin/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all ok\"}"
+					curl -X PUT http://localhost:5001/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all ok\"}"
 
 			2. Reply from server:
 
@@ -214,7 +214,7 @@ Example using 2 nodes: 5000 and 6000
 
 		1. Send the edit:
 
-				curl -X POST http://localhost:5001/users/admin/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all better\"}"
+				curl -X POST http://localhost:5001/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all better\"}"
 
 		2. Reply:
 
@@ -240,7 +240,7 @@ Example using 2 nodes: 5000 and 6000
 
 	2. Edit the text in node_2:
 
-			curl -X POST http://localhost:6001/users/admin/nodes/node_1/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all much better!\"}"
+			curl -X POST http://localhost:6001/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all much better!\"}"
 
 
 ### Force problems to get recovery actions:
