@@ -3,7 +3,7 @@
 from flask import Flask, session, request, abort, render_template, redirect, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from abrim.config import Config
-from abrim.util import get_log, args_init, response_parse, get_request, post_request, put_request
+from abrim.util import get_log, args_init, response_parse, get_request, post_request, put_request, ROUTE_FOR
 
 log = get_log(full_debug=False)
 
@@ -102,8 +102,8 @@ def _list_items(username, password, node):
                 return None, False, True
 
 
-def _list_nodes(username, password, node):
-    url = f"{node}/users/user_1/nodes"  #FIXME change it so it doesn't ask for user and node
+def _list_nodes(username, password):
+    url = f"{session['user_node']}{ROUTE_FOR['nodes']}"  # fixme
     raw_response = get_request(url, username, password)
 
     if not raw_response and raw_response.status_code != 404:
@@ -206,14 +206,13 @@ def _root():
         return redirect(url_for('_root'))
 
 
-@app.route('/nodes', methods=['GET', 'POST'])
+@app.route(ROUTE_FOR['nodes'], methods=['GET', 'POST'])
 @login_required
 def _nodes():
     if request.method == 'GET':
         try:
             content, conn_ok, auth_ok = _list_nodes(session['current_user_name'],
-                                                    session['current_user_password'],
-                                                    session['user_node'])
+                                                    session['current_user_password'])
             return render_template('nodes.html', conn_ok=conn_ok, auth_ok=auth_ok, content=content)
         except KeyError:
             log.debug("AttributeError, logging out")
@@ -229,8 +228,8 @@ def _nodes():
         except KeyError:
             log.debug("_new KeyError")
             return redirect(url_for('_nodes'))
-        url = f"/users/{session['current_user_name']}/nodes"
-        url = f"{session['user_node']}/users/user_1/nodes" #fixme
+
+        url = f"{session['user_node']}{ROUTE_FOR['nodes']}" #fixme
         post_request(url, {"new_node_base_url": new_node_base_url}, session['current_user_name'], session['current_user_password'])
 
         return redirect(url_for('_nodes'))

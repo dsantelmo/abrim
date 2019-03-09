@@ -6,7 +6,7 @@ import werkzeug
 from flask import Flask, g, request
 from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
-                       create_hash, args_init, requires_auth
+                       create_hash, args_init, requires_auth, ROUTE_FOR
 
 log = get_log(full_debug=False)
 
@@ -427,9 +427,9 @@ def _get_items(user_id, client_node_id):
         return resp("queue_in/get_items/200/ok", "get_text OK", items)
 
 
-@app.route('/users/<string:user_id>/nodes', methods=['GET'])
+@app.route(ROUTE_FOR['nodes'], methods=['GET'])
 @requires_auth
-def _get_nodes(user_id):
+def _get_nodes():
     log.debug("_get_nodes")
     config = g.config
     try:
@@ -449,9 +449,9 @@ def _get_nodes(user_id):
         return resp("queue_in/get_nodes/200/ok", "get_nodes OK", nodes)
 
 
-@app.route('/users/<string:user_id>/nodes', methods=['POST'])
+@app.route(ROUTE_FOR['nodes'], methods=['POST'])
 @requires_auth
-def _post_node(user_id):
+def _post_node():
     log.debug("_post_node")
     config = g.config
     try:

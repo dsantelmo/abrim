@@ -12,6 +12,11 @@ import diff_match_patch
 from flask import jsonify, request, Response
 
 
+ROUTE_FOR = {
+    'nodes': '/nodes'
+}
+
+
 def resp(api_unique_code, msg, resp_json=None):
     log.debug(f"{prefix_debug()} RESPONSE: {api_unique_code} :: {msg}")
     log.debug("-----------------------------------------------")
