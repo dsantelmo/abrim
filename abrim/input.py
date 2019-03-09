@@ -181,7 +181,7 @@ def _auth():
 
 @app.route(f"{ROUTE_FOR['items']}/<string:item_id>/sync/<string:client_node_id>", methods=['POST'])
 @requires_auth
-def _post_sync(item_id, client_node_id):
+def _receive_sync_post(item_id, client_node_id):
     log.debug("_post_sync")
     config = g.config
     try:
@@ -265,7 +265,7 @@ def _post_sync(item_id, client_node_id):
 
 @app.route(f"{ROUTE_FOR['items']}/<string:item_id>/shadow/<string:client_node_id>", methods=['PUT'])
 @requires_auth
-def _put_shadow(client_node_id, item_id):
+def _receive_shadow_put(client_node_id, item_id):
     log.debug("_put_shadow")
     config = g.config
     config.item_edit = {"item_node_id": client_node_id, "item_id": item_id}
@@ -304,7 +304,7 @@ def _put_shadow(client_node_id, item_id):
 
 @app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['GET'])
 @requires_auth
-def _get_text(item_id):
+def _receive_item_get(item_id):
     log.debug("_get_text")
     config = g.config
     try:
@@ -327,7 +327,7 @@ def _get_text(item_id):
 
 @app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['PUT'])
 @requires_auth
-def _put_text(item_id):
+def _receive_item_put(item_id):
     log.debug("_put_text")
     config = g.config
     try:
@@ -369,7 +369,7 @@ def _put_text(item_id):
 
 @app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['POST'])
 @requires_auth
-def _post_text(item_id):
+def _receive_item_post(item_id):
     log.debug("_post_text")
     config = g.config
     try:
@@ -407,7 +407,7 @@ def _post_text(item_id):
 
 @app.route(ROUTE_FOR['items'], methods=['GET'])
 @requires_auth
-def _get_items():
+def _receive_items_get():
     log.debug("_get_items")
     config = g.config
     try:
@@ -429,7 +429,7 @@ def _get_items():
 
 @app.route(ROUTE_FOR['nodes'], methods=['GET'])
 @requires_auth
-def _get_nodes():
+def _receive_nodes_get():
     log.debug("_get_nodes")
     config = g.config
     try:
@@ -451,7 +451,7 @@ def _get_nodes():
 
 @app.route(ROUTE_FOR['nodes'], methods=['POST'])
 @requires_auth
-def _post_node():
+def _receive_node_post():
     log.debug("_post_node")
     config = g.config
     try:
