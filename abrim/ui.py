@@ -70,8 +70,8 @@ def _check_list_nodes(raw_response):
         return None
 
 
-def _list_items(username, password, node):
-    url = f"{node}/users/user_1/nodes/node_1/items"  #FIXME change it so it doesn't ask for user and node
+def _list_items(username, password):
+    url = f"{session['user_node']}{ROUTE_FOR['items']}"  #fixme
     try:
         raw_response = get_request(url, username, password)
     except ConnectionError:
@@ -197,8 +197,7 @@ def teardown_request(exception):
 def _root():
     try:
         content, conn_ok, auth_ok = _list_items(session['current_user_name'],
-                                                session['current_user_password'],
-                                                session['user_node'])
+                                                session['current_user_password'])
         return render_template('list.html', conn_ok=conn_ok, auth_ok=auth_ok, content=content)
     except KeyError:
         log.debug("AttributeError, logging out")

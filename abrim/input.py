@@ -405,9 +405,9 @@ def _post_text(user_id, client_node_id, item_id):
     return resp("queue_in/post_text/200/ok", "PUT OK")
 
 
-@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items', methods=['GET'])
+@app.route(ROUTE_FOR['items'], methods=['GET'])
 @requires_auth
-def _get_items(user_id, client_node_id):
+def _get_items():
     log.debug("_get_items")
     config = g.config
     try:

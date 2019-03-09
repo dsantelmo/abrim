@@ -13,7 +13,8 @@ from flask import jsonify, request, Response
 
 
 ROUTE_FOR = {
-    'nodes': '/nodes'
+    'nodes': '/nodes',
+    'items': '/items'
 }
 
 

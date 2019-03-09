@@ -20,7 +20,7 @@ Right click -> New -> String
     py -3 abrim/input.py -i node_1 -p 5000
 
 ### List items
-    curl -X GET http://127.0.0.1:5001/users/user_1/nodes/node_1/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
+    curl -X GET http://127.0.0.1:5001/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
 
 ### Put new item
     curl -X PUT http://127.0.0.1:5001/users/user_1/nodes/node_1/items/item_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json" -d "{\"text\":\"item 1 ok\"}"
