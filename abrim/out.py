@@ -5,7 +5,7 @@ import traceback
 import time
 import requests
 import json
-from abrim.util import get_log, args_init, response_parse, post_request, put_request
+from abrim.util import get_log, args_init, response_parse, post_request, put_request, ROUTE_FOR
 from abrim.config import Config
 log = get_log(full_debug=False)
 
@@ -37,9 +37,16 @@ def send_sync(edit, other_node_url, use_put=False):
         raise
 
 
-def prepare_url(config_, item_id, other_node_url):
-    url_route = f"{other_node_url}/users/user_1/nodes/{config_.node_id}/items/{item_id}/sync"  # FIXME don't trust node_id from url
+def prepare_sync_url(config_, item_id, other_node_url, shadow=False):
+    sync_or_shadow = 'sync'
+    if shadow:
+        sync_or_shadow = 'shadow'
+    url_route = f"{other_node_url}{ROUTE_FOR['items']}/{item_id}/{sync_or_shadow}/{config_.node_id}"  # FIXME don't trust node_id from url
     return url_route
+
+
+def prepare_shadow_url(config_, item_id, other_node_url):
+    return prepare_sync_url(config_, item_id, other_node_url, shadow=True)
 
 
 def process_out_queue(lock, node_id, port):
@@ -69,10 +76,10 @@ def process_out_queue(lock, node_id, port):
                     break
 
                 log.debug(f"other_node_url: {other_node_url}")
-                url = prepare_url(config, item, other_node_url)
+                sync_url = prepare_sync_url(config, item, other_node_url)
                 try:
-                    log.debug(f"about to send {edit} to {url}")
-                    response_http, api_unique_code = send_sync(edit, url)
+                    log.debug(f"about to send {edit} to {sync_url}")
+                    response_http, api_unique_code = send_sync(edit, sync_url)
 
                     try:
                         response_http = int(response_http)
@@ -102,7 +109,8 @@ def process_out_queue(lock, node_id, port):
                                            'shadow': old_shadow}
 
                             log.debug("trying to send the shadow again")
-                            shad_http, shad_api_unique_code = send_sync(shadow_json, url + "/shadow", use_put=True)
+                            shadow_url = prepare_shadow_url(config, item, other_node_url)
+                            shad_http, shad_api_unique_code = send_sync(shadow_json, shadow_url, use_put=True)
                             if shad_http == 201 and shad_api_unique_code == "queue_in/put_shadow/201/ack":
                                 log.info("EVENT: remote needed the shadow") #  TODO: save events
                             elif shad_http == 201 and shad_api_unique_code == "queue_in/put_shadow/201/lost_return_packet":
@@ -126,7 +134,7 @@ def process_out_queue(lock, node_id, port):
                         log.error(f"Undefined HTTP response: {response_http} {api_unique_code}")
                         config.db.rollback_transaction()
                         raise Exception("Undefined HTTP response")  # fail for the rest of HTTP codes
-                except (requests.exceptions.ConnectionError):
+                except requests.exceptions.ConnectionError:
                     log.debug("other node seems offline... sleep 5 secs")
                     config.db.rollback_transaction()
                     time.sleep(5) # TODO make this adaptative and break the for loop for the nodes whose wait time is not finished yet

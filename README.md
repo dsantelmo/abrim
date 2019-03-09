@@ -29,22 +29,22 @@ Right click -> New -> String
     curl -X PUT http://localhost:5001/items/item_2 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json" -d "{\"text\":\"this is item 2\"}"
 
 ### get item
-    curl -X GET http://localhost:5001//items/item_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
+    curl -X GET http://localhost:5001/items/item_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
 
 ### Post first sync (will fail with queue_in/post_sync/404/not_shadow )
-    curl -X POST http://localhost:5001/users/user_1/nodes/node_1/items/item_1/sync -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
+    curl -X POST http://localhost:6001/items/item_1/sync/node_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
 
 ### Put shadow
-    curl -X PUT http://localhost:5001/users/user_1/nodes/node_1/items/item_1/shadow -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\" }"
+    curl -X PUT http://localhost:6001/items/item_1/shadow/node_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\" }"
 
 ### Post again first sync
-    curl -X POST http://localhost:5001/users/user_1/nodes/node_1/items/item_1/sync -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
+    curl -X POST http://localhost:6001/items/item_1/sync/node_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 1, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"shadow_adler32\": \"1\", \"old_shadow_adler32\": \"1\", \"edits\": \"\" }"
 
 ### Post second sync (first edit)
-    curl -X POST http://localhost:5001/users/user_1/nodes/node_1/items/item_1/sync -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 2, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 1, \"m_rev\": 0, \"shadow_adler32\": \"317981617\", \"old_shadow_adler32\": \"1\", \"edits\": \"@@ -0,0 +1,10 @@\n+a new text\n\"}"
+    curl -X POST http://localhost:6001/items/item_1/sync/node_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 2, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 1, \"m_rev\": 0, \"shadow_adler32\": \"317981617\", \"old_shadow_adler32\": \"1\", \"edits\": \"@@ -0,0 +1,10 @@\n+a new text\n\"}"
 
 ### Post third sync (second edit)
-    curl -X POST http://localhost:5001/users/user_1/nodes/node_1/items/item_1/sync -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 3, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 2, \"m_rev\": 0, \"shadow_adler32\": \"469435528\", \"old_shadow_adler32\": \"317981617\", \"edits\": \"@@ -1,10 +1,12 @@\n a new\n+er\n  text\n\"}"
+    curl -X POST http://localhost:6001/items/item_1/sync/node_1 -H "content-type: application/json" -H "Authorization: Basic YWRtaW46c2VjcmV0" -d "{ \"rowid\": 3, \"item\": \"item_1\", \"other_node\": \"node_2\", \"n_rev\": 2, \"m_rev\": 0, \"shadow_adler32\": \"469435528\", \"old_shadow_adler32\": \"317981617\", \"edits\": \"@@ -1,10 +1,12 @@\n a new\n+er\n  text\n\"}"
 
 
 # The process' internals
@@ -158,15 +158,15 @@ Example using 2 nodes: 5000 and 6000
 
 		2. Something like this, using cURL (change other_node value):
 
-				curl -X POST http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01/sync -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
+				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
 
 		3. The other node can reply:
 
-				{"api_unique_code":"queue_in/post_sync/404/not_shadow","message":"Shadow not found. PUT the full shadow to URL + /shadow"}
+				{"api_unique_code":"queue_in/post_sync/404/not_shadow","message":"Shadow not found. PUT the full shadow to this URL changing 'sync' with 'shadow'"}
 
 		4. That happens if other node's input.py doesn't have our shadow for that item, so this node's out.py rollbacks the current transaction and sends the shadow:
 
-				curl -X PUT http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01/shadow -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\"}"
+				curl -X PUT http://localhost:6001/items/item_id_01/shadow/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"n_rev\": 0, \"m_rev\": 0, \"shadow\": \"\"}"
 
 		5. The other's node input.py should accept it with:
 
@@ -178,7 +178,7 @@ Example using 2 nodes: 5000 and 6000
 
 		1. It tries to process it:
 
-				curl -X POST http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01/sync -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
+				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
 
 		2. The other node's input.py processes the POST again. This time it finds the shadow so enqueues the edit.
 
@@ -226,7 +226,7 @@ Example using 2 nodes: 5000 and 6000
 
 		* node_1 sends the edit:
 
-				curl -X POST http://localhost:6001/users/user_1/nodes/node_1/items/item_id_01/sync -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"0f12daaf267a4fc3a93446ee6655eb6b\", \"n_rev\": 1, \"m_rev\": 0, \"edits\": \"@@ -1,6 +1,10 @@\n all \n-ok\n+better\n\", \"hash\": \"130089524\"}"
+				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"0f12daaf267a4fc3a93446ee6655eb6b\", \"n_rev\": 1, \"m_rev\": 0, \"edits\": \"@@ -1,6 +1,10 @@\n all \n-ok\n+better\n\", \"hash\": \"130089524\"}"
 
 		* node_02 should reply with ack
 

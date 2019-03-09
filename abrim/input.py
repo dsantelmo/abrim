@@ -179,9 +179,9 @@ def _auth():
         return resp("queue_in/auth/200/ok", "auth OK")
 
 
-@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/sync', methods=['POST'])
+@app.route(f"{ROUTE_FOR['items']}/<string:item_id>/sync/<string:client_node_id>", methods=['POST'])
 @requires_auth
-def _post_sync(user_id, client_node_id, item_id):
+def _post_sync(item_id, client_node_id):
     log.debug("_post_sync")
     config = g.config
     try:
@@ -232,7 +232,7 @@ def _post_sync(user_id, client_node_id, item_id):
 
         if not got_shadow:
             config.db.rollback_transaction()
-            return resp("queue_in/post_sync/404/not_shadow", "Shadow not found. PUT the full shadow to URL + /shadow")
+            return resp("queue_in/post_sync/404/not_shadow", "Shadow not found. PUT the full shadow to this URL changing 'sync' with 'shadow'")
         if not check_crc(shadow, hash_):
             config.db.rollback_transaction()
             return resp("queue_in/post_sync/403/check_crc", "CRC of shadow doesn't match")
@@ -263,12 +263,12 @@ def _post_sync(user_id, client_node_id, item_id):
     return resp("queue_in/post_sync/201/done", "Sync done", patch_done_json)
 
 
-@app.route('/users/<string:user_id>/nodes/<string:client_node_id>/items/<string:item_id>/shadow', methods=['PUT'])
+@app.route(f"{ROUTE_FOR['items']}/<string:item_id>/shadow/<string:client_node_id>", methods=['PUT'])
 @requires_auth
-def _put_shadow(user_id, client_node_id, item_id):
+def _put_shadow(client_node_id, item_id):
     log.debug("_put_shadow")
     config = g.config
-    config.item_edit = {"item_user_id": user_id, "item_node_id": client_node_id, "item_id": item_id}
+    config.item_edit = {"item_node_id": client_node_id, "item_id": item_id}
 
     try:
         if not _check_permissions(config.item_edit):
