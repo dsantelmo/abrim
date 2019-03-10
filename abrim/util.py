@@ -41,7 +41,7 @@ def resp(api_unique_code, msg, resp_json=None):
     return response
 
 
-def get_log(level=None):
+def get_log(level):
     if level == 'full_debug':
         # enable debug for HTTP requests
         import http.client as http_client
@@ -80,7 +80,7 @@ def get_log(level=None):
     return logging.getLogger(__name__)
 
 
-log = get_log('critical')
+log = get_log('debug')
 
 
 def create_diff_edits(text, shadow):
@@ -135,7 +135,7 @@ def check_fields_in_dict(my_dict, fields):
         try:
             _ = my_dict[field]
         except KeyError:
-            log.error(f"missing '{field}' in dict")
+            log.error(f"{prefix_debug()} missing '{field}' in dict")
             is_ok = False
     return is_ok
 

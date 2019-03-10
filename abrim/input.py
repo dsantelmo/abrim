@@ -8,7 +8,7 @@ from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
                        create_hash, args_init, requires_auth, ROUTE_FOR
 
-log = get_log('critical')
+log = get_log('debug')
 
 app = Flask(__name__)
 
@@ -71,14 +71,14 @@ def _check_text_request_ok(r_json):
 
 
 def _check_new_node_ok(r_json):
-    if not check_fields_in_dict(r_json, ('new_node_base_url',)):
-        return False, _
+    if not check_fields_in_dict(r_json, ('new_node_id','new_node_base_url',)):
+        return False, None, None
     try:
         log.debug("new_node_base_url: {:.30}...".format(r_json['new_node_base_url'].replace('\n', ' ')))
     except KeyError:
         log.error("no new_node_base_url in request")
-        return False, _
-    return True, r_json['new_node_base_url']
+        return False, None, None
+    return True, r_json['new_node_id'], r_json['new_node_base_url']
 
 
 def _check_permissions(dummy):  # TODO: implement me
@@ -125,7 +125,9 @@ def new_item(config, item_id, new_text):
     log.debug(f"saving NEW item {item_id} with {new_text}")
     new_text_crc = get_crc(new_text)
     config.db.save_new_item(item_id, new_text, new_text_crc)  # save the new item
-    for known_node in config.db.get_known_nodes():
+    known_nodes = config.db.get_known_nodes()
+    log.debug(f"known_nodes: {known_nodes}")
+    for known_node in known_nodes:
         other_node_id = known_node["id"]
 
         n_rev = 0
@@ -201,9 +203,9 @@ def _receive_sync_post(item_id, client_node_id):
         saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
 
         if not saved_n_rev and not saved_m_rev:
-            if _check_item_exists(config, item_id):
+            item_exists, item_text, item_crc = _check_item_exists(config, item_id)
+            if item_exists:
                 # item already exists locally but the other_node has no local shadow so create a new local shadow and signal ir to the other node
-                _, item_text, item_crc = config.db.get_item(item_id)
                 _save_shadow(config, client_node_id, item_id, item_text, 1, 1, item_crc)  # save new shadow
                 config.db.end_transaction()
                 return resp("queue_in/post_sync/409/use_this_as_shadow",
@@ -473,14 +475,14 @@ def _receive_node_post():
         except werkzeug.exceptions.BadRequest:
             return resp("queue_in/post_node/405/check_req", "Malformed JSON request")
 
-        check_new_node_ok, new_node_base_url = _check_new_node_ok(r_json)
+        check_new_node_ok, new_node_id, new_node_base_url = _check_new_node_ok(r_json)
         if not check_new_node_ok:
             return resp("queue_in/post_node/405/check_req", "Malformed JSON request")
 
         log.debug("request with the new node seems ok, trying to save it")
         config.db.start_transaction("_post_node")
 
-        node_uuid = config.db.add_known_node(new_node_base_url)
+        node_uuid = config.db.add_known_node(new_node_id, new_node_base_url)
     except Exception as err:
         config.db.rollback_transaction()
         log.error(f"ERROR: {err}")
@@ -502,8 +504,8 @@ def __end():
 
 @app.before_request
 def before_request():
-    log.debug("-------------------------------------------------------------------------------")
     if request.full_path and request.method:
+        log.debug("-------------------------------------------------------------------------------")
         log.debug(f"{request.method} REQUEST: {request.full_path}")
         if request.data:
             log.debug(f"{request.method} REQUEST HAS DATA: {request.data}")

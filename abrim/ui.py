@@ -219,6 +219,7 @@ def _nodes():
             return redirect(url_for('_root'))
     else:
         try:
+            new_node_id = request.form['new_node_id']
             new_node_base_url = request.form['new_node_base_url']
             log.debug(new_node_base_url)
         except IndexError:
@@ -229,7 +230,8 @@ def _nodes():
             return redirect(url_for('_nodes'))
 
         url = f"{session['user_node']}{ROUTE_FOR['nodes']}" #fixme
-        post_request(url, {"new_node_base_url": new_node_base_url}, session['current_user_name'], session['current_user_password'])
+        json_payload = {"new_node_id": new_node_id, "new_node_base_url": new_node_base_url}
+        post_request(url, json_payload, session['current_user_name'], session['current_user_password'])
 
         return redirect(url_for('_nodes'))
 

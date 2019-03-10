@@ -255,8 +255,8 @@ class DataStore(object):
 
     # NODES
 
-    def add_known_node(self, url):
-        node_uuid = uuid.uuid4().hex
+    def add_known_node(self, node_uuid, url):
+        # node_uuid = uuid.uuid4().hex
         insert = (node_uuid,
                   url)
         self.cur.execute("""INSERT OR IGNORE INTO nodes
