@@ -41,8 +41,8 @@ def resp(api_unique_code, msg, resp_json=None):
     return response
 
 
-def get_log(full_debug=False):
-    if full_debug:
+def get_log(level=None):
+    if level == 'full_debug':
         # enable debug for HTTP requests
         import http.client as http_client
         http_client.HTTPConnection.debuglevel = 1
@@ -54,10 +54,22 @@ def get_log(full_debug=False):
         logging.getLogger('urllib3').setLevel(logging.CRITICAL)
         logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
 
+    log_level = logging.DEBUG
+    if level == 'full_debug' or level == 'debug':
+        log_level = logging.DEBUG
+    elif level == 'info':
+        log_level = logging.INFO
+    elif level == 'warn' or level == 'warning':
+        log_level = logging.WARNING
+    elif level == 'error':
+        log_level = logging.ERROR
+    elif level == 'critical':
+        log_level = logging.CRITICAL
+
     # FIXME http://docs.python-guide.org/en/latest/writing/logging/
     # It is strongly advised that you do not add any handlers other
     # than NullHandler to your library's loggers.
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=log_level,
                         format='%(levelname)-7s %(asctime)s PID:%(process)-6s %(module)10s:%(lineno)-5s %(funcName)25s ::: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')  # ,
     # disable_existing_loggers=False)
@@ -68,7 +80,7 @@ def get_log(full_debug=False):
     return logging.getLogger(__name__)
 
 
-log = get_log(full_debug=False)
+log = get_log('critical')
 
 
 def create_diff_edits(text, shadow):

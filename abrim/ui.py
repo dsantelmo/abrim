@@ -5,7 +5,7 @@ from flask_login import LoginManager, UserMixin, current_user, login_required, l
 from abrim.config import Config
 from abrim.util import get_log, args_init, response_parse, get_request, post_request, put_request, ROUTE_FOR
 
-log = get_log(full_debug=False)
+log = get_log('critical')
 
 app = Flask(__name__)
 

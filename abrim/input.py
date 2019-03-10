@@ -8,7 +8,7 @@ from abrim.config import Config
 from abrim.util import get_log, fragile_patch_text, resp, check_fields_in_dict, check_crc, get_crc, create_diff_edits, \
                        create_hash, args_init, requires_auth, ROUTE_FOR
 
-log = get_log(full_debug=False)
+log = get_log('critical')
 
 app = Flask(__name__)
 

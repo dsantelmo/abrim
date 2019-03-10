@@ -6,7 +6,7 @@ import uuid
 
 from util import get_log
 
-log = get_log(full_debug=False)
+log = get_log('critical')
 
 
 class DataStore(object):

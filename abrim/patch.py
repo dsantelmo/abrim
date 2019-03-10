@@ -5,7 +5,7 @@ import time
 from abrim.config import Config
 from abrim.util import get_log, fuzzy_patch_text, args_init
 from abrim.input import update_item
-log = get_log(full_debug=False)
+log = get_log('critical')
 
 
 def _check_first_patch(config, other_node):

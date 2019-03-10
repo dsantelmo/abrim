@@ -7,7 +7,7 @@ import requests
 import json
 from abrim.util import get_log, args_init, response_parse, post_request, put_request, get_crc, ROUTE_FOR
 from abrim.config import Config
-log = get_log(full_debug=False)
+log = get_log('critical')
 
 
 def send_sync(edit, other_node_url, use_put=False):
