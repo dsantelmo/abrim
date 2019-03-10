@@ -16,7 +16,7 @@
                     {% if conn_ok %}
                         {% if content %}
                             {% for item in content %}
-                                <p> <a href="/nodes/{{ item.node|safe }}/items/{{ item.id|safe }}">{{ item.id|safe }}</a></p>
+                                <p> <a href="/items/{{ item.id|safe }}">{{ item.id|safe }}</a></p>
                             {% endfor %}
                         {% else %}
                             <p>No content!</p>
