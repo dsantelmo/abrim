@@ -82,7 +82,7 @@ Example using 2 nodes: 5000 and 6000
 
 			1. Send:
 
-					curl -X POST http://localhost:5001/nodes -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"new_node_base_url\":\"http://localhost:6001\" }"
+					curl -X POST http://localhost:5001/nodes -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"new_node_id\":\"node_2\", \"new_node_base_url\":\"http://localhost:6001\" }"
 
 			2. Reply form server:
 
@@ -236,7 +236,7 @@ Example using 2 nodes: 5000 and 6000
 
 	1. Create a node connection in node_2:
 
-			curl -X POST http://localhost:6001/nodes -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"new_node_base_url\":\"http://localhost:5001\" }"
+			curl -X POST http://localhost:6001/nodes -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"new_node_id\":\"node_1\", \"new_node_base_url\":\"http://localhost:5001\" }"
 
 	2. Edit the text in node_2:
 
