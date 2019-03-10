@@ -86,7 +86,7 @@ Example using 2 nodes: 5000 and 6000
 
 			2. Reply form server:
 
-					{"api_unique_code":"queue_in/post_node/201/done","message":"<NODE_2_INTERNAL_ID>"}
+					{"api_unique_code":"queue_in/post_node/201/done","message":"node_2"}
 
 		2. Using UI:
 
@@ -158,7 +158,7 @@ Example using 2 nodes: 5000 and 6000
 
 		2. Something like this, using cURL (change other_node value):
 
-				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
+				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
 
 		3. The other node can reply:
 
@@ -178,7 +178,7 @@ Example using 2 nodes: 5000 and 6000
 
 		1. It tries to process it:
 
-				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"<NODE_2_INTERNAL_ID>\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
+				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"node_1\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
 
 		2. The other node's input.py processes the POST again. This time it finds the shadow so enqueues the edit.
 
@@ -241,12 +241,12 @@ Example using 2 nodes: 5000 and 6000
 	2. Edit the text in node_2:
 
 			curl -X POST http://localhost:6001/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all much better!\"}"
-	
-	3. Although node_2 has edited a text originally from node_1 it doesn't know that the node connection in the step before is node_1. So it handles the connection as a new node and sends a full sync from an empty shadow
+
+	3. node_2 patches its text and sends a new edit to node_1
 	
 		* node_1 sends the edit:
 
-				curl -X POST http://localhost:5001/items/item_id_01/sync/node_2 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"2954a5db1810454689df9bd7d7f7b0f7\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,16 @@\n+all much better!\n\", \"hash\": \"1\"}"
+				curl -X POST http://localhost:5001/items/item_id_01/sync/node_2 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"node_1\", \"n_rev\": 2, \"m_rev\": 0, \"edits\": \"@@ -1,10 +1,16 @@\n all \n+much \n better\n+!\n\", \"hash\": \"344785888º\" }"
 
 
 ### Force problems to get recovery actions:
