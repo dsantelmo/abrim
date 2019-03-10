@@ -5,7 +5,7 @@ import traceback
 import time
 import requests
 import json
-from abrim.util import get_log, args_init, response_parse, post_request, put_request, ROUTE_FOR
+from abrim.util import get_log, args_init, response_parse, post_request, put_request, get_crc, ROUTE_FOR
 from abrim.config import Config
 log = get_log(full_debug=False)
 
@@ -17,9 +17,9 @@ def send_sync(edit, other_node_url, use_put=False):
         else:
             p_response = post_request(other_node_url, edit)
 
-        api_unique_code, response_http, _ = response_parse(p_response)
+        api_unique_code, response_http, response_dict = response_parse(p_response)
         if api_unique_code and response_http:
-            return response_http, api_unique_code
+            return response_http, api_unique_code, response_dict
         else:
             raise Exception
     except requests.exceptions.ConnectionError:
@@ -79,7 +79,7 @@ def process_out_queue(lock, node_id, port):
                 sync_url = prepare_sync_url(config, item, other_node_url)
                 try:
                     log.debug(f"about to send {edit} to {sync_url}")
-                    response_http, api_unique_code = send_sync(edit, sync_url)
+                    response_http, api_unique_code, response_dict = send_sync(edit, sync_url)
 
                     try:
                         response_http = int(response_http)
@@ -110,18 +110,30 @@ def process_out_queue(lock, node_id, port):
 
                             log.debug("trying to send the shadow again")
                             shadow_url = prepare_shadow_url(config, item, other_node_url)
-                            shad_http, shad_api_unique_code = send_sync(shadow_json, shadow_url, use_put=True)
+                            shad_http, shad_api_unique_code, response_dict = send_sync(shadow_json, shadow_url, use_put=True)
                             if shad_http == 201 and shad_api_unique_code == "queue_in/put_shadow/201/ack":
                                 log.info("EVENT: remote needed the shadow") #  TODO: save events
                             elif shad_http == 201 and shad_api_unique_code == "queue_in/put_shadow/201/lost_return_packet":
                                 log.info("EVENT: it seems that previously we have lost a return packet from that remote node")
                             else:
+                                config.db.rollback_transaction()
                                 raise Exception("implement me! 2")
                         else:
                             config.db.rollback_transaction()
                             raise Exception("implement me! 3")
-                    elif response_http == 403:
-                        if api_unique_code == "queue_in/post_sync/403/no_match_revs":
+                    elif response_http == 409:
+                        if api_unique_code == "queue_in/post_sync/409/use_this_as_shadow":
+                            try:
+                                log.debug("use_this_as_shadow: deleting this edit")
+                                resp_crc = response_dict['content']['crc']
+                                resp_text = response_dict['content']['text']
+
+                                config.db.save_new_shadow(other_node_id, item, resp_text, 1, 1, resp_crc)
+                                config.db.delete_edit(rowid)  # <- FIXME CHANGE ME to create an entry for patch to recreate edit
+                                config.db.end_transaction()
+                            except KeyError:
+                                raise Exception("implement me! 7")
+                        elif api_unique_code == "queue_in/post_sync/403/no_match_revs":
                             log.debug("queue_in/post_sync/403/no_match_revs")
                             config.db.rollback_transaction()
                             raise Exception("implement me! 4")
@@ -129,6 +141,10 @@ def process_out_queue(lock, node_id, port):
                             raise Exception("implement me! 5")
                         else:
                             raise Exception("implement me! 6")
+                    elif response_http == 500:
+                        log.debug("other node is responding with HTTP Error 500... sleep 5 secs")
+                        config.db.rollback_transaction()
+                        time.sleep(5)  # TODO make this adaptative and break the for loop for the nodes whose wait time is not finished yet
                     else:
                         # raise for the rest of the codes
                         log.error(f"Undefined HTTP response: {response_http} {api_unique_code}")

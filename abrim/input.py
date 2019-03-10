@@ -197,13 +197,23 @@ def _receive_sync_post(item_id, client_node_id):
 
         config.db.start_transaction("_post_sync")
 
+        log.debug(f"checking revs for {item_id} from node: {client_node_id}")
         saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
 
         if not saved_n_rev and not saved_m_rev:
-            # it's a new item, so create a new empty shadow
-            saved_n_rev = 0
-            saved_m_rev = 0
-            _save_shadow(config, client_node_id, item_id, "", saved_n_rev, saved_m_rev, 1)
+            if _check_item_exists(config, item_id):
+                # item already exists locally but the other_node has no local shadow so create a new local shadow and signal ir to the other node
+                _, item_text, item_crc = config.db.get_item(item_id)
+                _save_shadow(config, client_node_id, item_id, item_text, 1, 1, item_crc)  # save new shadow
+                config.db.end_transaction()
+                return resp("queue_in/post_sync/409/use_this_as_shadow",
+                            "That item exists locally but I have no shadow from you. Use this item and use it for shadow 1-1",
+                            {"text": item_text, "crc": item_crc})
+            else:
+                # it's a new item, so create a new empty shadow
+                saved_n_rev = 0
+                saved_m_rev = 0
+                _save_shadow(config, client_node_id, item_id, "", saved_n_rev, saved_m_rev, 1)
 
         if n_rev != saved_n_rev:
             if n_rev < saved_n_rev:

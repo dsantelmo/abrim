@@ -241,6 +241,12 @@ Example using 2 nodes: 5000 and 6000
 	2. Edit the text in node_2:
 
 			curl -X POST http://localhost:6001/items/item_id_01 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"text\": \"all much better!\"}"
+	
+	3. Although node_2 has edited a text originally from node_1 it doesn't know that the node connection in the step before is node_1. So it handles the connection as a new node and sends a full sync from an empty shadow
+	
+		* node_1 sends the edit:
+
+				curl -X POST http://localhost:5001/items/item_id_01/sync/node_2 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"2954a5db1810454689df9bd7d7f7b0f7\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,16 @@\n+all much better!\n\", \"hash\": \"1\"}"
 
 
 ### Force problems to get recovery actions:
