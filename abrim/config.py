@@ -5,7 +5,7 @@ from pathlib import Path
 from abrim.util import get_log
 from datastore import DataStore
 
-log = get_log(full_debug=False)
+log = get_log('critical')
 
 
 class Config(object):
