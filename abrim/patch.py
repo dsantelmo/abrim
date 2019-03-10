@@ -52,7 +52,7 @@ def process_out_patches(lock, node_id, port):
         there_was_nodes = True
         log.debug(other_node_id)
         try:
-            config.db.sql_debug_trace(True)
+            # config.db.sql_debug_trace(True)
             patch_found_item, other_node, n_rev, m_rev, patches, crc = _check_first_patch(config, other_node_id)
             if not patch_found_item:
                 log.debug("no patch found for this item for this node")
