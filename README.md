@@ -158,7 +158,7 @@ Example using 2 nodes: 5000 and 6000
 
 		2. Something like this, using cURL (change other_node value):
 
-				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"node_2\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
+				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\" }"
 
 		3. The other node can reply:
 
@@ -174,11 +174,11 @@ Example using 2 nodes: 5000 and 6000
 
 		6. This node's out.py stops processing this entry of the queue and continue with the rest of the remote nodes.
 
-	4. If the other node didn't have a shadow and ç1 rolled back, node_1's out.py eventually out.py finds this edit again:
+	4. If the other node didn't have a shadow and rolled back, node_1's out.py eventually out.py finds this edit again:
 
 		1. It tries to process it:
 
-				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"node_1\", \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
+				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"n_rev\": 0, \"m_rev\": 0, \"edits\": \"@@ -0,0 +1,6 @@\n+all ok\n\", \"hash\": \"1\"}"
 
 		2. The other node's input.py processes the POST again. This time it finds the shadow so enqueues the edit.
 
@@ -226,7 +226,7 @@ Example using 2 nodes: 5000 and 6000
 
 		* node_1 sends the edit:
 
-				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{\"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"0f12daaf267a4fc3a93446ee6655eb6b\", \"n_rev\": 1, \"m_rev\": 0, \"edits\": \"@@ -1,6 +1,10 @@\n all \n-ok\n+better\n\", \"hash\": \"130089524\"}"
+				curl -X POST http://localhost:6001/items/item_id_01/sync/node_1 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"n_rev\": 1, \"m_rev\": 0, \"edits\": \"@@ -1,6 +1,10 @@\n all \n-ok\n+better\n\", \"hash\": \"130089524\"}"
 
 		* node_02 should reply with ack
 
@@ -246,7 +246,7 @@ Example using 2 nodes: 5000 and 6000
 	
 		* node_1 sends the edit:
 
-				curl -X POST http://localhost:5001/items/item_id_01/sync/node_2 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"rowid\": 1, \"item\": \"item_id_01\", \"other_node\": \"node_1\", \"n_rev\": 2, \"m_rev\": 0, \"edits\": \"@@ -1,10 +1,16 @@\n all \n+much \n better\n+!\n\", \"hash\": \"344785888º\" }"
+				curl -X POST http://localhost:5001/items/item_id_01/sync/node_2 -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "Content-Type: application/json" -d "{ \"n_rev\": 2, \"m_rev\": 0, \"edits\": \"@@ -1,10 +1,16 @@\n all \n+much \n better\n+!\n\", \"hash\": \"344785888º\" }"
 
 
 ### Force problems to get recovery actions:

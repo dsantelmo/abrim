@@ -449,14 +449,10 @@ class DataStore(object):
                  other_node = ?
                  ORDER BY n_rev ASC LIMIT 1""", (other_node_id,))
         edit_row = self.cur.fetchone()
-        if not edit_row:
-            return None, None
-        else:
-            log.debug("----------------------------------------------------------")
-            self._log_debug_trans("got edits")
-            edit_rowid = edit_row["rowid"]
-            edit = dict(edit_row)
-            return edit_rowid, edit
+        try:
+            return dict(edit_row)
+        except TypeError:
+            return None
 
     def archive_edit(self, edit_rowid):
         self.cur.execute("""INSERT INTO edits_archive

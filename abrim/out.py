@@ -68,17 +68,23 @@ def process_out_queue(lock, node_id, port):
             while queue_limit > 0:
                 config.db.start_transaction()
                 # config.db.sql_debug_trace(True)
-                edit, item, m_rev, n_rev, old_shadow, rowid = get_first_queued_edit(config, other_node_id)
-                try:
-                    edit.pop("old_shadow", None) # do not send old shadow during sync
-                except AttributeError:
-                    pass
-                if not rowid:
-                    # log.debug(f"not rowid for {other_node_id}")
+                edit = get_first_queued_edit(config, other_node_id)
+
+                if not edit:
                     break
+                rowid = edit.pop("rowid")
+                item = edit.pop("item")
+                old_shadow = edit.pop("old_shadow", "")
+
+                n_rev = edit["n_rev"]
+                m_rev = edit["m_rev"]
+
+                edit.pop("other_node", None)
+                edit.pop("item", None)
 
                 log.debug(f"other_node_url: {other_node_url}")
                 sync_url = prepare_sync_url(config, item, other_node_url)
+
                 try:
                     log.debug(f"about to send {edit} to {sync_url}")
                     response_http, api_unique_code, response_dict = send_sync(edit, sync_url)
@@ -184,16 +190,7 @@ def process_out_queue(lock, node_id, port):
 
 
 def get_first_queued_edit(config, other_node_id):
-    rowid, edit = config.db.get_first_queued_edit(other_node_id)
-    if not edit or not rowid:
-        return None, None, None, None, None, None
-    else:
-        item = edit["item"]
-        n_rev = edit["n_rev"]
-        m_rev = edit["m_rev"]
-        old_shadow = edit["old_shadow"]
-        log.debug(f"queued edits for {other_node_id}")
-        return edit, item, m_rev, n_rev, old_shadow, rowid
+    return config.db.get_first_queued_edit(other_node_id)
 
 
 if __name__ == '__main__':
