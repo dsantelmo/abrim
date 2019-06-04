@@ -55,7 +55,7 @@ def proc_terminate(my_proc):
 
 
 def launch_subprocess(script, prefix, node_id, port=None):
-    popen = ['py', '-3', '-u', str(script), '-i', str(node_id)]
+    popen = ['py', '-u', str(script), '-i', str(node_id)]
     if port:
         popen.extend(['-p', str(port)])
 
