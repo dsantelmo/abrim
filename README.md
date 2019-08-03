@@ -17,7 +17,7 @@ Right click -> New -> String
 ### Run one node
     export PYTHONPATH=./:$PYTHONPATH
     set PYTHONPATH=%PYTHONPATH%;%cd%
-    py -3 abrim/input.py -i node_1 -p 5000
+    py abrim/input.py -i node_1 -p 5000
 
 ### List items
     curl -X GET http://localhost:5001/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
@@ -70,11 +70,11 @@ Example using 2 nodes: 5000 and 6000
 
 		1. Start node_2 at port 6000:
 
-				python node.py node.py -i node_2 -p 6000
+				python node.py -i node_2 -p 6000
 
 		2. Start node_1 at port 5000:
 
-				python node.py node.py -i node_1 -p 5000
+				python node.py -i node_1 -p 5000
 
 	3. Create a new node connection in node_1:
 
