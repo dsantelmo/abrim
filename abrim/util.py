@@ -18,7 +18,7 @@ ROUTE_FOR = {
 }
 
 
-def resp(api_unique_code, msg, resp_json=None):
+def resp(api_unique_code, msg, resp_json=None, location=None):
     log.debug(f"{prefix_debug()} RESPONSE: {api_unique_code} :: {msg}")
     log.debug("-----------------------------------------------")
     if not resp_json:
@@ -38,7 +38,11 @@ def resp(api_unique_code, msg, resp_json=None):
         response.status_code = int(api_unique_code.split('/')[2])
     except IndexError:
         response.status_code = 500
-    return response
+    if location:
+        response.headers['Location'] = location
+        return response
+    else:
+        return response
 
 
 def get_log(level):

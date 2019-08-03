@@ -3,8 +3,8 @@
 import multiprocessing
 import time
 from abrim.config import Config
-from abrim.util import get_log, fuzzy_patch_text, args_init
-from abrim.input import update_item
+from abrim.util import get_log, args_init, fuzzy_patch_text, get_crc, create_diff_edits, create_hash
+
 log = get_log('critical')
 
 
@@ -31,7 +31,7 @@ def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc)
     # if the server text has not changed, save the new text
     if item_crc == item_crc_again:
         # config.db.save_item(item, patched_text)
-        update_item(config, item, patched_text)
+        _update_item(config, item, patched_text)
         config.db.archive_patch(item, other_node, n_rev)
         config.db.delete_patch(item, other_node, n_rev)
         config.db.end_transaction()
@@ -42,9 +42,92 @@ def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc)
     return True
 
 
+def _check_item_exists(config, item_id):
+    return config.db.get_item(item_id)
+
+
+def _enqueue_edit(config, other_node_id, item_id, diffs,  n_rev, m_rev, old_shadow):
+    hash_ = create_hash(old_shadow)
+    temp_diffs = diffs.replace('\n', ' ')
+    log.debug(f"enquing edits ({n_rev},{m_rev}) old_hash: {hash_}, diffs: {temp_diffs}")
+    config.db.enqueue_client_edits(other_node_id, item_id, diffs, hash_, n_rev, m_rev, old_shadow)
+
+
+def _update_item(config, item_id, new_text):
+    log.debug(f"saving item {item_id} with {new_text}")
+    new_text_crc = get_crc(new_text)
+    config.db.update_item(item_id, new_text, new_text_crc)
+    for known_node in config.db.get_known_nodes():
+        other_node_id = known_node["id"]
+
+        n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
+
+        log.debug(f"latest revs for that item in {other_node_id} are {n_rev} - {m_rev}")
+        log.debug(f"creating diffs")
+        diffs = create_diff_edits(new_text, old_shadow)  # maybe doing a slow blocking diff in a transaction is wrong
+        if diffs:
+            _enqueue_edit(config, other_node_id, item_id, diffs, n_rev, m_rev, old_shadow)
+
+            # now save the new shadow for the other node
+            n_rev += 1
+            log.debug(f"saving new shadow for {other_node_id} with crc {new_text_crc}")
+            config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, new_text_crc)
+        else:
+            log.warning("no diffs. Nothing done!")
+
+
+def _new_item(config, item_id, new_text):
+    log.debug(f"saving NEW item {item_id} with {new_text}")
+    new_text_crc = get_crc(new_text)
+    config.db.save_new_item(item_id, new_text, new_text_crc)  # save the new item
+    known_nodes = config.db.get_known_nodes()
+    log.debug(f"known_nodes: {known_nodes}")
+    for known_node in known_nodes:
+        other_node_id = known_node["id"]
+
+        n_rev = 0
+        m_rev = 0
+        old_shadow = ""
+
+        # create and enqueue the edit for the new item
+        log.debug(f"creating diffs")
+        diffs = create_diff_edits(new_text, old_shadow)  # TODO: maybe doing a slow blocking diff in a transaction is wrong
+        if diffs:
+            _enqueue_edit(config, other_node_id, item_id, diffs, n_rev, m_rev, old_shadow)
+
+            # now save the new shadow for the other node
+            n_rev += 1
+            log.debug(f"saving new shadow for {other_node_id} with crc {new_text_crc}")
+            config.db.save_new_shadow(other_node_id, item_id, new_text, n_rev, m_rev, new_text_crc)
+        else:
+            log.warning("no diffs. Nothing done!")
+
+
 def process_out_patches(lock, node_id, port):
     config = Config(node_id, port)
     # config.db.sql_debug_trace(True)
+
+    there_was_posts = False
+    try:
+        rowid, item_id, new_text, _, _ = config.db.get_post_pending()
+        if rowid:
+            config.db.start_transaction("posts queue")
+            there_was_posts = True
+            rowid, item_id, new_text, _, _ = config.db.get_post_pending()
+            item_exists, item, _ = _check_item_exists(config, item_id)
+
+            if item_exists:
+                _update_item(config, item_id, new_text)
+            else:
+                _new_item(config, item_id, new_text)
+            config.db.update_post_pending(rowid)
+
+    except Exception as err:
+        config.db.rollback_transaction()
+        log.error(err)
+    else:
+        if there_was_posts:
+            config.db.end_transaction()
 
     there_was_nodes = False
     # to avoid one node hoarding the queue, process one patch a time for each node
@@ -89,8 +172,8 @@ def process_out_patches(lock, node_id, port):
         except TypeError:
             # log.debug("no patches")
             pass
-    if there_was_nodes:
-        log.debug("processed some patches")
+    if there_was_nodes or there_was_posts:
+        log.debug("processed some patches or posts")
     else:
         # log.debug("no processing done, sleeping for a bit")
         time.sleep(0.5)  # TODO: make this adaptative

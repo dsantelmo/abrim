@@ -121,7 +121,18 @@ def _enqueue_edit(config, other_node_id, item_id, diffs,  n_rev, m_rev, old_shad
     config.db.enqueue_client_edits(other_node_id, item_id, diffs, hash_, n_rev, m_rev, old_shadow)
 
 
-def new_item(config, item_id, new_text):
+def _enqueue_post_text(config, item_id, new_text):
+    new_text_crc = get_crc(new_text)
+    rowid = config.db.save_new_post(item_id, new_text, new_text_crc)
+    log.debug(f"new post {rowid} for {item_id} saved")
+    return rowid, new_text_crc
+
+
+def _get_enqueue_post_text_status(config, queue_rowid):
+    return config.db.get_post_status(queue_rowid)
+
+
+def _new_item(config, item_id, new_text):
     log.debug(f"saving NEW item {item_id} with {new_text}")
     new_text_crc = get_crc(new_text)
     config.db.save_new_item(item_id, new_text, new_text_crc)  # save the new item
@@ -148,7 +159,7 @@ def new_item(config, item_id, new_text):
             log.warning("no diffs. Nothing done!")
 
 
-def update_item(config, item_id, new_text):
+def _update_item(config, item_id, new_text):
     log.debug(f"saving item {item_id} with {new_text}")
     new_text_crc = get_crc(new_text)
     config.db.update_item(item_id, new_text, new_text_crc)
@@ -298,7 +309,7 @@ def _receive_shadow_put(client_node_id, item_id):
         item_exists, item, _ = _check_item_exists(config, item_id)
         if not item_exists:
             # _save_item(item_id, shadow)
-            update_item(config, item_id, shadow)
+            _update_item(config, item_id, shadow)
 
         else:
             _save_shadow(config, client_node_id, item_id, shadow, r_json['n_rev'], r_json['m_rev'], get_crc(shadow))
@@ -360,11 +371,11 @@ def _receive_item_put(item_id):
         item_exists, item, _ = _check_item_exists(config, item_id)
 
         if item_exists:
-            # update_item(config, item_id, new_text)
+            # _update_item(config, item_id, new_text)
             config.db.end_transaction()
             return resp("queue_in/put_text/200/item_exists", "ITEM EXISTS")
         else:
-            new_item(config, item_id, new_text)
+            _new_item(config, item_id, new_text)
 
     except Exception as err:
         config.db.rollback_transaction()
@@ -382,7 +393,8 @@ def _receive_item_put(item_id):
 @app.route(f"{ROUTE_FOR['items']}/<string:item_id>", methods=['POST'])
 @requires_auth
 def _receive_item_post(item_id):
-    log.debug("_post_text")
+    log.debug("_receive_item_post")
+
     config = g.config
     try:
         if not _check_permissions("to do"):  # TODO: implement me
@@ -398,23 +410,47 @@ def _receive_item_post(item_id):
             return resp("queue_in/post_text/405/check_req", "Malformed JSON request")
 
         log.debug("request with the text seems ok, trying to save it")
-        config.db.start_transaction("_post_text")
-        item_exists, item, _ = _check_item_exists(config, item_id)
 
-        if item_exists:
-            update_item(config, item_id, new_text)
+        # to avoid locking the datastore or making the client wait accept it without transaction and return 202 Accepted
+        # then continue saving in the background
+
+        new_post_id, new_text_crc = _enqueue_post_text(config, item_id, new_text)
+        if new_post_id:
+            location = f"{ROUTE_FOR['items']}/queue/post/{new_post_id}"
+            return resp("queue_in/post_text/202/accepted", "POST OK", {"location": location}, location)
         else:
-            new_item(config, item_id, new_text)
-
+            log.error("queue_in/post_text/500/no_new_post_id_error")
+            return resp("queue_in/post_text/500/no_new_post_id_error", "Unknown error. Please report this")
     except Exception as err:
-        config.db.rollback_transaction()
+        log.error("queue_in/post_text/500/transaction_exception")
         log.error(err)
         traceback.print_exc()
         return resp("queue_in/post_text/500/transaction_exception", "Unknown error. Please report this")
-    else:
-        log.info("_post_text about to finish OK")
-        config.db.end_transaction()
-    return resp("queue_in/post_text/200/ok", "PUT OK")
+
+
+@app.route(f"{ROUTE_FOR['items']}/queue/post/<int:queue_rowid>", methods=['GET'])
+@requires_auth
+def _receive_item_post_queue_get(queue_rowid):
+    log.debug("_receive_item_post_queue_get")
+
+    config = g.config
+    try:
+        if not _check_permissions("to do"):  # TODO: implement me
+            return resp("queue_in/post_queue/403/check_permissions", "you have no permissions for that")
+
+        status, item_id = _get_enqueue_post_text_status(config, queue_rowid)
+        if status:
+            if status != "DONE":
+                return resp("queue_in/post_queue/200/ok", status)
+            else:
+                location = f"{ROUTE_FOR['items']}/{item_id}"
+                return resp("queue_in/post_queue/303/see_other", status, {"location": location}, location)
+        else:
+            return resp("queue_in/post_queue/500/transaction_exception", "Unknown error. Please report this")
+    except Exception as err:
+        log.error(err)
+        traceback.print_exc()
+        return resp("queue_in/post_queue/500/transaction_exception", "Unknown error. Please report this")
 
 
 @app.route(ROUTE_FOR['items'], methods=['GET'])

@@ -57,6 +57,15 @@ class DataStore(object):
             base_url TEXT
             );
 
+           CREATE TABLE IF NOT EXISTS posts
+           (item TEXT NOT NULL,
+            text TEXT,
+            node TEXT NOT NULL,
+            crc INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            FOREIGN KEY(node) REFERENCES nodes(id)
+            );
+
            CREATE TABLE IF NOT EXISTS items
            (id TEXT PRIMARY KEY NOT NULL,
             text TEXT,
@@ -373,6 +382,81 @@ class DataStore(object):
         self.cur.execute("""INSERT OR REPLACE INTO shadows
                            (item, other_node, n_rev, m_rev, shadow, crc)
                            VALUES (?,?,?,?,?,?)""", insert)
+
+
+    # POST
+
+    def save_new_post(self, item_id, new_text, new_text_crc):  # TODO: MAYBE REFACTOR THIS TO A SEPARATE SQLITE FILE?
+        status = "PENDING"
+        self._log_debug_trans(f"about to save post: {item_id} {new_text_crc} as {status}")
+        try:
+            self.cur.execute("""INSERT INTO posts
+                           (item,
+                            text,
+                            node,
+                            crc,
+                            status)
+                           VALUES (?,?,?,?,?)""", (item_id, new_text, self.node_id, new_text_crc, status))
+            self.con.commit()
+            rowid = self.cur.lastrowid
+        except sqlite3.IntegrityError:
+            self._log_debug_trans(f"save_new_post: IntegrityError for {item_id} with {self.node_id}")
+            rowid = None
+        self._log_debug_trans(f"new post rowid {rowid} for {item_id} saved")
+        return rowid
+
+    def get_post_status(self, queue_rowid):
+        try:
+            self.cur.execute("""SELECT status, item
+                     FROM posts
+                     WHERE
+                     rowid = ?""", (queue_rowid,))
+
+            status_row = self.cur.fetchone()
+            if not status_row:
+                self._log_debug_trans(f"no status found for {queue_rowid}")
+                return None, None
+            else:
+                return status_row["status"], status_row["item"]
+        except (TypeError, IndexError):
+            self._log_debug_trans(f"no status found for {queue_rowid}")
+            return None, None
+
+    def get_post_pending(self):
+        try:
+            pending_status = "PENDING"
+            self.cur.execute("""SELECT rowid, 
+                        item,
+                        text,
+                        node,
+                        crc
+                     FROM posts
+                     WHERE
+                     status = ?""", (pending_status,))
+
+            post_row = self.cur.fetchone()
+            if not post_row:
+                return None, None, None, None, None
+            else:
+                return post_row["rowid"], post_row["item"], post_row["text"], post_row["node"], post_row["crc"]
+        except (TypeError, IndexError):
+            self._log_debug_trans(f"no posts found with status {pending_status}")
+            return None, None, None, None, None
+
+    def update_post_pending(self, rowid):
+        pending_status = "PENDING"
+        done_status = "DONE"
+        self.cur.execute("""UPDATE posts
+                SET
+                    status = ?
+                WHERE
+                    status = ? 
+                    AND
+                    rowid = ?""", (done_status, pending_status, rowid))
+        if self.cur.rowcount > 0:
+            return True
+        else:
+            return False
 
     # ITEM
 
