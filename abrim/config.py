@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 from abrim.util import get_log
-from datastore import DataStore
+from abrim.datastore import DataStore
 
 log = get_log('critical')
 
@@ -41,10 +41,16 @@ class Config(object):
                 log.error("can't locate NODE_ID value")
                 raise
 
-    def __init__(self, node_id, port, db_prefix="", drop_db=False):
+    def __init__(self, node_id, port, drop_db=False):
         if not node_id:
             self.load_config()
         else:
             self.node_id = node_id
-        self.db = DataStore(self.node_id, port, db_prefix, drop_db)
+        self.db_input = DataStore(self.node_id, port, "input", False, drop_db)
+        self.db_input_ro = DataStore(self.node_id, port, "input", True, drop_db)
+        self.db_out = DataStore(self.node_id, port, "out", False, drop_db)
+        self.db_out_ro = DataStore(self.node_id, port, "out", True, drop_db)
+        self.db_patch = DataStore(self.node_id, port, "out", False, drop_db)
+        self.db_patch_ro = DataStore(self.node_id, port, "out", True, drop_db)
+
         self.edit_queue_limit = 50

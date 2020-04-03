@@ -4,7 +4,7 @@ import sqlite3
 import sys
 import uuid
 
-from util import get_log
+from abrim.util import get_log
 
 log = get_log('critical')
 
@@ -13,11 +13,7 @@ class DataStore(object):
 
     # MAINTENANCE
     def get_db_path(self):
-        node_id = self.node_id
-        port_int = self.port
-        port_temp = str(port_int)
-        port = port_temp[:-1]
-        filename = f'abrim_{node_id}_{port}.sqlite'
+        filename = f'abrim_{self.node_id}_{str(self.port)[:-1]}_{self.db_prefix}.sqlite'
         try:
             # noinspection PyUnresolvedReferences
             import appdirs
@@ -30,7 +26,9 @@ class DataStore(object):
                 db_path = f".{os.path.basename(sys.modules['__main__'].__file__)}{filename}"
             except AttributeError:
                 db_path = f'{filename}_error.sqlite'
-        self.db_path = db_path
+        import pathlib
+        db_path_uri = pathlib.Path(db_path).as_uri()
+        self.db_path = db_path_uri
         # log.debug(self.db_path)
 
     def drop_db(self):
@@ -244,7 +242,7 @@ class DataStore(object):
             callb = log.debug
         self.con.set_trace_callback(callb)
 
-    def __init__(self, node_id, port, db_prefix="", drop_db=False):
+    def __init__(self, node_id, port, db_prefix, ro, drop_db=False):
         if not node_id or not port:
             raise Exception
         else:
@@ -254,9 +252,9 @@ class DataStore(object):
 
         self._transaction_code = None
         self.db_path = ""
-        self.get_db_path()
+        self.get_db_path(ro)
         # log.debug("db_path: " + self.db_path)
-        with sqlite3.connect(self.db_path) as con:
+        with sqlite3.connect(self.db_path, uri=True) as con:
             #con.isolation_level = None
             con.isolation_level = 'EXCLUSIVE'
             con.row_factory = sqlite3.Row
