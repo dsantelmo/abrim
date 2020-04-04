@@ -9,11 +9,11 @@ log = get_log('critical')
 
 
 def _check_first_patch(config, other_node):
-    return config.db.check_first_patch(other_node)
+    return config.db_ro.check_first_patch(other_node)
 
 
 def _get_item(config, item_id):
-    return config.db.get_item(item_id)
+    return config.db_ro.get_item(item_id)
 
 
 def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc):
@@ -43,7 +43,7 @@ def _patch_server_text(config, item, other_node, n_rev, patches, text, item_crc)
 
 
 def _check_item_exists(config, item_id):
-    return config.db.get_item(item_id)
+    return config.db_ro.get_item(item_id)
 
 
 def _enqueue_edit(config, other_node_id, item_id, diffs,  n_rev, m_rev, old_shadow):
@@ -57,10 +57,10 @@ def _update_item(config, item_id, new_text):
     log.debug(f"saving item {item_id} with {new_text}")
     new_text_crc = get_crc(new_text)
     config.db.update_item(item_id, new_text, new_text_crc)
-    for known_node in config.db.get_known_nodes():
+    for known_node in config.db_ro.get_known_nodes():
         other_node_id = known_node["id"]
 
-        n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
+        n_rev, m_rev, old_shadow = config.db_ro.get_latest_rev_shadow(other_node_id, item_id)
 
         log.debug(f"latest revs for that item in {other_node_id} are {n_rev} - {m_rev}")
         log.debug(f"creating diffs")
@@ -80,7 +80,7 @@ def _new_item(config, item_id, new_text):
     log.debug(f"saving NEW item {item_id} with {new_text}")
     new_text_crc = get_crc(new_text)
     config.db.save_new_item(item_id, new_text, new_text_crc)  # save the new item
-    known_nodes = config.db.get_known_nodes()
+    known_nodes = config.db_ro.get_known_nodes()
     log.debug(f"known_nodes: {known_nodes}")
     for known_node in known_nodes:
         other_node_id = known_node["id"]
@@ -109,11 +109,11 @@ def process_out_patches(lock, node_id, port):
 
     there_was_posts = False
     try:
-        rowid, item_id, new_text, _, _ = config.db.get_post_pending()
+        rowid, item_id, new_text, _, _ = config.db_ro.get_post_pending()
         if rowid:
             config.db.start_transaction("posts queue")
             there_was_posts = True
-            rowid, item_id, new_text, _, _ = config.db.get_post_pending()
+            rowid, item_id, new_text, _, _ = config.db_ro.get_post_pending()
             item_exists, item, _ = _check_item_exists(config, item_id)
 
             if item_exists:
@@ -131,7 +131,7 @@ def process_out_patches(lock, node_id, port):
 
     there_was_nodes = False
     # to avoid one node hoarding the queue, process one patch a time for each node
-    for other_node_id in config.db.get_nodes_from_patches():
+    for other_node_id in config.db_ro.get_nodes_from_patches():
         there_was_nodes = True
         log.debug(other_node_id)
         try:

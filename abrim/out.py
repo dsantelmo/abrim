@@ -60,7 +60,7 @@ def process_out_queue(lock, node_id, port):
     # lock.release()
 
     result = None
-    for known_node in config.db.get_known_nodes():
+    for known_node in config.db_ro.get_known_nodes():
         other_node_id = known_node["id"]
         other_node_url = known_node["base_url"]
         if other_node_url:
@@ -190,7 +190,7 @@ def process_out_queue(lock, node_id, port):
 
 
 def get_first_queued_edit(config, other_node_id):
-    return config.db.get_first_queued_edit(other_node_id)
+    return config.db_ro.get_first_queued_edit(other_node_id)
 
 
 if __name__ == '__main__':

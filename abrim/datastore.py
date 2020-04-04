@@ -12,7 +12,7 @@ log = get_log('critical')
 class DataStore(object):
 
     # MAINTENANCE
-    def get_db_path(self):
+    def get_db_path(self, read_only):
         filename = f'abrim_{self.node_id}_{str(self.port)[:-1]}_{self.db_prefix}.sqlite'
         try:
             # noinspection PyUnresolvedReferences
@@ -29,7 +29,9 @@ class DataStore(object):
         import pathlib
         db_path_uri = pathlib.Path(db_path).as_uri()
         self.db_path = db_path_uri
-        # log.debug(self.db_path)
+        if read_only:
+            self.db_path = self.db_path + '?mode=ro'
+        log.debug(self.db_path)
 
     def drop_db(self):
         self.cur.execute("""SELECT name FROM sqlite_master WHERE type = 'table';

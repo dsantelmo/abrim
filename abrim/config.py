@@ -46,11 +46,7 @@ class Config(object):
             self.load_config()
         else:
             self.node_id = node_id
-        self.db_input = DataStore(self.node_id, port, "input", False, drop_db)
-        self.db_input_ro = DataStore(self.node_id, port, "input", True, drop_db)
-        self.db_out = DataStore(self.node_id, port, "out", False, drop_db)
-        self.db_out_ro = DataStore(self.node_id, port, "out", True, drop_db)
-        self.db_patch = DataStore(self.node_id, port, "out", False, drop_db)
-        self.db_patch_ro = DataStore(self.node_id, port, "out", True, drop_db)
+        self.db = DataStore(self.node_id, port, "", False, drop_db)
+        self.db_ro = DataStore(self.node_id, port, "", True, drop_db)
 
         self.edit_queue_limit = 50

@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 
 def _get_server_shadow(config, item_id, client_node_id, n_rev, m_rev):
-    got_shadow, shadow = config.db.get_shadow(item_id, client_node_id, n_rev, m_rev)
+    got_shadow, shadow = config.db_ro.get_shadow(item_id, client_node_id, n_rev, m_rev)
     if got_shadow:
         log.debug(f"shadow: {shadow}")
     return got_shadow, shadow
@@ -86,7 +86,7 @@ def _check_permissions(dummy):  # TODO: implement me
 
 
 def _check_item_exists(config, item_id):
-    return config.db.get_item(item_id)
+    return config.db_ro.get_item(item_id)
 
 
 def _save_shadow(config, client_node_id, item_id, shadow, n_rev, m_rev, crc):
@@ -100,7 +100,7 @@ def _enqueue_patches(config, client_node_id, item_id, patches, n_rev, m_rev, crc
 def _check_patch_done(config, timeout, client_node_id, item_id, n_rev, m_rev):
     # wait a bit for the patching of server text
     while True:
-        patch_done = config.db.check_if_patch_done(client_node_id, item_id, n_rev, m_rev)
+        patch_done = config.db_ro.check_if_patch_done(client_node_id, item_id, n_rev, m_rev)
         if patch_done:
             break
         else:
@@ -129,14 +129,14 @@ def _enqueue_post_text(config, item_id, new_text):
 
 
 def _get_enqueue_post_text_status(config, queue_rowid):
-    return config.db.get_post_status(queue_rowid)
+    return config.db_ro.get_post_status(queue_rowid)
 
 
 def _new_item(config, item_id, new_text):
     log.debug(f"saving NEW item {item_id} with {new_text}")
     new_text_crc = get_crc(new_text)
     config.db.save_new_item(item_id, new_text, new_text_crc)  # save the new item
-    known_nodes = config.db.get_known_nodes()
+    known_nodes = config.db_ro.get_known_nodes()
     log.debug(f"known_nodes: {known_nodes}")
     for known_node in known_nodes:
         other_node_id = known_node["id"]
@@ -163,10 +163,10 @@ def _update_item(config, item_id, new_text):
     log.debug(f"saving item {item_id} with {new_text}")
     new_text_crc = get_crc(new_text)
     config.db.update_item(item_id, new_text, new_text_crc)
-    for known_node in config.db.get_known_nodes():
+    for known_node in config.db_ro.get_known_nodes():
         other_node_id = known_node["id"]
 
-        n_rev, m_rev, old_shadow = config.db.get_latest_rev_shadow(other_node_id, item_id)
+        n_rev, m_rev, old_shadow = config.db_ro.get_latest_rev_shadow(other_node_id, item_id)
 
         log.debug(f"latest revs for that item in {other_node_id} are {n_rev} - {m_rev}")
         log.debug(f"creating diffs")
@@ -211,7 +211,7 @@ def _receive_sync_post(item_id, client_node_id):
         config.db.start_transaction("_post_sync")
 
         log.debug(f"checking revs for {item_id} from node: {client_node_id}")
-        saved_n_rev, saved_m_rev = config.db.get_latest_revs(item_id, client_node_id)
+        saved_n_rev, saved_m_rev = config.db_ro.get_latest_revs(item_id, client_node_id)
 
         if not saved_n_rev and not saved_m_rev:
             item_exists, item_text, item_crc = _check_item_exists(config, item_id)
@@ -231,7 +231,7 @@ def _receive_sync_post(item_id, client_node_id):
         if n_rev != saved_n_rev:
             if n_rev < saved_n_rev:
                 log.warning(f"n_rev DOESN'T match: {n_rev} < {saved_n_rev}")
-                if config.db.find_rev_shadow(client_node_id, item_id, n_rev, m_rev, hash_):
+                if config.db_ro.find_rev_shadow(client_node_id, item_id, n_rev, m_rev, hash_):
                     # lost return packet
                     # FIXME: we should delete local edits at this point
                     # copy backup shadow to shadow (in our code that means deleting shadows with a higher than n_rev)
@@ -334,7 +334,7 @@ def _receive_item_get(item_id):
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_text/403/check_permissions", "you have no permissions for that")
 
-        item_ok, item_text, item_crc = config.db.get_item(item_id)
+        item_ok, item_text, item_crc = config.db_ro.get_item(item_id)
 
         if not item_ok:
             return resp("queue_in/get_text/404/not_item", "Item not found")
@@ -462,7 +462,7 @@ def _receive_items_get():
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_items/403/check_permissions", "you have no permissions for that")
 
-        items = config.db.get_items()
+        items = config.db_ro.get_items()
         if not items:
             return resp("queue_in/get_items/404/not_items", "No items")
 
@@ -484,7 +484,7 @@ def _receive_nodes_get():
         if not _check_permissions("to do"):  # TODO: implement me
             return resp("queue_in/get_nodes/403/check_permissions", "you have no permissions for that")
 
-        nodes = config.db.get_known_nodes()
+        nodes = config.db_ro.get_known_nodes()
         if not nodes:
             return resp("queue_in/get_nodes/404/not_items", "No nodes")
 
