@@ -5,11 +5,11 @@ Travis-CI [![Build Status](https://travis-ci.org/dsantelmo/abrim.svg?branch=mast
 
 ### Firefox info
 
-Firefox won't let you connect to some local port (as 6000) so you have to modify its configuration:
+Firefox won't let you connect to some local port (as 5000) so you have to modify its configuration:
 http://about:config
 Right click -> New -> String
 `network.security.ports.banned.override`
-`6000`
+`5000`
 
 
 ## REST API Usage examples
@@ -17,7 +17,7 @@ Right click -> New -> String
 ### Run one node
     export PYTHONPATH=./:$PYTHONPATH
     set PYTHONPATH=%PYTHONPATH%;%cd%
-    py abrim/input.py -i node_1 -p 5000
+    py node.py -i node_1 -p 5000
 
 ### List items
     curl -X GET http://localhost:5001/items -H "Authorization: Basic YWRtaW46c2VjcmV0" -H "content-type: application/json"
